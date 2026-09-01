@@ -44,3 +44,9 @@ neo/.vscode/
 neo/cmake-build-*/
 neo/bin/
 /tools/
+!/tools/
+/tools/*
+!/tools/neural-rendering/
+!/tools/neural-rendering/**
+/docs/neural-rendering/LAST_CONFIGURE.txt
+/docs/neural-rendering/LAST_BUILD.txt

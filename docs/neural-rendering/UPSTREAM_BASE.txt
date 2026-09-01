@@ -1,0 +1,10 @@
+Recorded: 2026-08-31
+Repository: https://github.com/RobertBeckebans/RBDOOM-3-BFG.git
+Commit: ea29c006e84fedcc0e7c173c383a087ce0a8c0d5
+Feature branch: feature/neural-rendering-spike
+
+Submodules:
+neo/extern/nvrhi dafbd407f6fb8b91078da72ca1712dbbd6ac2496
+neo/extern/ShaderMake 13867771f6142f35690a5e2103c1e1efdd90cb0e
+neo/extern/nvrhi/rtxmu 0c9ce1177000d5923e2cc6a35ae9cb7ff03748d2
+neo/extern/nvrhi/thirdparty/Vulkan-Headers 39f924b810e561fd86b2558b6711ca68d4363f68
