@@ -95,7 +95,7 @@ backend closes/submits NVRHI command list -> Present
 - `neo/renderer/RenderSystem.cpp:idRenderSystemLocal::RenderCommandBuffers` hands command buffers to `idRenderBackend::ExecuteBackEndCommands`.
 - `neo/renderer/RenderBackend.cpp:idRenderBackend::ExecuteBackEndCommands` starts the frame, iterates 3D, GUI, copy, and post-process commands in order, then ends the frame.
 - `neo/renderer/RenderBackend.cpp:idRenderBackend::DrawViewInternal` binds `_hdr` for a 3D view or `_ldr` for ordinary 2D. The observed 3D order is depth prepass, Hi-Z, geometry buffer, SSAO, ambient/static light, shadow atlas, light interactions, generic/emissive surfaces, fog/blend lights, screen-warp post surfaces, debug tools, motion vectors, TAA, tone mapping to `_ldr`, then swapchain blit.
-- An ordinary GUI command subsequently binds `_ldr`, draws 2D surfaces into it, and blits the updated image to the swapchain. Therefore `_ldr` immediately after the 3D tone-map call is the strongest existing post-tonemap HUD-free candidate, but it is mutated later by GUI rendering and must be captured or copied at that boundary.
+- An ordinary GUI command subsequently binds `_ldr`, draws 2D surfaces into it, and blits the updated image to the swapchain. RenderDoc additionally confirms a scene post-processing region between the first scene blit and GUI. Therefore the strongest final-LDR HUD-free boundary is after scene post-processing and immediately before the GUI `Standard Shader Stage`; `_ldr` is mutated by GUI rendering after that boundary and must be captured or copied there.
 - The first-person weapon is part of the 3D scene before TAA/tone mapping. `neo/d3xp/Weapon.cpp` sets `renderEntity.weaponDepthHack`; `neo/renderer/tr_frontend_addmodels.cpp` propagates it to `viewEntity_t` and applies the depth hack to its MVP.
 
 ### Command submission and present
@@ -112,8 +112,8 @@ All listed images use `renderSystem->GetWidth()/GetHeight()` unless noted. They 
 | Semantic | Image / creation site | NVRHI format and samples | Producer / consumer | Finding |
 |---|---|---|---|---|
 | Scene color | `_currentRenderHDR`; `neo/renderer/Image_intrinsic.cpp:R_HDR_RGBA16FImage_ResNative_Multisampled` | `RGBA16_FLOAT`; current MSAA sample count; UAV only at 1x | Main 3D scene -> motion mask, TAA or tone map | Best pre-tonemap linear/HDR candidate. Alpha is repurposed as a TAA exclusion mask late in the frame. |
-| Post-tonemap color | `_currentRenderLDR` / `ldrImage`; `R_LdrNativeImage` | `RGBA8_UNORM`, 1x | Tone map -> swapchain; later GUI draws mutate it | Best post-tonemap HUD-free boundary is immediately after 3D tone mapping and before `RC_DRAW_VIEW_GUI`. |
-| Depth/stencil | `_currentDepth`; `R_DepthImage` | Normally `D24S8` because NVRHI D24S8 support defaults enabled; otherwise `D32S8`; current MSAA count | Depth prepass -> lighting, Hi-Z, motion reconstruction, GUI depth/stencil | Conventional Z: cleared to 1.0 and opaque depth uses `LessOrEqual`. Projection/window Z is `[0,1]`, with near near 0 and far approaching 0.999. |
+| Post-tonemap color | `_currentRenderLDR` / `ldrImage`; `R_LdrNativeImage` | Capture: `R8G8B8A8_UNORM`, 1280x720, 1x | Tone map -> scene post-processing -> GUI -> final blits | Best final-LDR HUD-free boundary is after scene post-processing and before the GUI `Standard Shader Stage`. |
+| Depth/stencil | `_currentDepth`; `R_DepthImage` | Capture: `D24_UNORM_S8_UINT`, 1280x720, 1x | Depth prepass -> Hi-Z/SSAO, lighting, motion reconstruction, tone map/post, GUI | Conventional Z: cleared to 1.0 and opaque depth uses `LessOrEqual`. Projection/window Z is `[0,1]`, with near near 0 and far approaching 0.999. |
 | Motion vectors | `_taaMotionVectors`; `R_HDR_RG16FImage_ResNative` | `RG16_FLOAT`, 1x | `DrawMotionVectors` -> TAA compute | Camera-only current-to-previous displacement in **pixels**. No object/skinned velocity. |
 | TAA resolved | `_taaResolved` | `RGBA16_FLOAT`, 1x, UAV | TAA compute -> tone map | Current resolved HDR output. |
 | TAA history | `_taaFeedback1`, `_taaFeedback2` | `RGBA16_FLOAT`, 1x, UAV | TAA ping-pong | Swapped every backend frame by `TemporalAntiAliasingPass::AdvanceFrame`. |
@@ -138,6 +138,8 @@ The swapchain format defaults to `RGBA8_UNORM` in `neo/sys/DeviceManager.h`; no 
 - Convention: RG pixels, current -> previous; screen X right positive, screen Y down positive after the shader's NDC-to-texture Y flip.
 - The pass draws a fullscreen vector field derived from depth and camera matrices only. It stores no prior `viewEntity_t::modelMatrix`/MVP and no prior MD5 joint buffer, so moving rigid objects and animated/skinned geometry receive incorrect background/camera reprojection.
 - Weapon-depth-hack, `skipMotionBlur`, and subview surfaces are written as alpha zero in scene HDR and rejected by the motion-vector shader. Translucent members of that exclusion group are skipped, leaving transparency behavior incomplete.
+- RenderDoc stationary frame 1487 showed only `_taaMotionVectors` clear -> barrier -> TAA read and a zero field, matching the `cameraMoved == false` path.
+- RenderDoc forward-motion frame 1469 showed a nonzero signed field at `-8..8`: left-side X was positive, right-side X negative, upper Y positive, and lower Y negative. The field converged toward the vanishing point, confirming the shader-derived current-pixel -> previous-pixel sign convention. Weapon/character silhouettes also made the current exclusion behavior visible.
 
 ### History and reset state
 
@@ -171,9 +173,18 @@ The swapchain format defaults to `RGBA8_UNORM` in `neo/sys/DeviceManager.h`; no 
 - RenderDoc 1.46 was installed locally through the verified Winget package after the baseline run. It is a system diagnostic tool only and is not copied into or tracked by the repository.
 - Nsight Graphics was not installed. NVIDIA documents current Nsight Graphics support for RTX 50-series and D3D12, so it remains a fallback for driver-specific debugging/profiling.
 
+### RenderDoc baseline evidence
+
+- The first F12 capture was intentionally retained as failed evidence: the key also invoked RBDOOM's screenshot path, producing a valid container with only buffer unmaps and `Present`.
+- Using Print Screen avoided the conflict and produced complete captures with RenderDoc reporting no replay problems.
+- Stationary frame 1487: ignored local file `captures/neural/renderdoc-baseline-pass2/baseline_frame1487.rdc`, 430,744,078 bytes, SHA-256 `4BE1C051078CBB08C974F622566C864894EC32DC452CC0263C6AB714CC3614B4`.
+- Forward-motion frame 1469: ignored local file `captures/neural/renderdoc-motion/lateral_frame1469.rdc`, 435,818,501 bytes, SHA-256 `D734ADF641C71EABC1499D1224372040048EC8AE001BA70A0CA1AB3BBB397BA8` (the directory name predates the user's choice to move forward rather than laterally).
+- Frame 1487 event order: `Render_MotionVectors` EID 8074-8080; `Render_TemporalAA` 8085-8092; `Render_ToneMapPass` 8097-8126; first swapchain blit 8130-8142; `Render_PostProcessing` 8146-8180; `Render_DrawViewGUI` 8185-8308.
+- Captured resources: `_currentRenderHDR` is 1280x720 `R16G16B16A16_FLOAT`; `_currentDepth` is single-sample `D24_UNORM_S8_UINT`; `_currentRenderLDR` is single-sample `R8G8B8A8_UNORM`; `_taaMotionVectors` is single-sample `R16G16_FLOAT`. `_taaFeedback1`, `_taaFeedback2`, and `_taaResolved` are present and active in the TAA sequence.
+
 ## Candidate insertion points
 
-1. **HUD-free LDR diagnostic/copy:** immediately after `TonemapPass::SimpleRender` in `idRenderBackend::DrawViewInternal`, before the first 3D swapchain blit and before subsequent `RC_DRAW_VIEW_GUI` commands mutate `_ldr`.
+1. **HUD-free LDR diagnostic/copy:** at the backend command boundary after scene `Render_PostProcessing` completes and before `Render_DrawViewGUI` begins. A simpler earlier diagnostic immediately after `TonemapPass::SimpleRender` is still useful, but it omits scene post-processing observed in the final LDR path.
 2. **Pre-tonemap temporal evaluate point:** after `DrawMotionVectors` and before/at `TemporalAAPass`, using `_currentRenderHDR`, `_currentDepth`, `_taaMotionVectors`, unjittered/jitter data, reset state, and future masks. This is only a candidate until inputs are validated.
 3. **Native D3D12 call boundary:** inside the already-open backend NVRHI command list at the chosen evaluate point, below an engine-facing neutral interface and behind an OFF-by-default build option.
 4. **History reset hook:** a renderer API/event consumed at the start of the main 3D view, with producers at proven game/map/camera/resolution discontinuities.
@@ -186,13 +197,13 @@ The swapchain format defaults to `RGBA8_UNORM` in `neo/sys/DeviceManager.h`; no 
 4. Translucency, smoke, muzzle flashes, glass, emissive animation, and subviews lack an explicit reactive/transparency mask contract.
 5. The GPU exposure buffer does not yet expose a verified CPU/API value, and `r_hdrAutoExposure` behavior conflicts with the active tone-map path.
 6. `_ldr` is HUD-free only at a moment in the command stream, not as a durable separate texture.
-7. MSAA depth/HDR resources need explicit resolve policy for any SDK input; the baseline TAA mode is expected to be 1x but must be confirmed in a RenderDoc capture.
+7. MSAA depth/HDR resources need explicit resolve policy for any SDK input; this captured TAA baseline is confirmed single-sample.
 8. Debug-runtime DLL dependencies make `RelWithDebInfo` unsuitable for distribution without a separate packaging decision.
 9. No Streamline/DLSS SDK version, public API contract, redistribution license, or dependency mechanism has been selected. External feeder/RenoDX remains manual local validation only.
 
 ## Recommended next narrow code task
 
-Implement an OFF-by-default **diagnostic output-separation scaffold** that can preserve or capture the post-tonemap `_ldr` image immediately after the 3D view and before GUI rendering. It should:
+Implement an OFF-by-default **diagnostic output-separation scaffold** that can preserve or capture `_ldr` after scene post-processing and before GUI rendering. It should:
 
 - add one renderer cvar/debug mode following existing patterns;
 - use NVRHI resources and markers;
@@ -201,4 +212,4 @@ Implement an OFF-by-default **diagnostic output-separation scaffold** that can p
 - record format, dimensions, resource states, and command ordering;
 - avoid SDK/vendor code.
 
-Before making that code change, capture one baseline frame from the saved scene with RenderDoc and record `_currentRenderHDR`, `_currentDepth`, `_taaMotionVectors`, `_taaResolved`, `_currentRenderLDR`, the two GUI/3D draw-view regions, and the active AA/MSAA cvars. That capture is the Phase 2 exit evidence and the Phase 3 input.
+The stationary and forward-motion RenderDoc captures above satisfy the Phase 2 capture gate. TAA execution and single-sample resources are proven; a console cvar dump remains useful metadata but no longer blocks the narrow Phase 3 diagnostic task.

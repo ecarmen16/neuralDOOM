@@ -12,8 +12,8 @@ Statuses: `BLOCKED`, `READY`, `IN PROGRESS`, `VERIFY`, `DONE`, `DEFERRED`.
 | ND3-003 | DONE | Compile unmodified `RelWithDebInfo` | Successful build; `LAST_BUILD.txt`; staged executable hash recorded |
 | ND3-004 | DONE | Launch baseline with local BFG data | User verified DX12/new game and created a save; clean exit |
 | ND3-010 | DONE | Renderer reconnaissance | `RECON_REPORT.md` with exact paths/symbols |
-| ND3-011 | VERIFY | Select reproducible test save/scene | Save exists; exact map/position and test route still need recording |
-| ND3-012 | READY | Capture baseline GPU frame | RenderDoc 1.46 installed; capture saved scene next |
+| ND3-011 | DONE | Select reproducible test save/scene | User save resumed in Mars City Hangar; stationary and forward-motion captures recorded |
+| ND3-012 | DONE | Capture baseline GPU frame | Full stationary and moving RenderDoc captures; formats/order recorded in `RECON_REPORT.md` |
 
 ## Proof-of-concept track
 
@@ -28,8 +28,8 @@ Statuses: `BLOCKED`, `READY`, `IN PROGRESS`, `VERIFY`, `DONE`, `DEFERRED`.
 
 | ID | Status | Task | Exit evidence |
 |---|---|---|---|
-| ND3-200 | BLOCKED | Add renderer debug/capture cvar scaffold | Requires ND3-012 capture; disabled path unchanged |
-| ND3-210 | BLOCKED | Expose HUD-free scene color | Candidate boundary found; requires ND3-012 capture |
+| ND3-200 | READY | Add renderer debug/capture cvar scaffold | Recon/capture gates passed; disabled path must remain unchanged |
+| ND3-210 | READY | Expose HUD-free scene color | Boundary proven after scene post-processing and before GUI |
 | ND3-220 | BLOCKED | Add camera/static velocity | Debug vector tests T01–T03 |
 | ND3-230 | BLOCKED | Add rigid-object velocity | Tests T04–T05 |
 | ND3-240 | BLOCKED | Add MD5/skinned velocity | Tests T06–T07 |

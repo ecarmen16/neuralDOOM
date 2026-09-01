@@ -54,18 +54,20 @@ Append dated entries. Do not replace prior evidence.
 - Build: pass; 749 DXIL shader jobs plus the engine executable.
 - Executable: 24,732,160 bytes; SHA-256 `8EEF627AA8B7BEDA5E89FFD2410C3E94B549530CC01F45484FCEB7D46946F2BA`.
 - Runtime: user visually confirmed DX12, started a new game, observed correct rendering, and created a resumable save; process then exited cleanly.
-- RenderDoc 1.46 installed locally after the baseline run for the next capture task.
+- RenderDoc 1.46 installed locally. Complete stationary and forward-motion DX12 frames were captured from the saved Mars City Hangar scene.
+- Capture verified HDR `R16G16B16A16_FLOAT`, depth `D24_UNORM_S8_UINT`, LDR `R8G8B8A8_UNORM`, and motion `R16G16_FLOAT` at 1280x720 and 1x sampling where applicable.
+- Signed forward-motion visualization confirmed current-to-previous vectors converging toward the vanishing point. Static capture correctly left the motion target cleared to zero.
+- Event ordering confirmed scene post-processing completes before the GUI standard-shader stage mutates `_currentRenderLDR`.
 
 ### Known issues
 
-- A repeatable save exists, but exact map/position and console cvar dump have not yet been recorded.
-- No GPU frame capture has yet been made.
+- A repeatable Mars City Hangar save and capture position exist; a full console cvar dump has not yet been recorded.
 - `RelWithDebInfo` links debug Visual C++ runtime DLLs and is not a redistribution build.
 - Runtime validation did not yet cover the full static/motion/transparency/camera-cut matrix.
 
 ### Next narrow task
 
-- Launch the saved scene through RenderDoc, enable named render markers, capture one representative DX12 frame, and verify the resource/pass findings in `RECON_REPORT.md` before changing renderer code.
+- Implement and validate an OFF-by-default diagnostic output-separation scaffold after scene post-processing and before GUI rendering; keep the disabled path pixel-equivalent.
 
 ## 2026-08-30 — Starter prepared
 
