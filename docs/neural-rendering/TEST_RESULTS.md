@@ -1,5 +1,40 @@
 # Test results
 
+## 2026-09-01 / 99b03cf5 + ND3-260 worktree / reactive and transparency masks
+
+- Tester/machine label: local Windows development machine; runtime visually checked by user.
+- Branch and base commit: `feature/neural-rendering-spike`, `99b03cf5`.
+- Build configuration: `RelWithDebInfo`, VS2022 x64, DX12 only.
+- GPU and driver: NVIDIA GeForce RTX 5090, 610.47.
+- Scene/save/map: `game/mars_city2`, pistol combat with a demon worker, smoke, muzzle effects, animated screens, and mixed world materials.
+- Relevant cvars: `r_neuralDebug 3` (reactive red), `r_neuralDebug 4` (transparency cyan); feature-off smoke used `r_neuralDebug 0` and `r_neuralTemporalMasks 0`.
+
+| Test | Result | Evidence | Notes |
+|---|---|---|---|
+| Configure and build | PASS | configure/build output; staged executable | 768 DXIL tasks; C++ linked; SHA-256 `0C5F0FF4274C60AFAD213F0C254FCD215615D9F9BF14051CB8AF8AF449228294`. |
+| T09 reactive combat effects | PASS | user manual combat observation | Red diagnostic identified muzzle/exhaust, smoke, animated screens, and other unstable work. Texture-aware sampling removed the original white particle-proxy rectangle. |
+| T10 alpha/translucent coverage | PASS after correction | user manual observation and local RenderDoc captures | Cyan diagnostic initially classified broad floor/world additive and emissive stages. Restricting it to alpha/premultiplied-alpha/glass composition produced localized transparency coverage accepted by the user. |
+| T11 in-world GUI/dynamic stage | PASS | user manual observation and material classification | Dynamic screens remain reactive; GUI/subview fallback uses geometry coverage when no sampleable ambient stage exists. |
+| T12 overlap/coverage behavior | PASS | combat motion and smoke observation | Maximum blending preserves strongest sampled coverage without accumulating faint overlapping particles toward opaque white. |
+| T13 UI separation and feature-off | PASS | diagnostic behavior plus automated startup smoke | Diagnostics intentionally overwrite GUI/console; normal mode leaves HUD/console intact. Disabled process stayed alive for ten seconds and closed normally. |
+| GPU capture inspection | PASS / classifier correction | local `transparency_frame2422.rdc`, `transparency_frame2548.rdc`, `transparency_frame2742.rdc` | Per-material markers and combat captures distinguished additive/emissive reactive stages from true alpha-composed transparency. Captures are intentionally untracked. |
+
+### Performance
+
+- Baseline and enabled frame time: not measured.
+- Disabled mode performs no mask clear or classification draw, although both native-resolution `R8` resources remain allocated.
+- Enabled mode scans visible material stages and redraws classified geometry into two single-channel targets; performance tuning is deferred until the inputs have a consumer.
+
+### Regressions and limits
+
+- None observed in the final combat diagnostics or disabled-path startup smoke.
+- Classification remains heuristic; cubemap texgens and unusual custom blends may require later targeted handling.
+- The masks are generated but not yet wired into TAA or a vendor backend.
+
+### Conclusion
+
+ND3-260 and combined T09-T13 pass. D-008 records the independent reactive/transparency contract, and ND3-270 history-reset lifecycle is now `READY`.
+
 ## 2026-09-01 / 442c0427 + ND3-250 worktree / viewmodel motion vectors
 
 - Tester/machine label: local Windows development machine; runtime visually checked by user.

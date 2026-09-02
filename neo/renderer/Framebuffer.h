@@ -146,6 +146,8 @@ struct globalFramebuffers_t
 	Framebuffer*				ldrFBO;
 	Framebuffer*				postProcFBO; // HDR16 used by 3D effects like heatHaze
 	Framebuffer*				taaMotionVectorsFBO;
+	Framebuffer*				neuralReactiveMaskFBO;
+	Framebuffer*				neuralTransparencyMaskFBO;
 	Framebuffer*				taaResolvedFBO;
 	Framebuffer*				envprobeFBO;
 	Framebuffer*				bloomRenderFBO[MAX_BLOOM_BUFFERS];

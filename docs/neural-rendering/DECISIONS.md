@@ -56,12 +56,19 @@
 
 **Consequence:** `r_neuralViewmodelMotionVectors` independently enables viewmodel vectors and is not forced by `r_neuralDebug`. Current and previous viewmodel projections receive the same depth hack used by scene rasterization. Existing motion-blur alpha rejection is unchanged. Reactive handling for muzzle flashes and unstable weapon effects remains a separate mask task.
 
+## D-008 - Keep reactive and transparency classification independent
+
+**Status:** Accepted for the engine temporal-input path; generation is OFF by default.
+
+**Reasoning:** Combat captures proved that treating every nonopaque blend as transparency marks large additive and emissive portions of the world, destroying the mask's usefulness for temporal reconstruction. Those stages are unstable and belong in the broader reactive signal, while transparency is limited to conventional alpha composition, premultiplied-alpha composition, and nonopaque glass stages.
+
+**Consequence:** The renderer owns two native-resolution `R8` resources: `_neuralReactiveMask` and `_neuralTransparencyMask`. Reactive classification includes translucent, additive/emissive, dynamic/cinematic, GUI/subview, and decal-or-later material work. Transparency is the narrower alpha/glass subset. Both are geometry- and texture-aware, combine overlaps with maximum blending, and are not yet consumed by TAA or a vendor backend.
+
 ## Pending decisions
 
 - Exact linear/HDR scene-color stage used by the reconstruction backend.
 - Motion-vector format, units, sign, Y convention, and jitter treatment.
 - Previous-pose storage strategy for MD5 animation.
-- Reactive/transparency mask representation and material classification.
 - Official Streamline acquisition mechanism and source-tree layout.
 
 Resolve these only after `RECON_REPORT.md` and targeted captures provide evidence.

@@ -156,6 +156,16 @@ void Framebuffer::ResizeFramebuffers( bool reloadImages )
 			.addColorAttachment( globalImages->taaMotionVectorsImage->texture )
 			.setDepthAttachment( globalImages->currentDepthImage->texture ) );
 
+	globalFramebuffers.neuralReactiveMaskFBO = new Framebuffer( "_neuralReactiveMask",
+			nvrhi::FramebufferDesc()
+			.addColorAttachment( globalImages->neuralReactiveMaskImage->texture )
+			.setDepthAttachment( globalImages->currentDepthImage->texture ) );
+
+	globalFramebuffers.neuralTransparencyMaskFBO = new Framebuffer( "_neuralTransparencyMask",
+			nvrhi::FramebufferDesc()
+			.addColorAttachment( globalImages->neuralTransparencyMaskImage->texture )
+			.setDepthAttachment( globalImages->currentDepthImage->texture ) );
+
 	globalFramebuffers.taaResolvedFBO = new Framebuffer( "_taaResolved",
 			nvrhi::FramebufferDesc()
 			.addColorAttachment( globalImages->taaResolvedImage->texture ) );
@@ -233,6 +243,8 @@ void Framebuffer::ReloadImages()
 	globalImages->hierarchicalZbufferImage->Reload( false, backEnd.commandList );
 	globalImages->gbufferNormalsRoughnessImage->Reload( false, backEnd.commandList );
 	globalImages->taaMotionVectorsImage->Reload( false, backEnd.commandList );
+	globalImages->neuralReactiveMaskImage->Reload( false, backEnd.commandList );
+	globalImages->neuralTransparencyMaskImage->Reload( false, backEnd.commandList );
 	globalImages->taaFeedback1Image->Reload( false, backEnd.commandList );
 	globalImages->taaFeedback2Image->Reload( false, backEnd.commandList );
 	globalImages->taaResolvedImage->Reload( false, backEnd.commandList );

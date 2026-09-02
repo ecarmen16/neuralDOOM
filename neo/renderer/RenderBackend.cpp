@@ -48,10 +48,11 @@ extern DeviceManager* deviceManager;
 
 idCVar r_drawEyeColor( "r_drawEyeColor", "0", CVAR_RENDERER | CVAR_BOOL, "Draw a colored box, red = left eye, blue = right eye, grey = non-stereo" );
 idCVar r_motionBlur( "r_motionBlur", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "1 - 5, log2 of the number of motion blur samples" );
-idCVar r_neuralDebug( "r_neuralDebug", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_NEW, "neural renderer diagnostic output: 0 = disabled, 1 = HUD-free post-processed LDR, 2 = signed motion vectors", 0, 2, idCmdSystem::ArgCompletion_Integer<0, 2> );
+idCVar r_neuralDebug( "r_neuralDebug", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_NEW, "neural renderer diagnostic output: 0 = disabled, 1 = HUD-free post-processed LDR, 2 = signed motion vectors, 3 = reactive mask, 4 = transparency mask", 0, 4, idCmdSystem::ArgCompletion_Integer<0, 4> );
 idCVar r_neuralRigidMotionVectors( "r_neuralRigidMotionVectors", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "generate rigid-object motion vectors; forced on by r_neuralDebug 2" );
 idCVar r_neuralSkinnedMotionVectors( "r_neuralSkinnedMotionVectors", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "generate skinned-object motion vectors; forced on by r_neuralDebug 2" );
 idCVar r_neuralViewmodelMotionVectors( "r_neuralViewmodelMotionVectors", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "include first-person viewmodel motion vectors; experimental and not forced by diagnostic modes" );
+idCVar r_neuralTemporalMasks( "r_neuralTemporalMasks", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "generate reactive and transparency masks; forced on by r_neuralDebug 3 or 4" );
 idCVar r_forceZPassStencilShadows( "r_forceZPassStencilShadows", "0", CVAR_RENDERER | CVAR_BOOL, "force Z-pass rendering for performance testing" );
 idCVar r_useStencilShadowPreload( "r_useStencilShadowPreload", "0", CVAR_RENDERER | CVAR_BOOL, "use stencil shadow preload algorithm instead of Z-fail" );
 idCVar r_skipShaderPasses( "r_skipShaderPasses", "0", CVAR_RENDERER | CVAR_BOOL, "" );
@@ -4858,6 +4859,171 @@ void idRenderBackend::FogAllLights()
 	renderLog.CloseMainBlock();
 }
 
+/*
+==================
+idRenderBackend::DrawTemporalMask
+
+Rasterizes texture-aware material coverage into one of the engine-owned temporal
+masks. Max blending preserves the strongest overlapping contribution without
+turning a stack of faint particles into an indiscriminate full-frame mask.
+==================
+*/
+void idRenderBackend::DrawTemporalMask( bool transparencyMask )
+{
+	Framebuffer* maskFramebuffer = transparencyMask ? globalFramebuffers.neuralTransparencyMaskFBO : globalFramebuffers.neuralReactiveMaskFBO;
+	idImage* maskImage = transparencyMask ? globalImages->neuralTransparencyMaskImage : globalImages->neuralReactiveMaskImage;
+
+	maskFramebuffer->Bind();
+	commandList->clearTextureFloat( maskImage->GetTextureHandle(), nvrhi::AllSubresources, nvrhi::Color( 0.f ) );
+
+	currentSpace = NULL;
+	for( int surfNum = 0; surfNum < viewDef->numDrawSurfs; surfNum++ )
+	{
+		const drawSurf_t* surf = viewDef->drawSurfs[surfNum];
+		const idMaterial* material = surf->material;
+		if( material == NULL || !material->IsDrawn() )
+		{
+			continue;
+		}
+
+		const bool translucent = material->Coverage() == MC_TRANSLUCENT;
+		const bool guiOrSubview = surf->space->isGuiSurface || material->HasGui() || material->HasSubview();
+		if( transparencyMask && !translucent )
+		{
+			continue;
+		}
+
+		if( surf->space != currentSpace )
+		{
+			RB_SetMVP( surf->space->mvp );
+			currentSpace = surf->space;
+		}
+
+		bool drewStage = false;
+		const float* regs = surf->shaderRegisters;
+		for( int stageNum = 0; stageNum < material->GetNumStages(); stageNum++ )
+		{
+			const shaderStage_t* stage = material->GetStage( stageNum );
+			if( stage->lighting != SL_AMBIENT || regs[stage->conditionRegister] == 0.0f )
+			{
+				continue;
+			}
+
+			const uint64 blendBits = stage->drawStateBits & ( GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS );
+			const bool nonOpaqueBlend = blendBits != ( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
+			const bool dynamicStage = stage->texture.cinematic != NULL || stage->texture.dynamic != DI_STATIC;
+			const bool reactiveStage = translucent || guiOrSubview || dynamicStage || nonOpaqueBlend || material->GetSort() >= SS_DECAL;
+			if( !transparencyMask && !reactiveStage )
+			{
+				continue;
+			}
+			const uint64 alphaBlend = GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA;
+			const uint64 premultipliedAlphaBlend = GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA;
+			const bool alphaComposed = blendBits == alphaBlend || blendBits == premultipliedAlphaBlend;
+			const bool glassComposed = material->GetSurfaceType() == SURFTYPE_GLASS && nonOpaqueBlend;
+			if( transparencyMask && !alphaComposed && !glassComposed )
+			{
+				continue;
+			}
+			if( stage->texture.texgen == TG_DIFFUSE_CUBE || stage->texture.texgen == TG_REFLECT_CUBE ||
+				stage->texture.texgen == TG_REFLECT_CUBE2 || stage->texture.texgen == TG_SKYBOX_CUBE ||
+				stage->texture.texgen == TG_WOBBLESKY_CUBE )
+			{
+				continue;
+			}
+
+			const bool useRgbCoverage = !alphaComposed;
+			float stageRgb = regs[stage->color.registers[0]];
+			stageRgb = regs[stage->color.registers[1]] > stageRgb ? regs[stage->color.registers[1]] : stageRgb;
+			stageRgb = regs[stage->color.registers[2]] > stageRgb ? regs[stage->color.registers[2]] : stageRgb;
+			const float stageAlpha = regs[stage->color.registers[3]];
+			const float stageWeight = idMath::ClampFloat( 0.0f, 1.0f, useRgbCoverage ? stageRgb : stageAlpha );
+			if( stageWeight <= 0.0f )
+			{
+				continue;
+			}
+			GL_Color( useRgbCoverage ? 1.0f : 0.0f, stageWeight, 0.0f, 0.0f );
+			RB_SetVertexColorParms( SVC_IGNORE );
+
+			GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE | GLS_BLENDOP_MAX | GLS_DEPTHMASK |
+				( translucent ? GLS_DEPTHFUNC_LESS : GLS_DEPTHFUNC_EQUAL ) | GLS_CULL_TWOSIDED );
+
+			GL_SelectTexture( 0 );
+			BindVariableStageImage( &stage->texture, regs, commandList );
+			PrepareStageTexturing( stage, surf );
+
+			// Bind after resolving dynamic/cinematic images because that path can select
+			// its normal presentation shader as a side effect.
+			if( surf->jointCache )
+			{
+				renderProgManager.BindShader_NeuralMaskSkinned();
+			}
+			else
+			{
+				renderProgManager.BindShader_NeuralMask();
+			}
+
+			renderLog.OpenBlock( material->GetName(), transparencyMask ? colorCyan : colorRed );
+			DrawElementsWithCounters( surf );
+			renderLog.CloseBlock();
+			FinishStageTexturing( stage, surf );
+			drewStage = true;
+		}
+
+		// In-world GUI/subview geometry may have no standard ambient stage that
+		// the mask shader can sample. Preserve its exact geometry coverage. Do not
+		// apply this fallback to particles: their proxy quads are too conservative.
+		if( !drewStage && !transparencyMask && guiOrSubview )
+		{
+			GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE | GLS_BLENDOP_MAX | GLS_DEPTHMASK |
+				GLS_DEPTHFUNC_EQUAL | GLS_CULL_TWOSIDED );
+			GL_Color( 1.0f, 1.0f, 0.0f, 0.0f );
+			GL_SelectTexture( 0 );
+			globalImages->whiteImage->Bind();
+			if( surf->jointCache )
+			{
+				renderProgManager.BindShader_NeuralMaskSkinned();
+			}
+			else
+			{
+				renderProgManager.BindShader_NeuralMask();
+			}
+			renderLog.OpenBlock( material->GetName(), colorRed );
+			DrawElementsWithCounters( surf );
+			renderLog.CloseBlock();
+		}
+	}
+
+	GL_Color( 1.0f, 1.0f, 1.0f );
+	GL_State( GLS_DEFAULT );
+	GL_SelectTexture( 0 );
+}
+
+/*
+==================
+idRenderBackend::DrawTemporalMasks
+==================
+*/
+void idRenderBackend::DrawTemporalMasks()
+{
+	const int debugMode = r_neuralDebug.GetInteger();
+	if( !r_neuralTemporalMasks.GetBool() && debugMode != 3 && debugMode != 4 )
+	{
+		return;
+	}
+
+	if( !viewDef->viewEntitys || viewDef->isSubview || ( viewDef->renderView.rdflags & ( RDF_NOAMBIENT | RDF_IRRADIANCE ) ) )
+	{
+		return;
+	}
+
+	OPTICK_GPU_EVENT( "Render_TemporalMasks" );
+	renderLog.OpenBlock( "Render_TemporalMasks", colorBlue );
+	DrawTemporalMask( false );
+	DrawTemporalMask( true );
+	renderLog.CloseBlock();
+}
+
 void idRenderBackend::DrawMotionVectors()
 {
 	if( !viewDef->viewEntitys )
@@ -5595,6 +5761,7 @@ void idRenderBackend::ExecuteBackEndCommands( const emptyCommand_t* cmds )
 	drawView3D = false;
 	bool neuralHudlessLDRCaptured = false;
 	bool neuralMotionVectorsAvailable = false;
+	int neuralMaskMode = 0;
 
 	for( ; cmds != NULL; cmds = ( const emptyCommand_t* )cmds->next )
 	{
@@ -5630,6 +5797,7 @@ void idRenderBackend::ExecuteBackEndCommands( const emptyCommand_t* cmds )
 				drawView3D = true;
 				DrawView( cmds, 0 );
 				neuralMotionVectorsAvailable = r_neuralDebug.GetInteger() == 2;
+				neuralMaskMode = ( r_neuralDebug.GetInteger() == 3 || r_neuralDebug.GetInteger() == 4 ) ? r_neuralDebug.GetInteger() : 0;
 				c_draw3d++;
 				break;
 
@@ -5696,6 +5864,20 @@ void idRenderBackend::ExecuteBackEndCommands( const emptyCommand_t* cmds )
 		blitParms.targetFramebuffer = deviceManager->GetCurrentFramebuffer();
 		blitParms.targetViewport = nvrhi::Viewport( renderSystem->GetNativeWidth(), renderSystem->GetNativeHeight() );
 		blitParms.sampler = BlitSampler::MotionVectors;
+		commonPasses.BlitTexture( commandList, blitParms, &bindingCache );
+
+		renderLog.CloseBlock();
+	}
+	else if( neuralMaskMode != 0 )
+	{
+		OPTICK_GPU_EVENT( "Neural_PresentTemporalMask" );
+		renderLog.OpenBlock( "Neural_PresentTemporalMask", colorBlue );
+
+		BlitParameters blitParms;
+		blitParms.sourceTexture = neuralMaskMode == 3 ? globalImages->neuralReactiveMaskImage->GetTextureHandle() : globalImages->neuralTransparencyMaskImage->GetTextureHandle();
+		blitParms.targetFramebuffer = deviceManager->GetCurrentFramebuffer();
+		blitParms.targetViewport = nvrhi::Viewport( renderSystem->GetNativeWidth(), renderSystem->GetNativeHeight() );
+		blitParms.sampler = neuralMaskMode == 3 ? BlitSampler::ReactiveMask : BlitSampler::TransparencyMask;
 		commonPasses.BlitTexture( commandList, blitParms, &bindingCache );
 
 		renderLog.CloseBlock();
@@ -6104,6 +6286,11 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 		DrawShaderPasses( drawSurfs + processed, numDrawSurfs - processed, 0.0f /* definitely not a gui */, stereoEye );
 		renderLog.CloseMainBlock();
 	}
+
+	//-------------------------------------------------
+	// classify unstable and translucent scene coverage before temporal resolve
+	//-------------------------------------------------
+	DrawTemporalMasks();
 
 	//-------------------------------------------------
 	// render debug tools

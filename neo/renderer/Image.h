@@ -605,6 +605,8 @@ public:
 	idImage*			ldrImage;						// tonemapped result which can be used for further post processing
 	idImage*			neuralHudlessLDRImage;			// post-processed LDR scene captured before overlay GUI rendering
 	idImage*			taaMotionVectorsImage;			// motion vectors for TAA projection
+	idImage*			neuralReactiveMaskImage;			// unstable scene pixels that should reduce temporal history reuse
+	idImage*			neuralTransparencyMaskImage;		// translucent scene coverage for temporal reconstruction
 	idImage*			taaResolvedImage;
 	idImage*			taaFeedback1Image;
 	idImage*			taaFeedback2Image;

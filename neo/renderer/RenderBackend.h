@@ -189,6 +189,8 @@ private:
 	void				ShadowAtlasPass( const viewDef_t* _viewDef );
 
 	void				DrawMotionVectors();
+	void				DrawTemporalMasks();
+	void				DrawTemporalMask( bool transparencyMask );
 	void				TemporalAAPass( const viewDef_t* _viewDef );
 
 	// RB: outdated HDR stuff

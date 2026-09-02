@@ -2,6 +2,54 @@
 
 Append dated entries. Do not replace prior evidence.
 
+## 2026-09-01 - Reactive and transparency classification masks
+
+### Repository state
+
+- Branch: `feature/neural-rendering-spike`.
+- Base checkpoint: `99b03cf5` (`renderer: add viewmodel motion vectors`).
+- Dirty before task: no.
+
+### Files and symbols
+
+- `neo/renderer/Image.h` and `Image_intrinsic.cpp` add `_neuralReactiveMask` and `_neuralTransparencyMask` as native-resolution `R8` images.
+- `neo/renderer/Framebuffer.h` and `NVRHI/Framebuffer_NVRHI.cpp` create and resize one depth-attached framebuffer for each mask.
+- `neo/renderer/RenderBackend.cpp:idRenderBackend::DrawTemporalMasks` conditionally generates both engine-owned resources before temporal resolve. `DrawTemporalMask` evaluates visible material stages, samples their actual coverage textures, and rasterizes rigid or GPU-skinned geometry.
+- `neo/renderer/RenderBackend.cpp:r_neuralTemporalMasks` controls generation and defaults to `0`. `r_neuralDebug 3` and `4` force generation and present reactive red or transparency cyan after GUI rendering.
+- `neo/renderer/RenderProgs.h/.cpp`, `neo/shaders/shaders.cfg`, and `neo/shaders/builtin/debug/neural_mask.*.hlsl` add rigid/skinned mask programs with existing texture-matrix and screen-texgen support.
+- `neo/renderer/Passes/CommonPasses.*` and `neo/shaders/builtin/debug/temporal_mask.ps.hlsl` add explicit diagnostic presentation permutations.
+
+### Data and classification contract
+
+- Both resources are full native resolution, single-channel `R8`, cleared to zero each generated view, depth-tested against `_currentDepth`, and accumulated with maximum blending.
+- Reactive coverage includes translucent materials, nonopaque blend stages (including additive/emissive), dynamic or cinematic stages, in-world GUI/subview geometry, and decal-or-later sorts.
+- Transparency is intentionally narrower: conventional source-alpha composition, premultiplied-alpha composition, or a nonopaque stage on a translucent glass material.
+- Alpha-composed stages use sampled alpha times evaluated stage alpha. Other reactive stages use sampled RGB intensity times the strongest evaluated stage RGB channel.
+- Standard stages use their sampled silhouette. Cubemap texgens are skipped. Only GUI/subview surfaces receive a solid-geometry fallback; particle proxy quads never do.
+- These resources are neutral engine inputs. No TAA, DLSS, Streamline, ReShade, or RenoDX dependency or consumption is introduced.
+
+### Validation
+
+- Configure: pass with the established VS2022 x64 DX12-only configuration.
+- Build: pass, `RelWithDebInfo`; ShaderMake completed 768 DXIL tasks and the engine linked and staged successfully.
+- Final staged executable: 24,756,736 bytes; SHA-256 `0C5F0FF4274C60AFAD213F0C254FCD215615D9F9BF14051CB8AF8AF449228294`.
+- Reactive diagnostic: user verified localized red coverage for combat instability including muzzle/exhaust, smoke, and animated screens, without the earlier full particle-proxy rectangle.
+- Transparency diagnostic: an initial broad cyan floor/world result was rejected. Three combat RenderDoc captures isolated additive/emissive material work; restricting the mask to alpha/premultiplied-alpha/glass composition removed that false coverage. User confirmed the corrected result: "nailed it."
+- Capture evidence remains local and untracked: `captures/neural/renderdoc-masks/transparency_frame2422.rdc`, `transparency_frame2548.rdc`, and `transparency_frame2742.rdc`.
+- Feature-off smoke: the staged DX12 process with `r_neuralDebug 0` and `r_neuralTemporalMasks 0` remained alive after ten seconds and closed normally.
+
+### Known limitations
+
+- Classification is a material heuristic, not an authored semantic tag. Unusual custom blend equations may need targeted rules when observed.
+- Cubemap/custom render-proc coverage is not sampled by the mask shader. The GUI/subview fallback preserves exact geometry only.
+- Two `R8` resources are allocated even while generation is disabled; the feature-off path performs no mask clears or draws.
+- Diagnostic presentation overwrites the final swapchain after GUI, so the console can be open but invisible in modes `3` and `4`.
+- Masks are not yet consumed by the existing TAA pass or any neutral/vendor interface.
+
+### Next narrow task
+
+- Implement one explicit history-reset lifecycle covering map loads, camera cuts/teleports, resolution changes, and large FOV discontinuities before exposing the temporal input bundle through a neutral backend interface.
+
 ## 2026-09-01 - First-person viewmodel motion policy
 
 ### Repository state

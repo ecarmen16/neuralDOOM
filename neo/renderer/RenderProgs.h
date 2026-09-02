@@ -453,6 +453,8 @@ enum
 	BUILTIN_DEBUG_LIGHTGRID_SKINNED,
 	BUILTIN_RIGID_MOTION_VECTORS,
 	BUILTIN_SKINNED_MOTION_VECTORS,
+	BUILTIN_NEURAL_MASK,
+	BUILTIN_NEURAL_MASK_SKINNED,
 
 	BUILTIN_DEBUG_OCTAHEDRON,
 	BUILTIN_DEBUG_OCTAHEDRON_SKINNED,
@@ -1112,6 +1114,16 @@ public:
 	void	BindShader_SkinnedMotionVectors()
 	{
 		BindShader_Builtin( BUILTIN_SKINNED_MOTION_VECTORS );
+	}
+
+	void	BindShader_NeuralMask()
+	{
+		BindShader_Builtin( BUILTIN_NEURAL_MASK );
+	}
+
+	void	BindShader_NeuralMaskSkinned()
+	{
+		BindShader_Builtin( BUILTIN_NEURAL_MASK_SKINNED );
 	}
 
 	void	BindShader_DebugShadowMap()

@@ -1303,6 +1303,7 @@ extern idCVar r_neuralDebug;
 extern idCVar r_neuralRigidMotionVectors;
 extern idCVar r_neuralSkinnedMotionVectors;
 extern idCVar r_neuralViewmodelMotionVectors;
+extern idCVar r_neuralTemporalMasks;
 
 extern idCVar r_useFilmicPostFX;
 extern idCVar r_useCRTPostFX;

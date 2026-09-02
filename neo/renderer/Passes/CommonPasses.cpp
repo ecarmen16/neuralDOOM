@@ -71,6 +71,14 @@ void CommonRenderPasses::Init( nvrhi::IDevice* device )
 	int motionVectorsIndex = renderProgManager.FindShader( "builtin/debug/motion_vectors", SHADER_STAGE_FRAGMENT, "", idList<shaderMacro_t>(), true, LAYOUT_DRAW_VERT );
 	m_MotionVectorsPS = renderProgManager.GetShader( motionVectorsIndex );
 
+	idList<shaderMacro_t> maskMacros;
+	maskMacros.Append( shaderMacro_t( "TRANSPARENCY_MASK", "0" ) );
+	int maskIndex = renderProgManager.FindShader( "builtin/debug/temporal_mask", SHADER_STAGE_FRAGMENT, "_reactive", maskMacros, true, LAYOUT_DRAW_VERT );
+	m_ReactiveMaskPS = renderProgManager.GetShader( maskIndex );
+	maskMacros[0].definition = "1";
+	maskIndex = renderProgManager.FindShader( "builtin/debug/temporal_mask", SHADER_STAGE_FRAGMENT, "_transparency", maskMacros, true, LAYOUT_DRAW_VERT );
+	m_TransparencyMaskPS = renderProgManager.GetShader( maskIndex );
+
 	auto samplerDesc = nvrhi::SamplerDesc()
 					   .setAllFilters( false )
 					   .setAllAddressModes( nvrhi::SamplerAddressMode::Clamp );
@@ -195,6 +203,8 @@ void CommonRenderPasses::Shutdown()
 	m_SharpenPS = nullptr;
 	m_SharpenArrayPS = nullptr;
 	m_MotionVectorsPS = nullptr;
+	m_ReactiveMaskPS = nullptr;
+	m_TransparencyMaskPS = nullptr;
 
 	m_BlackTexture = nullptr;
 	m_GrayTexture = nullptr;
@@ -256,6 +266,14 @@ void CommonRenderPasses::BlitTexture( nvrhi::ICommandList* commandList, const Bl
 		case BlitSampler::MotionVectors:
 			assert( !isTextureArray );
 			shader = m_MotionVectorsPS;
+			break;
+		case BlitSampler::ReactiveMask:
+			assert( !isTextureArray );
+			shader = m_ReactiveMaskPS;
+			break;
+		case BlitSampler::TransparencyMask:
+			assert( !isTextureArray );
+			shader = m_TransparencyMaskPS;
 			break;
 		default:
 			assert( false );
