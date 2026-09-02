@@ -255,9 +255,11 @@ void idRenderBackend::Init()
 	currentVertexBuffer = nullptr;
 	currentIndexBuffer = nullptr;
 	currentJointBuffer = nullptr;
+	currentPreviousJointBuffer = nullptr;
 	currentVertexOffset = 0;
 	currentIndexOffset = 0;
 	currentJointOffset = 0;
+	currentPreviousJointOffset = 0;
 	prevBindingLayoutType = -1;
 
 	deviceManager->GetDevice()->waitForIdle();
@@ -386,6 +388,8 @@ void idRenderBackend::DrawElementsWithCounters( const drawSurf_t* surf, bool sha
 	const vertCacheHandle_t jointHandle = surf->jointCache;
 	currentJointBuffer = nullptr;
 	currentJointOffset = 0;
+	currentPreviousJointBuffer = nullptr;
+	currentPreviousJointOffset = 0;
 
 #if 0
 	if( jointHandle )
@@ -432,6 +436,35 @@ void idRenderBackend::DrawElementsWithCounters( const drawSurf_t* surf, bool sha
 
 		currentJointBuffer = jointBuffer->GetAPIObject();
 		currentJointOffset = offset;
+	}
+
+	const vertCacheHandle_t previousJointHandle = jointHandle ? surf->space->previousJointCache : 0;
+	if( previousJointHandle )
+	{
+		const idUniformBuffer* previousJointBuffer = nullptr;
+		if( vertexCache.CacheIsStatic( previousJointHandle ) )
+		{
+			previousJointBuffer = &vertexCache.staticData.jointBuffer;
+		}
+		else
+		{
+			const uint64 frameNum = static_cast<uint64>( previousJointHandle >> VERTCACHE_FRAME_SHIFT ) & VERTCACHE_FRAME_MASK;
+			if( frameNum != ( ( vertexCache.currentFrame - 1 ) & VERTCACHE_FRAME_MASK ) )
+			{
+				idLib::Warning( "RB_DrawElementsWithCounters, previousJointBuffer == NULL" );
+				return;
+			}
+			previousJointBuffer = &vertexCache.frameData[vertexCache.drawListNum].jointBuffer;
+		}
+
+		const uint offset = static_cast<uint>( previousJointHandle >> VERTCACHE_OFFSET_SHIFT ) & VERTCACHE_OFFSET_MASK;
+		if( currentPreviousJointBuffer != previousJointBuffer->GetAPIObject() || currentPreviousJointOffset != offset )
+		{
+			changeState = true;
+		}
+
+		currentPreviousJointBuffer = previousJointBuffer->GetAPIObject();
+		currentPreviousJointOffset = offset;
 	}
 
 	//
@@ -599,6 +632,51 @@ void idRenderBackend::GetCurrentBindingLayout( int type )
 		else
 		{
 			desc[0].bindings[0] = uniformsBindingSetItem;
+		}
+
+		if( desc[1].bindings.empty() )
+		{
+			desc[1].bindings =
+			{
+				nvrhi::BindingSetItem::Texture_SRV( 0, ( nvrhi::ITexture* )GetImageAt( 0 )->GetTextureID() )
+			};
+		}
+		else
+		{
+			desc[1].bindings[0].resourceHandle = ( nvrhi::ITexture* )GetImageAt( 0 )->GetTextureID();
+		}
+
+		if( desc[2].bindings.empty() )
+		{
+			desc[2].bindings =
+			{
+				nvrhi::BindingSetItem::Sampler( 0, ( nvrhi::ISampler* )GetImageAt( 0 )->GetSampler( samplerCache ) )
+			};
+		}
+		else
+		{
+			desc[2].bindings[0].resourceHandle = ( nvrhi::ISampler* )GetImageAt( 0 )->GetSampler( samplerCache );
+		}
+	}
+	else if( type == BINDING_LAYOUT_MOTION_VECTORS_SKINNED )
+	{
+		if( desc[0].bindings.empty() )
+		{
+			desc[0].bindings =
+			{
+				uniformsBindingSetItem,
+				nvrhi::BindingSetItem::StructuredBuffer_SRV( 11, currentJointBuffer, nvrhi::Format::UNKNOWN, nvrhi::BufferRange( currentJointOffset, sizeof( idVec4 ) * numBoneMatrices ) ),
+				nvrhi::BindingSetItem::StructuredBuffer_SRV( 12, currentPreviousJointBuffer, nvrhi::Format::UNKNOWN, nvrhi::BufferRange( currentPreviousJointOffset, sizeof( idVec4 ) * numBoneMatrices ) )
+			};
+		}
+		else
+		{
+			auto& bindings = desc[0].bindings;
+			bindings[0] = uniformsBindingSetItem;
+			bindings[1].resourceHandle = currentJointBuffer;
+			bindings[1].range = nvrhi::BufferRange{ currentJointOffset, sizeof( idVec4 ) * numBoneMatrices };
+			bindings[2].resourceHandle = currentPreviousJointBuffer;
+			bindings[2].range = nvrhi::BufferRange{ currentPreviousJointOffset, sizeof( idVec4 ) * numBoneMatrices };
 		}
 
 		if( desc[1].bindings.empty() )
@@ -2367,8 +2445,11 @@ void idRenderBackend::ClearCaches()
 	currentVertexBuffer = nullptr;
 	currentIndexBuffer = nullptr;
 	currentJointBuffer = nullptr;
+	currentPreviousJointBuffer = nullptr;
 	currentIndexOffset = -1;
 	currentVertexOffset = -1;
+	currentJointOffset = 0;
+	currentPreviousJointOffset = 0;
 	currentBindingLayout = nullptr;
 	currentPipeline = nullptr;
 }

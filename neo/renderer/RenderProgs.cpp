@@ -111,6 +111,23 @@ nvrhi::BindingLayoutHandle idRenderProgManager::uniformsLayout( bindingLayoutTyp
 	}
 }
 
+nvrhi::BindingLayoutHandle idRenderProgManager::motionVectorsSkinningLayout( bindingLayoutType_t layoutType )
+{
+	auto rpLayoutItem = layoutTypeAttributes[layoutType].cbStatic ? nvrhi::BindingLayoutItem::ConstantBuffer( 0 ) : nvrhi::BindingLayoutItem::VolatileConstantBuffer( 0 );
+	if( layoutTypeAttributes[layoutType].pcEnabled )
+	{
+		rpLayoutItem = nvrhi::BindingLayoutItem::PushConstants( 0, layoutTypeAttributes[layoutType].rpBufSize );
+	}
+
+	auto layoutDesc = nvrhi::BindingLayoutDesc()
+		.setVisibility( nvrhi::ShaderType::All )
+		.addItem( rpLayoutItem )
+		.addItem( nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 11 ) )
+		.addItem( nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 12 ) );
+
+	return device->createBindingLayout( layoutDesc );
+}
+
 /*
 ================================================================================================
 idRenderProgManager::Init()
@@ -451,6 +468,7 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 
 	bindingLayouts[BINDING_LAYOUT_DEBUG] = { uniformsLayout( BINDING_LAYOUT_DEBUG, false ), defaultLayout, samplerOneBindingLayout };
 	bindingLayouts[BINDING_LAYOUT_DEBUG_SKINNED] = { uniformsLayout( BINDING_LAYOUT_DEBUG_SKINNED, true ), defaultLayout, samplerOneBindingLayout };
+	bindingLayouts[BINDING_LAYOUT_MOTION_VECTORS_SKINNED] = { motionVectorsSkinningLayout( BINDING_LAYOUT_MOTION_VECTORS_SKINNED ), defaultLayout, samplerOneBindingLayout };
 
 	bindingLayouts[BINDING_LAYOUT_POST_PROCESS] = { uniformsLayout( BINDING_LAYOUT_POST_PROCESS, false ), defaultLayout, samplerOneBindingLayout };
 
@@ -878,7 +896,8 @@ void idRenderProgManager::Init( nvrhi::IDevice* device )
 		// debug stuff
 		{ BUILTIN_DEBUG_LIGHTGRID, "builtin/debug/lightgrid", "", { { "USE_GPU_SKINNING", "0" }, { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_DEBUG ) } }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DEBUG },
 		{ BUILTIN_DEBUG_LIGHTGRID_SKINNED, "builtin/debug/lightgrid", "_skinned", { { "USE_GPU_SKINNING", "1" }, { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_DEBUG_SKINNED ) } }, true, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DEBUG_SKINNED },
-		{ BUILTIN_RIGID_MOTION_VECTORS, "builtin/debug/rigid_motion_vectors", "", { { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_DEBUG ) } }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DEBUG },
+		{ BUILTIN_RIGID_MOTION_VECTORS, "builtin/debug/rigid_motion_vectors", "", { { "USE_GPU_SKINNING", "0" }, { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_DEBUG ) } }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DEBUG },
+		{ BUILTIN_SKINNED_MOTION_VECTORS, "builtin/debug/rigid_motion_vectors", "_skinned", { { "USE_GPU_SKINNING", "1" }, { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_MOTION_VECTORS_SKINNED ) } }, true, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_MOTION_VECTORS_SKINNED },
 
 		{ BUILTIN_DEBUG_OCTAHEDRON, "builtin/debug/octahedron", "", { { "USE_GPU_SKINNING", "0" }, { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_DEFAULT ) } }, false, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DEFAULT },
 		{ BUILTIN_DEBUG_OCTAHEDRON_SKINNED, "builtin/debug/octahedron", "_skinned", { { "USE_GPU_SKINNING", "1" }, { "USE_PUSH_CONSTANTS", usePushConstants( BINDING_LAYOUT_DEFAULT_SKINNED ) } }, true, SHADER_STAGE_DEFAULT, LAYOUT_DRAW_VERT, BINDING_LAYOUT_DEFAULT_SKINNED },

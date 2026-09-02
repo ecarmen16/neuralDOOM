@@ -282,6 +282,10 @@ public:
 	idRenderMatrix			previousMotionVectorModelMatrix;
 	int						motionVectorFrameNum;
 	bool					motionVectorHistoryValid;
+	idList<idJointMat, TAG_RENDER>	motionVectorJoints;
+	idList<idJointMat, TAG_RENDER>	previousMotionVectorJoints;
+	int						motionVectorJointFrameNum;
+	bool					motionVectorJointHistoryValid;
 	idRenderMatrix			inverseBaseModelProject;// transforms the unit cube to exactly cover the model in world space
 
 	idRenderWorldLocal* 	world;
@@ -425,6 +429,9 @@ struct viewEntity_t
 	idRenderMatrix			previousModelRenderMatrix;
 	bool					motionVectorHistoryValid;
 	bool					rigidMotionVectorMoved;
+	vertCacheHandle_t		previousJointCache;
+	bool					jointMotionVectorHistoryValid;
+	bool					skinnedMotionVectorMoved;
 
 	// parallelAddModels will build a chain of surfaces here that will need to
 	// be linked to the lights or added to the drawsurf list in a serial code section
@@ -813,6 +820,7 @@ enum bindingLayoutType_t
 
 	BINDING_LAYOUT_DEBUG,
 	BINDING_LAYOUT_DEBUG_SKINNED,
+	BINDING_LAYOUT_MOTION_VECTORS_SKINNED,
 
 	BINDING_LAYOUT_POST_PROCESS,
 	// SRS end
@@ -1291,6 +1299,9 @@ extern idCVar r_taaClampingFactor;
 extern idCVar r_taaNewFrameWeight;
 extern idCVar r_taaMaxRadiance;
 extern idCVar r_taaMotionVectors;
+extern idCVar r_neuralDebug;
+extern idCVar r_neuralRigidMotionVectors;
+extern idCVar r_neuralSkinnedMotionVectors;
 
 extern idCVar r_useFilmicPostFX;
 extern idCVar r_useCRTPostFX;

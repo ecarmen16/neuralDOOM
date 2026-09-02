@@ -1,5 +1,36 @@
 # Test results
 
+## 2026-09-01 / e63f0bb9 + ND3-240 worktree / skinned-object motion vectors
+
+- Tester/machine label: local Windows development machine; runtime visually checked by user.
+- Branch and base commit: `feature/neural-rendering-spike`, `e63f0bb9`.
+- Build configuration: `RelWithDebInfo`, VS2022 x64, DX12 only.
+- GPU and driver: NVIDIA GeForce RTX 5090, 610.47.
+- Scene/save/map: resumable Mars City scene with a nearby talking marine.
+- Relevant cvars: diagnostic `r_neuralDebug 2`; feature-off `r_neuralDebug 0`; `r_neuralSkinnedMotionVectors` defaults to `0` and is forced by diagnostic mode `2`.
+
+| Test | Result | Evidence | Notes |
+|---|---|---|---|
+| Configure and build | PASS | configure/build output; staged executable | 758 DXIL jobs; C++ linked; executable SHA-256 `A77F5FF4E870C7461807AB3AAB04A06841605BB0660DB20CA3BB8918F62DD923`. |
+| T06 animated MD5 / static camera | PASS | user manual observation | Talking marine's helmet/body triangles showed subtle independent signed-color shimmer; static field remained mostly neutral. |
+| T07 animated MD5 / moving camera | PASS | user manual observation | Forward movement and mouse rotation retained the coherent camera field while the skinned contribution remained stable; no corruption or crash reported. |
+| Joint-history initialization | PASS | source review and stable runtime | First/non-consecutive sample and joint-count changes suppress pose velocity; no frame-local GPU handle is retained. |
+| Feature-off startup regression | PASS | automated local DX12 launch | With both skinned controls off, process remained alive after ten seconds and closed normally. This was a startup smoke, not a fresh visual comparison. |
+
+### Performance
+
+- Baseline and changed frame time: not measured.
+- Feature-off performs no joint-history scan/upload. Enabled mode adds one previous-palette upload per visible tracked actor and extra draws for changed opaque skinned surfaces.
+
+### Regressions and limits
+
+- None observed in the tested conversational animation or moving-camera scenario.
+- Perforated/translucent surfaces, CPU deforms, viewmodel velocity, crowded-scene joint-cache pressure, and explicit history resets remain untested.
+
+### Conclusion
+
+ND3-240 passes T06 and T07. ND3-250 viewmodel ordering/velocity is now `READY`.
+
 ## 2026-09-01 / c9c5e063 + ND3-230 worktree / rigid-object motion vectors
 
 - Tester/machine label: local Windows development machine; runtime visually checked by user.

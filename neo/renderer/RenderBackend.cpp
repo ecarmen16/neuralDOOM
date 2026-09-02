@@ -50,6 +50,7 @@ idCVar r_drawEyeColor( "r_drawEyeColor", "0", CVAR_RENDERER | CVAR_BOOL, "Draw a
 idCVar r_motionBlur( "r_motionBlur", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "1 - 5, log2 of the number of motion blur samples" );
 idCVar r_neuralDebug( "r_neuralDebug", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_NEW, "neural renderer diagnostic output: 0 = disabled, 1 = HUD-free post-processed LDR, 2 = signed motion vectors", 0, 2, idCmdSystem::ArgCompletion_Integer<0, 2> );
 idCVar r_neuralRigidMotionVectors( "r_neuralRigidMotionVectors", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "generate rigid-object motion vectors; forced on by r_neuralDebug 2" );
+idCVar r_neuralSkinnedMotionVectors( "r_neuralSkinnedMotionVectors", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "generate skinned-object motion vectors; forced on by r_neuralDebug 2" );
 idCVar r_forceZPassStencilShadows( "r_forceZPassStencilShadows", "0", CVAR_RENDERER | CVAR_BOOL, "force Z-pass rendering for performance testing" );
 idCVar r_useStencilShadowPreload( "r_useStencilShadowPreload", "0", CVAR_RENDERER | CVAR_BOOL, "use stencil shadow preload algorithm instead of Z-fail" );
 idCVar r_skipShaderPasses( "r_skipShaderPasses", "0", CVAR_RENDERER | CVAR_BOOL, "" );
@@ -5010,9 +5011,11 @@ void idRenderBackend::DrawMotionVectors()
 		DrawElementsWithCounters( &unitSquareSurface );
 	}
 
-	if( r_taaMotionVectors.GetBool() && prevViewsValid && ( r_neuralRigidMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2 ) )
+	const bool drawRigidMotionVectors = r_neuralRigidMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2;
+	const bool drawSkinnedMotionVectors = r_neuralSkinnedMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2;
+	if( r_taaMotionVectors.GetBool() && prevViewsValid && ( drawRigidMotionVectors || drawSkinnedMotionVectors ) )
 	{
-		renderLog.OpenBlock( "Render_RigidMotionVectors" );
+		renderLog.OpenBlock( "Render_ObjectMotionVectors" );
 
 		float screenSizeParm[4] = { ( float )w, ( float )h, 0.0f, 0.0f };
 		SetFragmentParm( RENDERPARM_SCREENCORRECTIONFACTOR, screenSizeParm );
@@ -5021,17 +5024,31 @@ void idRenderBackend::DrawMotionVectors()
 
 		GL_SelectTexture( 0 );
 		globalImages->blackImage->Bind();
-		renderProgManager.BindShader_RigidMotionVectors();
 
 		const viewEntity_t* motionSpace = NULL;
+		bool motionShaderBound = false;
+		bool motionShaderSkinned = false;
 		for( int surfNum = 0; surfNum < viewDef->numDrawSurfs; surfNum++ )
 		{
 			const drawSurf_t* surf = viewDef->drawSurfs[surfNum];
 			const viewEntity_t* space = surf->space;
+			const bool skinned = surf->jointCache != 0;
 
-			if( !space->motionVectorHistoryValid || !space->rigidMotionVectorMoved ||
-				space->weaponDepthHack || space->skipMotionBlur || space->isGuiSurface ||
-				surf->jointCache || surf->material->HasSubview() || surf->material->Coverage() != MC_OPAQUE )
+			if( !space->motionVectorHistoryValid || space->weaponDepthHack || space->skipMotionBlur || space->isGuiSurface ||
+				surf->material->HasSubview() || surf->material->Coverage() != MC_OPAQUE )
+			{
+				continue;
+			}
+
+			if( skinned )
+			{
+				if( !drawSkinnedMotionVectors || !space->jointMotionVectorHistoryValid ||
+					( !space->skinnedMotionVectorMoved && !space->rigidMotionVectorMoved ) || !space->previousJointCache )
+				{
+					continue;
+				}
+			}
+			else if( !drawRigidMotionVectors || !space->rigidMotionVectorMoved )
 			{
 				continue;
 			}
@@ -5044,6 +5061,20 @@ void idRenderBackend::DrawMotionVectors()
 				RB_SetMVP( space->unjitteredMVP );
 				SetVertexParms( RENDERPARM_MODELMATRIX_X, previousObjectMVP[0], 4 );
 				motionSpace = space;
+			}
+
+			if( !motionShaderBound || motionShaderSkinned != skinned )
+			{
+				if( skinned )
+				{
+					renderProgManager.BindShader_SkinnedMotionVectors();
+				}
+				else
+				{
+					renderProgManager.BindShader_RigidMotionVectors();
+				}
+				motionShaderBound = true;
+				motionShaderSkinned = skinned;
 			}
 
 			DrawElementsWithCounters( surf );
@@ -5749,9 +5780,11 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	currentVertexBuffer = nullptr;
 	currentIndexBuffer = nullptr;
 	currentJointBuffer = nullptr;
+	currentPreviousJointBuffer = nullptr;
 	currentVertexOffset = 0;
 	currentIndexOffset = 0;
 	currentJointOffset = 0;
+	currentPreviousJointOffset = 0;
 
 	// SRS - clear renderparms and initialize/set change status for all binding layout types
 	renderProgManager.ZeroUniforms();

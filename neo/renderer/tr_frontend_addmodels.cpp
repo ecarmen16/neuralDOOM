@@ -451,6 +451,60 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 		return;
 	}
 
+	vEntity->previousJointCache = 0;
+	vEntity->jointMotionVectorHistoryValid = false;
+	vEntity->skinnedMotionVectorMoved = false;
+
+	// Joint cache handles are frame-local, so retain the previous CPU palette on the
+	// entity and upload it into this frame's cache for the motion-vector pass.
+	const idRenderModelStatic* jointModel = NULL;
+	if( modelIsVisible && r_useGPUSkinning.GetBool() && r_taaMotionVectors.GetBool() &&
+		( r_neuralSkinnedMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2 ) )
+	{
+		for( int surfaceNum = 0; surfaceNum < model->NumSurfaces(); surfaceNum++ )
+		{
+			const srfTriangles_t* geometry = model->Surface( surfaceNum )->geometry;
+			if( geometry != NULL && geometry->staticModelWithJoints != NULL )
+			{
+				jointModel = geometry->staticModelWithJoints;
+				break;
+			}
+		}
+	}
+
+	if( jointModel != NULL && jointModel->jointsInverted != NULL && jointModel->numInvertedJoints > 0 )
+	{
+		const int numJoints = jointModel->numInvertedJoints;
+		if( entityDef->motionVectorJointFrameNum != tr.frameCount )
+		{
+			entityDef->motionVectorJointHistoryValid = entityDef->motionVectorJointFrameNum == tr.frameCount - 1 &&
+				entityDef->motionVectorJoints.Num() == numJoints;
+
+			entityDef->previousMotionVectorJoints.SetNum( numJoints );
+			if( entityDef->motionVectorJointHistoryValid )
+			{
+				memcpy( entityDef->previousMotionVectorJoints.Ptr(), entityDef->motionVectorJoints.Ptr(), numJoints * sizeof( idJointMat ) );
+			}
+			else
+			{
+				memcpy( entityDef->previousMotionVectorJoints.Ptr(), jointModel->jointsInverted, numJoints * sizeof( idJointMat ) );
+			}
+
+			entityDef->motionVectorJoints.SetNum( numJoints );
+			memcpy( entityDef->motionVectorJoints.Ptr(), jointModel->jointsInverted, numJoints * sizeof( idJointMat ) );
+			entityDef->motionVectorJointFrameNum = tr.frameCount;
+		}
+
+		vEntity->jointMotionVectorHistoryValid = entityDef->motionVectorJointHistoryValid;
+		vEntity->skinnedMotionVectorMoved = vEntity->jointMotionVectorHistoryValid &&
+			memcmp( entityDef->motionVectorJoints.Ptr(), entityDef->previousMotionVectorJoints.Ptr(), numJoints * sizeof( idJointMat ) ) != 0;
+
+		if( vEntity->jointMotionVectorHistoryValid )
+		{
+			vEntity->previousJointCache = vertexCache.AllocJoint( entityDef->previousMotionVectorJoints.Ptr(), numJoints, sizeof( idJointMat ) );
+		}
+	}
+
 	// add the lightweight blood decal surfaces if the model is directly visible
 	if( modelIsVisible )
 	{

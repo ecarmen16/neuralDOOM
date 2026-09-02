@@ -2,6 +2,55 @@
 
 Append dated entries. Do not replace prior evidence.
 
+## 2026-09-01 - Skinned-object motion vectors
+
+### Repository state
+
+- Branch: `feature/neural-rendering-spike`.
+- Base checkpoint: `e63f0bb9` (`renderer: add rigid object motion vectors`).
+- Dirty before task: no.
+
+### Files and symbols
+
+- `neo/renderer/RenderCommon.h:idRenderEntityLocal` retains current and previous CPU joint palettes; `viewEntity_t` receives a frame-local previous-palette handle plus validity and movement flags.
+- `neo/renderer/RenderEntity.cpp:idRenderEntityLocal::idRenderEntityLocal` initializes joint history invalid.
+- `neo/renderer/tr_frontend_addmodels.cpp:R_AddSingleModel` finds the visible GPU-skinned palette, advances it once per consecutive renderer frame, and uploads the previous palette into the current frame's joint cache.
+- `neo/renderer/RenderProgs.h/.cpp` adds `BUILTIN_SKINNED_MOTION_VECTORS` and a dedicated layout containing current joints at `t11` and previous joints at `t12`.
+- `neo/renderer/NVRHI/RenderBackend_NVRHI.cpp:idRenderBackend::DrawElementsWithCounters` resolves both frame-local joint handles and builds the matching NVRHI binding set.
+- `neo/renderer/RenderBackend.cpp:DrawMotionVectors` now overlays opaque rigid and GPU-skinned object velocity in one pass, selecting the appropriate shader per surface.
+- `neo/shaders/builtin/debug/rigid_motion_vectors.vs.hlsl` has rigid and skinned permutations; the skinned permutation evaluates each vertex against both palettes before current/previous clip projection.
+- `neo/shaders/shaders.cfg` builds both skinning and push-constant permutations.
+
+### Data and ordering contract
+
+- Each `idJointMat` contributes three `float4` rows. The current palette remains the existing `t11` buffer; the prior visible palette is a new `t12` buffer.
+- Persistent history contains CPU matrices only. GPU joint-cache handles remain frame-local and are never retained across frames.
+- Joint history is valid only for consecutive `tr.frameCount` samples with the same padded joint count. First observation, reappearance, or a count change emits no pose velocity.
+- Current vertices use the current palette and current unjittered object MVP. Previous vertices use the previous palette and `previousViewMVP * previousModelRenderMatrix`.
+- Output remains current-to-previous pixel displacement in native-resolution `R16G16_FLOAT`, matching the camera and rigid paths.
+- Opaque GPU-skinned surfaces draw when either their palette or root model transform changed. GUI, viewmodel, subview, perforated, and translucent policy remains unchanged.
+- `r_neuralSkinnedMotionVectors` defaults to `0`; `r_neuralDebug 2` forces it. With both controls off, no joint-history scan, copy, upload, or skinned velocity draw occurs.
+
+### Validation
+
+- Configure: pass with the established VS2022 x64 DX12-only options.
+- Build: pass, `RelWithDebInfo`; ShaderMake completed 758 DXIL jobs and C++ linked successfully.
+- Final staged executable: 24,747,008 bytes; SHA-256 `A77F5FF4E870C7461807AB3AAB04A06841605BB0660DB20CA3BB8918F62DD923`.
+- Static-camera user validation: a talking marine produced subtle independent signed-color shimmer on animated helmet/body triangles while most static pixels remained neutral gray.
+- Moving-camera user validation: forward motion and mouse rotation retained the established coherent camera field, with the animated contribution remaining stable and no reported corruption or crash.
+- Feature-off smoke: the staged DX12 process with `r_neuralDebug 0` and `r_neuralSkinnedMotionVectors 0` remained alive after ten seconds and closed normally.
+
+### Known limitations
+
+- Only opaque GPU-skinned surfaces participate. Alpha-tested hair/grates, translucent effects, CPU deforms, and decals are not yet represented by this pass.
+- Idle conversational animation often moves less than one pixel per frame and therefore appears deliberately subtle in the fixed `[-8, 8]` diagnostic range.
+- Previous-palette uploads increase transient joint-cache use for visible tracked actors; a crowded multi-character scene has not yet been capacity-tested or timed.
+- Explicit cut, teleport, map, FOV, and resolution reset signals remain a later lifecycle task.
+
+### Next narrow task
+
+- Resolve and implement the first-person viewmodel ordering/velocity policy, keeping its contribution independently switchable from world geometry.
+
 ## 2026-09-01 - Rigid-object motion vectors
 
 ### Repository state

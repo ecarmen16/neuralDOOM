@@ -265,7 +265,7 @@ const idList<bindingLayoutType_t, TAG_RENDER> rpNominalSet5LayoutTypes = { BINDI
 // SRS - Try to limit rpNominalSets to 15 idVec4 entries (15*16 = 240 bytes) to fit within D3D12 root constant limit, otherwise 16 entries is the max for non-Apple Vulkan
 const idList<renderParm_t, TAG_RENDER> rpNominalSet6 = { RENDERPARM_SCREENCORRECTIONFACTOR, RENDERPARM_COLOR, RENDERPARM_MVPMATRIX_X, RENDERPARM_MVPMATRIX_Y, RENDERPARM_MVPMATRIX_Z, RENDERPARM_MVPMATRIX_W, RENDERPARM_MODELMATRIX_X, RENDERPARM_MODELMATRIX_Y, RENDERPARM_MODELMATRIX_Z, RENDERPARM_MODELMATRIX_W, RENDERPARM_GLOBALLIGHTORIGIN, RENDERPARM_JITTERTEXSCALE, RENDERPARM_JITTERTEXOFFSET, RENDERPARM_CASCADEDISTANCES };
 
-const idList<bindingLayoutType_t, TAG_RENDER> rpNominalSet6LayoutTypes = { BINDING_LAYOUT_DEBUG, BINDING_LAYOUT_DEBUG_SKINNED };
+const idList<bindingLayoutType_t, TAG_RENDER> rpNominalSet6LayoutTypes = { BINDING_LAYOUT_DEBUG, BINDING_LAYOUT_DEBUG_SKINNED, BINDING_LAYOUT_MOTION_VECTORS_SKINNED };
 
 // SRS - Try to limit rpNominalSets to 15 idVec4 entries (15*16 = 240 bytes) to fit within D3D12 root constant limit, otherwise 16 entries is the max for non-Apple Vulkan
 const idList<renderParm_t, TAG_RENDER> rpNominalSet7 = { RENDERPARM_COLOR, RENDERPARM_MVPMATRIX_X, RENDERPARM_MVPMATRIX_Y, RENDERPARM_MVPMATRIX_Z, RENDERPARM_MVPMATRIX_W, RENDERPARM_PROJMATRIX_W, RENDERPARM_TEXGEN_0_S, RENDERPARM_TEXGEN_0_T, RENDERPARM_TEXGEN_0_Q, RENDERPARM_TEXGEN_1_S, RENDERPARM_TEXGEN_1_T, RENDERPARM_PSX_DISTORTIONS };
@@ -452,6 +452,7 @@ enum
 	BUILTIN_DEBUG_LIGHTGRID,
 	BUILTIN_DEBUG_LIGHTGRID_SKINNED,
 	BUILTIN_RIGID_MOTION_VECTORS,
+	BUILTIN_SKINNED_MOTION_VECTORS,
 
 	BUILTIN_DEBUG_OCTAHEDRON,
 	BUILTIN_DEBUG_OCTAHEDRON_SKINNED,
@@ -1108,6 +1109,11 @@ public:
 		BindShader_Builtin( BUILTIN_RIGID_MOTION_VECTORS );
 	}
 
+	void	BindShader_SkinnedMotionVectors()
+	{
+		BindShader_Builtin( BUILTIN_SKINNED_MOTION_VECTORS );
+	}
+
 	void	BindShader_DebugShadowMap()
 	{
 		BindShader_Builtin( BUILTIN_DEBUG_SHADOWMAP );
@@ -1274,6 +1280,7 @@ private:
 	nvrhi::IDevice*								device;
 
 	nvrhi::BindingLayoutHandle uniformsLayout( bindingLayoutType_t layoutType, bool skinning );
+	nvrhi::BindingLayoutHandle motionVectorsSkinningLayout( bindingLayoutType_t layoutType );
 
 	using VertexAttribDescList = idList< nvrhi::VertexAttributeDesc >;
 	idStaticList< VertexAttribDescList, NUM_VERTEX_LAYOUTS > vertexLayoutDescs;
