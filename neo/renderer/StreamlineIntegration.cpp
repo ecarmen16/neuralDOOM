@@ -23,7 +23,7 @@ This file is part of the Doom 3 BFG Edition Source Code ("Doom 3 BFG Edition Sou
 #endif
 
 idCVar r_streamlineEnable( "r_streamlineEnable", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_INIT | CVAR_NEW, "initialize the optional local NVIDIA Streamline runtime at startup" );
-idCVar r_streamlineApplicationId( "r_streamlineApplicationId", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_INIT | CVAR_NEW, "NVIDIA-issued application ID used to request NGX/DLSS; 0 initializes Streamline core only" );
+idCVar r_streamlineApplicationId( "r_streamlineApplicationId", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_INIT | CVAR_NEW, "optional NVIDIA-issued application ID; 0 uses the experimental custom-engine identity" );
 
 namespace
 {
@@ -65,7 +65,7 @@ bool R_StreamlineInitialize()
 	}
 
 	streamlineState.applicationId = r_streamlineApplicationId.GetInteger();
-	streamlineState.dlssRequested = streamlineState.applicationId > 0;
+	streamlineState.dlssRequested = true;
 
 	sl::Feature features[] = { sl::kFeatureDLSS };
 	sl::Preferences preferences = {};
@@ -74,13 +74,11 @@ bool R_StreamlineInitialize()
 						sl::PreferenceFlags::eUseFrameBasedResourceTagging;
 	preferences.engine = sl::EngineType::eCustom;
 	preferences.engineVersion = ENGINE_VERSION;
+	preferences.projectId = "6f2c79d0-5c63-4e48-a129-5db818b387b8";
 	preferences.renderAPI = sl::RenderAPI::eD3D12;
 	preferences.applicationId = streamlineState.applicationId;
-	if( streamlineState.dlssRequested )
-	{
-		preferences.featuresToLoad = features;
-		preferences.numFeaturesToLoad = 1;
-	}
+	preferences.featuresToLoad = features;
+	preferences.numFeaturesToLoad = 1;
 
 	const sl::Result result = slInit( preferences );
 	streamlineState.initializeResult = sl::getResultAsStr( result );
@@ -91,9 +89,8 @@ bool R_StreamlineInitialize()
 		return false;
 	}
 
-	common->Printf( "Streamline initialized in %s mode%s\n",
-		streamlineState.dlssRequested ? "DLSS-requested" : "core-only",
-		streamlineState.dlssRequested ? "" : "; set an NVIDIA-issued r_streamlineApplicationId at startup to request DLSS" );
+	common->Printf( "Streamline initialized with DLSS requested (%s identity)\n",
+		streamlineState.applicationId > 0 ? "NVIDIA application ID" : "experimental custom-engine" );
 	return true;
 #endif
 }
@@ -119,20 +116,17 @@ bool R_StreamlineSetD3DDevice( void* nativeDevice )
 		return false;
 	}
 
-	if( streamlineState.dlssRequested )
-	{
-		ID3D12Device* d3dDevice = static_cast<ID3D12Device*>( nativeDevice );
-		LUID adapterLuid = d3dDevice->GetAdapterLuid();
-		sl::AdapterInfo adapterInfo = {};
-		adapterInfo.deviceLUID = reinterpret_cast<uint8_t*>( &adapterLuid );
-		adapterInfo.deviceLUIDSizeInBytes = sizeof( adapterLuid );
-		const sl::Result supportResult = slIsFeatureSupported( sl::kFeatureDLSS, adapterInfo );
-		streamlineState.dlssResult = sl::getResultAsStr( supportResult );
-		streamlineState.dlssSupported = supportResult == sl::Result::eOk;
-	}
+	ID3D12Device* d3dDevice = static_cast<ID3D12Device*>( nativeDevice );
+	LUID adapterLuid = d3dDevice->GetAdapterLuid();
+	sl::AdapterInfo adapterInfo = {};
+	adapterInfo.deviceLUID = reinterpret_cast<uint8_t*>( &adapterLuid );
+	adapterInfo.deviceLUIDSizeInBytes = sizeof( adapterLuid );
+	const sl::Result supportResult = slIsFeatureSupported( sl::kFeatureDLSS, adapterInfo );
+	streamlineState.dlssResult = sl::getResultAsStr( supportResult );
+	streamlineState.dlssSupported = supportResult == sl::Result::eOk;
 
 	common->Printf( "Streamline accepted the native D3D12 device; DLSS %s\n",
-		streamlineState.dlssRequested ? ( streamlineState.dlssSupported ? "supported" : streamlineState.dlssResult ) : "not requested" );
+		streamlineState.dlssSupported ? "supported" : streamlineState.dlssResult );
 	return true;
 #endif
 }
@@ -174,7 +168,7 @@ void R_StreamlineStatus_f( const idCmdArgs& args )
 		streamlineState.deviceSet ? "set" : "unset" );
 	common->Printf( "Streamline identity: applicationId %d, mode %s\n",
 		streamlineState.applicationId,
-		streamlineState.dlssRequested ? "DLSS-requested" : "core-only/fallback" );
+		streamlineState.applicationId > 0 ? "NVIDIA application ID" : "experimental custom-engine" );
 	common->Printf( "Streamline results: init %s, device %s, DLSS %s\n",
 		streamlineState.initializeResult,
 		streamlineState.deviceResult,

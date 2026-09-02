@@ -3,19 +3,20 @@
 ## 2026-09-01 / 71392b90 + ND3-320 worktree / Streamline core lifecycle
 
 - SDK build: `USE_STREAMLINE=ON`, official local Streamline `v2.12.0`.
-- Runtime controls: `r_streamlineEnable 1`, `r_streamlineApplicationId 0`, DX12, windowed, core-only mode.
+- Runtime controls: `r_streamlineEnable 1`, `r_streamlineApplicationId 0`, DX12, windowed, experimental custom-engine identity.
 - GPU and driver: NVIDIA GeForce RTX 5090, 610.47.
 
 | Test | Result | Evidence |
 |---|---|---|
 | Default SDK-OFF build | PASS | Established configure/build helper compiled stubs and linked `RelWithDebInfo` without an SDK dependency. |
 | SDK-ON build/runtime staging | PASS | Isolated build linked and copied the four required local runtime DLLs beside the ignored executable. |
-| Early core initialization | PASS | Ignored `captures/neural/streamline-smoke/base/streamline_core.log`: `Streamline initialized in core-only mode`. |
+| Early core initialization | PASS | Ignored `captures/neural/streamline-smoke/base/streamline_core.log`; the original probe initialized Streamline core before DX12 creation. |
 | Native D3D12 device handoff | PASS | Same log: RTX 5090 device created, followed by `Streamline accepted the native D3D12 device`. |
-| Startup fallback | PASS | Hidden process remained alive after ten seconds; DLSS was explicitly not requested with application ID 0. |
+| Startup fallback | PASS | Hidden process remained alive after ten seconds; this first lifecycle probe did not yet request DLSS. |
+| Experimental DLSS feature request, application ID 0 | PASS | Ignored `captures/neural/streamline-dlss-probe/base/streamline_dlss_probe.log`: custom-engine identity initialized, native D3D12 device accepted, and `DLSS supported`. |
 | Ordered shutdown | PASS | A 120-frame scripted run processed engine `+quit` and exited normally with code 0 after the Streamline-enabled initialization path. |
 
-The reversible core lifecycle is validated. DLSS support/evaluation remains untested and unavailable until a valid NVIDIA-issued application ID is provided; native presentation remains the active fallback.
+The reversible core lifecycle and local DLSS feature load/support probe are validated with application ID `0`. An NVIDIA-issued identity is deferred to any future supported distribution and does not gate private implementation. Native presentation remains active until resource tagging and evaluation are integrated.
 
 ## 2026-09-01 / ND3-300 + ND3-310 worktree / official SDK gate
 
