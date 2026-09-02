@@ -459,7 +459,8 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 	// entity and upload it into this frame's cache for the motion-vector pass.
 	const idRenderModelStatic* jointModel = NULL;
 	if( modelIsVisible && r_useGPUSkinning.GetBool() && r_taaMotionVectors.GetBool() &&
-		( r_neuralSkinnedMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2 ) )
+		( r_neuralSkinnedMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2 ||
+		  ( r_neuralViewmodelMotionVectors.GetBool() && renderEntity->weaponDepthHack ) ) )
 	{
 		for( int surfaceNum = 0; surfaceNum < model->NumSurfaces(); surfaceNum++ )
 		{

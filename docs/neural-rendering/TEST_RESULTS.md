@@ -1,5 +1,36 @@
 # Test results
 
+## 2026-09-01 / 442c0427 + ND3-250 worktree / viewmodel motion vectors
+
+- Tester/machine label: local Windows development machine; runtime visually checked by user.
+- Branch and base commit: `feature/neural-rendering-spike`, `442c0427`.
+- Build configuration: `RelWithDebInfo`, VS2022 x64, DX12 only.
+- GPU and driver: NVIDIA GeForce RTX 5090, 610.47.
+- Scene/save/map: disposable `devmap game/mars_city2`; weapon and ammunition granted through the local console.
+- Relevant cvars: `r_neuralViewmodelMotionVectors 1`, diagnostic `r_neuralDebug 2`; feature-off smoke used both at `0`.
+
+| Test | Result | Evidence | Notes |
+|---|---|---|---|
+| Configure and build | PASS | configure/build output; staged executable | C++ linked; 758 existing DXIL jobs current; SHA-256 `EE673ABDA9566656B5DCE3344C519478636793E6E5A6F632F64F9A5BF6436167`. |
+| Normal viewmodel presentation | PASS | user manual observation before enabling mode `2` | Granted weapon equipped and rendered normally on `game/mars_city2`. |
+| T08 weapon bob/turn/recoil | PASS | user manual combined walk/turn/fire test | Viewmodel motion diagnostic worked without reported disappearance, depth flicker, trails, corruption, or crash. |
+| Intro-map restriction | PASS / test correction | source inspection and user observation | Opening save intentionally held the weapon lowered despite inventory grant; disposable post-intro map removed the scripted restriction. |
+| Feature-off startup regression | PASS | automated local DX12 launch | With viewmodel motion and diagnostics off, process remained alive after ten seconds and closed normally. |
+
+### Performance
+
+- Baseline and changed frame time: not measured.
+- Feature-off adds no viewmodel palette upload or velocity draw. Enabled mode reuses the skinned object path for visible weapon surfaces.
+
+### Regressions and limits
+
+- None observed in the tested opaque viewmodel path.
+- Muzzle flash/translucency remains unclassified and is assigned to ND3-260 reactive/transparency masks.
+
+### Conclusion
+
+ND3-250 and T08 pass. Shared scene color/depth with independently enabled viewmodel velocity is the accepted neural-input policy; ND3-260 is `READY`.
+
 ## 2026-09-01 / e63f0bb9 + ND3-240 worktree / skinned-object motion vectors
 
 - Tester/machine label: local Windows development machine; runtime visually checked by user.

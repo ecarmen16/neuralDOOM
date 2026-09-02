@@ -2,6 +2,48 @@
 
 Append dated entries. Do not replace prior evidence.
 
+## 2026-09-01 - First-person viewmodel motion policy
+
+### Repository state
+
+- Branch: `feature/neural-rendering-spike`.
+- Base checkpoint: `442c0427` (`renderer: add skinned object motion vectors`).
+- Dirty before task: no.
+
+### Files and symbols
+
+- `neo/renderer/RenderBackend.cpp:r_neuralViewmodelMotionVectors` adds an independent OFF-by-default viewmodel switch that diagnostic mode `2` does not force.
+- `neo/renderer/RenderBackend.cpp:idRenderBackend::DrawMotionVectors` admits `weaponDepthHack` surfaces only when that switch is enabled, reuses rigid/skinned object history, and applies the viewmodel depth hack to both current and previous motion projections.
+- `neo/renderer/tr_frontend_addmodels.cpp:R_AddSingleModel` captures a viewmodel joint palette when the independent switch is enabled, even if world-skinned vectors and diagnostics are disabled.
+- `neo/renderer/RenderCommon.h` exposes the cvar to the frontend.
+- `docs/neural-rendering/DECISIONS.md:D-007` selects shared scene color/depth with dedicated viewmodel velocity for the future neural input path.
+
+### Data and ordering contract
+
+- The first-person weapon remains in the ordinary HDR scene color and current depth buffers; it is not split into a second lighting/composition pass.
+- Viewmodel velocity uses the same current-to-previous pixel units, `R16G16_FLOAT` target, joint palettes, and root-transform history as world geometry.
+- The current unjittered and previous object MVPs receive `idRenderMatrix::ApplyDepthHack` before the depth-equal velocity draw, matching the weapon's scene-depth placement.
+- Existing motion-blur alpha rejection remains unchanged. This slice changes motion-vector generation only.
+- `r_neuralViewmodelMotionVectors 0` preserves the previous neutral-vector behavior and performs no viewmodel-only history work. `1` enables both runtime vectors and mode-2 visualization.
+
+### Validation
+
+- Configure: pass with the established VS2022 x64 DX12-only options.
+- Build: pass, `RelWithDebInfo`; all 758 DXIL shaders were current and C++ linked successfully.
+- Final staged executable: 24,747,520 bytes; SHA-256 `EE673ABDA9566656B5DCE3344C519478636793E6E5A6F632F64F9A5BF6436167`.
+- User T08 validation: on disposable `devmap game/mars_city2`, a granted weapon rendered normally, then produced coherent diagnostic motion during the combined walk/turn/fire test with no reported disappearance, depth flicker, trails, or crash.
+- Feature-off smoke: the staged DX12 process with `r_neuralDebug 0` and `r_neuralViewmodelMotionVectors 0` remained alive after ten seconds and closed normally.
+
+### Known limitations
+
+- The opening Mars City save enforces a scripted no-weapon state even after inventory grant; `game/mars_city2` is the reproducible T08 test map.
+- Only opaque viewmodel surfaces receive geometry velocity. Muzzle flashes and other translucent/unstable weapon effects require reactive classification.
+- The switch remains off by default until the neutral temporal interface owns the input policy.
+
+### Next narrow task
+
+- Add engine-owned reactive/transparency classification resources for muzzle flashes, particles, glass, animated emissives, and in-world GUI content.
+
 ## 2026-09-01 - Skinned-object motion vectors
 
 ### Repository state

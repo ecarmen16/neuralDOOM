@@ -48,10 +48,17 @@
 
 **Consequence:** `_neuralHudlessLDR` is a native-resolution `R8G8B8A8_UNORM` snapshot. Debug mode `1` presents it after GUI execution to make separation directly observable. This decision does not select the linear/HDR input expected by a future temporal reconstruction backend.
 
+## D-007 - Keep the first-person viewmodel in the shared scene with dedicated motion
+
+**Status:** Accepted for the neural input path; OFF by default during development.
+
+**Reasoning:** The weapon and hands are already present in HDR scene color and depth before TAA, while their `weaponDepthHack` surfaces are deliberately omitted from the existing fullscreen camera-vector draw. A separate color layer would require invasive pass reordering and duplicate lighting. Reusing the verified rigid/skinned velocity path with the viewmodel's depth-hacked projection supplies coherent geometry motion without changing scene composition.
+
+**Consequence:** `r_neuralViewmodelMotionVectors` independently enables viewmodel vectors and is not forced by `r_neuralDebug`. Current and previous viewmodel projections receive the same depth hack used by scene rasterization. Existing motion-blur alpha rejection is unchanged. Reactive handling for muzzle flashes and unstable weapon effects remains a separate mask task.
+
 ## Pending decisions
 
 - Exact linear/HDR scene-color stage used by the reconstruction backend.
-- Viewmodel policy: after-pass, separate pass, or shared pass with dedicated inputs.
 - Motion-vector format, units, sign, Y convention, and jitter treatment.
 - Previous-pose storage strategy for MD5 animation.
 - Reactive/transparency mask representation and material classification.

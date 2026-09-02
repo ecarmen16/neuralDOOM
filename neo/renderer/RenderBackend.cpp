@@ -51,6 +51,7 @@ idCVar r_motionBlur( "r_motionBlur", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_AR
 idCVar r_neuralDebug( "r_neuralDebug", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_NEW, "neural renderer diagnostic output: 0 = disabled, 1 = HUD-free post-processed LDR, 2 = signed motion vectors", 0, 2, idCmdSystem::ArgCompletion_Integer<0, 2> );
 idCVar r_neuralRigidMotionVectors( "r_neuralRigidMotionVectors", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "generate rigid-object motion vectors; forced on by r_neuralDebug 2" );
 idCVar r_neuralSkinnedMotionVectors( "r_neuralSkinnedMotionVectors", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "generate skinned-object motion vectors; forced on by r_neuralDebug 2" );
+idCVar r_neuralViewmodelMotionVectors( "r_neuralViewmodelMotionVectors", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "include first-person viewmodel motion vectors; experimental and not forced by diagnostic modes" );
 idCVar r_forceZPassStencilShadows( "r_forceZPassStencilShadows", "0", CVAR_RENDERER | CVAR_BOOL, "force Z-pass rendering for performance testing" );
 idCVar r_useStencilShadowPreload( "r_useStencilShadowPreload", "0", CVAR_RENDERER | CVAR_BOOL, "use stencil shadow preload algorithm instead of Z-fail" );
 idCVar r_skipShaderPasses( "r_skipShaderPasses", "0", CVAR_RENDERER | CVAR_BOOL, "" );
@@ -5013,7 +5014,8 @@ void idRenderBackend::DrawMotionVectors()
 
 	const bool drawRigidMotionVectors = r_neuralRigidMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2;
 	const bool drawSkinnedMotionVectors = r_neuralSkinnedMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2;
-	if( r_taaMotionVectors.GetBool() && prevViewsValid && ( drawRigidMotionVectors || drawSkinnedMotionVectors ) )
+	const bool drawViewmodelMotionVectors = r_neuralViewmodelMotionVectors.GetBool();
+	if( r_taaMotionVectors.GetBool() && prevViewsValid && ( drawRigidMotionVectors || drawSkinnedMotionVectors || drawViewmodelMotionVectors ) )
 	{
 		renderLog.OpenBlock( "Render_ObjectMotionVectors" );
 
@@ -5034,7 +5036,8 @@ void idRenderBackend::DrawMotionVectors()
 			const viewEntity_t* space = surf->space;
 			const bool skinned = surf->jointCache != 0;
 
-			if( !space->motionVectorHistoryValid || space->weaponDepthHack || space->skipMotionBlur || space->isGuiSurface ||
+			if( !space->motionVectorHistoryValid || ( space->weaponDepthHack && !drawViewmodelMotionVectors ) ||
+				( !space->weaponDepthHack && space->skipMotionBlur ) || space->isGuiSurface ||
 				surf->material->HasSubview() || surf->material->Coverage() != MC_OPAQUE )
 			{
 				continue;
@@ -5042,13 +5045,13 @@ void idRenderBackend::DrawMotionVectors()
 
 			if( skinned )
 			{
-				if( !drawSkinnedMotionVectors || !space->jointMotionVectorHistoryValid ||
+				if( ( space->weaponDepthHack ? !drawViewmodelMotionVectors : !drawSkinnedMotionVectors ) || !space->jointMotionVectorHistoryValid ||
 					( !space->skinnedMotionVectorMoved && !space->rigidMotionVectorMoved ) || !space->previousJointCache )
 				{
 					continue;
 				}
 			}
-			else if( !drawRigidMotionVectors || !space->rigidMotionVectorMoved )
+			else if( ( space->weaponDepthHack ? !drawViewmodelMotionVectors : !drawRigidMotionVectors ) || !space->rigidMotionVectorMoved )
 			{
 				continue;
 			}
@@ -5057,8 +5060,14 @@ void idRenderBackend::DrawMotionVectors()
 			{
 				idRenderMatrix previousObjectMVP;
 				idRenderMatrix::Multiply( previousViewMVP, space->previousModelRenderMatrix, previousObjectMVP );
+				idRenderMatrix currentObjectMVP = space->unjitteredMVP;
+				if( space->weaponDepthHack )
+				{
+					idRenderMatrix::ApplyDepthHack( currentObjectMVP );
+					idRenderMatrix::ApplyDepthHack( previousObjectMVP );
+				}
 
-				RB_SetMVP( space->unjitteredMVP );
+				RB_SetMVP( currentObjectMVP );
 				SetVertexParms( RENDERPARM_MODELMATRIX_X, previousObjectMVP[0], 4 );
 				motionSpace = space;
 			}

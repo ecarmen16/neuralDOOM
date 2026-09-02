@@ -33,8 +33,8 @@ Statuses: `BLOCKED`, `READY`, `IN PROGRESS`, `VERIFY`, `DONE`, `DEFERRED`.
 | ND3-220 | DONE | Validate and expose camera/static velocity | `r_neuralDebug 2`; signed static/yaw/strafe checks and RenderDoc frame 1811 |
 | ND3-230 | DONE | Add rigid-object velocity | T04 door/lift class and T05 physics-prop settle behavior passed; feature-off regression passed |
 | ND3-240 | DONE | Add MD5/skinned velocity | T06-T07 passed; previous CPU joint palette uploaded through a frame-local `t12` binding |
-| ND3-250 | READY | Resolve viewmodel ordering/velocity | Test T08 and documented policy |
-| ND3-260 | BLOCKED | Add reactive/transparency masks | Tests T09–T13 |
+| ND3-250 | DONE | Resolve viewmodel ordering/velocity | T08 passed on `game/mars_city2`; D-007 selects shared scene inputs with dedicated depth-hacked velocity |
+| ND3-260 | READY | Add reactive/transparency masks | Tests T09–T13 |
 | ND3-270 | BLOCKED | Implement history-reset lifecycle | Tests T15–T17 |
 | ND3-280 | BLOCKED | Introduce neutral backend interface | Null/debug backend and no-SDK build |
 
