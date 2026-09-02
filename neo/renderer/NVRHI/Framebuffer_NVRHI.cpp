@@ -228,6 +228,7 @@ void Framebuffer::ResizeFramebuffers( bool reloadImages )
 			.addColorAttachment( globalImages->accumImage->texture ) );
 
 	Framebuffer::Unbind();
+	backEnd.ResizeNeuralTemporalBackend();
 }
 
 void Framebuffer::ReloadImages()

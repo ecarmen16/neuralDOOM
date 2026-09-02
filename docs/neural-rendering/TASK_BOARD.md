@@ -36,13 +36,13 @@ Statuses: `BLOCKED`, `READY`, `IN PROGRESS`, `VERIFY`, `DONE`, `DEFERRED`.
 | ND3-250 | DONE | Resolve viewmodel ordering/velocity | T08 passed on `game/mars_city2`; D-007 selects shared scene inputs with dedicated depth-hacked velocity |
 | ND3-260 | DONE | Add reactive/transparency masks | T09-T13 combined combat validation; localized red reactive and cyan transparency diagnostics |
 | ND3-270 | DONE | Implement history-reset lifecycle | Automated epoch/reason tests and combined visible load/FOV/`vid_restart` regression pass |
-| ND3-280 | READY | Introduce neutral backend interface | Null/debug backend and no-SDK build |
+| ND3-280 | DONE | Introduce neutral backend interface | Null/debug consumed 1,076 visible gameplay frames with zero rejects; normal TAA/HUD presentation confirmed |
 
 ## Official integration track
 
 | ID | Status | Task | Exit evidence |
 |---|---|---|---|
-| ND3-300 | DEFERRED | Re-verify current Streamline/DLSS docs and license | Versioned dependency decision |
+| ND3-300 | IN PROGRESS | Re-verify current Streamline/DLSS docs and license | Versioned dependency and acquisition decision from official sources |
 | ND3-310 | DEFERRED | Add OFF-by-default SDK build option | Default build unchanged |
 | ND3-320 | DEFERRED | Integrate native DLAA | Full temporal test matrix |
 | ND3-330 | DEFERRED | Add DLSS quality modes/resolution plumbing | Correct dynamic sizes and UI |

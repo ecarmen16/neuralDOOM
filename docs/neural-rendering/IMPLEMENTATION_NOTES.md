@@ -2,6 +2,43 @@
 
 Append dated entries. Do not replace prior evidence.
 
+## 2026-09-01 - Neutral temporal backend interface
+
+### Repository state
+
+- Branch: `feature/neural-rendering-spike`.
+- Base checkpoint: `b4d2225a` (`renderer: unify temporal history resets`).
+- Dirty before task: no.
+
+### Files and symbols
+
+- `neo/renderer/NeuralTemporal.h:neuralTemporalFrame_t` defines the engine-owned NVRHI resource and plain-metadata contract. `idNeuralTemporalBackend` defines explicit initialize, resize, reset, evaluate, status, and shutdown behavior.
+- `neo/renderer/NeuralTemporal.cpp:idNullNeuralTemporalBackend` validates/consumes complete frames, records counters and lifecycle state, and always returns `false` so the established TAA path presents the frame.
+- `neo/renderer/RenderBackend.cpp:idRenderBackend::EvaluateNeuralTemporalBackend` assembles the contract after masks and motion vectors and before TAA. `r_neuralBackend 1` forces full scene/object/skinned/viewmodel velocity and both masks; `0` is the default.
+- `neo/renderer/Passes/TonemapPass.h:GetExposureBuffer` exposes the NVRHI adapted-exposure buffer without leaking native API handles.
+- `neo/renderer/NVRHI/RenderBackend_NVRHI.cpp` and `Framebuffer_NVRHI.cpp` connect device init, resize, reset, and shutdown lifecycle.
+
+### Contract and conventions
+
+- Scene input/output: native-resolution linear HDR `RGBA16_FLOAT`, before tonemapping and overlay UI. Output is `_taaResolved`; returning `false` guarantees ordinary TAA fallback.
+- Depth: native `D24_UNORM_S8_UINT`, device 0..1, non-reversed. Sample count is explicit.
+- Velocity: native `RG16_FLOAT`, current-to-previous pixel displacement, +X right and +Y down. Previous unjittered MVP is captured before the velocity pass advances history.
+- Jitter: current and previous offsets are supplied in render pixels. Reset state is both an exact per-frame boolean and a monotonically increasing epoch.
+- Masks: native `R8_UNORM` reactive and transparency resources; validator mode forces fresh generation.
+- Exposure: `exp2(r_exposure)` scalar plus the live one-element adapted-exposure NVRHI buffer and an automatic-exposure flag.
+
+### Validation
+
+- Configure and `RelWithDebInfo` build passed; new files were included and all DXIL remained current.
+- Feature-off staged build remained alive for ten seconds with `r_neuralBackend 0`.
+- Hidden DX12 validator test deliberately set `r_taaMotionVectors 0`, loaded `game/mars_city2`, consumed 177 frames with 0 rejected, reported epoch/reset propagation and matching 1725x985 render/output sizes, then exited with code 0.
+- Visible saved-game validation consumed 1,076 frames with 0 rejected, epoch/reset epoch 4, and matching 1725x985 sizes. The user confirmed normal gameplay, weapon, HUD, and objective rendering through the unchanged TAA fallback.
+- Staged executable: 24,773,632 bytes; SHA-256 `71ECE524E25533B168BB75AA0D8CFA262F7182DD5167A62D6BFA1F3087E9F886`.
+
+### Next narrow task
+
+- Re-verify the current official Streamline/DLSS SDK version, acquisition mechanism, licensing, and redistributable boundaries before adding an OFF-by-default build option.
+
 ## 2026-09-01 - Unified temporal-history reset lifecycle
 
 ### Repository state

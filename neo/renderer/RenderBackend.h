@@ -41,6 +41,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Passes/TemporalAntiAliasingPass.h"
 
 #include "PipelineCache.h"
+#include "NeuralTemporal.h"
 
 struct tmu_t
 {
@@ -140,6 +141,8 @@ public:
 
 	void				ClearCaches();
 	void				InvalidateTemporalHistory();
+	void				ResizeNeuralTemporalBackend();
+	void				PrintNeuralTemporalBackendStatus() const;
 
 	static void			ImGui_RenderDrawLists( ImDrawData* draw_data );
 
@@ -192,6 +195,7 @@ private:
 	void				DrawMotionVectors();
 	void				DrawTemporalMasks();
 	void				DrawTemporalMask( bool transparencyMask );
+	bool				EvaluateNeuralTemporalBackend( const viewDef_t* _viewDef, int stereoEye );
 	void				TemporalAAPass( const viewDef_t* _viewDef );
 
 	// RB: outdated HDR stuff
@@ -350,6 +354,7 @@ private:
 	bool				currentRenderCopied;	// true if any material has already referenced _currentRender
 
 	idRenderMatrix		prevMVP[2];				// world MVP from previous frame for motion blur
+	idRenderMatrix		neuralPreviousMVP[2];		// previous matrices consumed by the most recent velocity pass
 	bool				prevViewsValid;
 	viewLight_t*		prevViewLight;			// SRS - for AMD shadow mapping fix in ShadowMapPassFast()
 
@@ -390,6 +395,7 @@ private:
 	MipMapGenPass*					hiZGenPass;
 	TonemapPass*					toneMapPass;
 	TemporalAntiAliasingPass*		taaPass;
+	idNeuralTemporalBackend*		neuralTemporalBackend;
 
 	BindingCache					bindingCache;
 	SamplerCache					samplerCache;

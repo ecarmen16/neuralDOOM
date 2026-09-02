@@ -65,6 +65,11 @@ public:
 		return isLoaded;
 	}
 
+	nvrhi::BufferHandle GetExposureBuffer() const
+	{
+		return exposureBuffer;
+	}
+
 private:
 	void ResetExposure( nvrhi::ICommandList* commandList, float initialExposure );
 	void ResetHistogram( nvrhi::ICommandList* commandList );

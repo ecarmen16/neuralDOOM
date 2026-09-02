@@ -87,13 +87,13 @@ Codex should fill this from the actual source before implementation.
 
 | Resource | Producer/pass | Format | Resolution | Color/depth space | Lifetime | Consumer | Known hazards |
 |---|---|---|---|---|---|---|---|
-| Scene color before UI | TBD | TBD | TBD | linear HDR or display-referred | TBD | temporal backend | post-order uncertainty |
-| Depth | TBD | TBD | TBD | normal/reversed Z; range TBD | TBD | temporal backend | viewmodel/transparent handling |
-| Motion vectors | new or existing | likely two-channel float | render resolution | pixels or normalized TBD | frame/history | temporal backend | sign and jitter convention |
-| Reactive mask | new | TBD | render resolution | 0..1 | frame | temporal backend | particle/material classification |
-| Transparency mask | new | TBD | render resolution | 0..1 | frame | temporal backend | blending order |
-| Exposure | existing/new | scalar/buffer | frame | pre-exposure convention TBD | frame | temporal backend | HDR behavior |
-| Output | backend | TBD | output resolution | stage-dependent | frame | later post/UI | state transitions |
+| Scene color before UI | `_currentRenderHDR` | `RGBA16_FLOAT` | native render size, sample count explicit | linear HDR before tone map/UI | frame | temporal backend | resolve required by consumers that reject MSAA |
+| Depth | `_currentDepth` | `D24_UNORM_S8_UINT` | native render size | device 0..1, non-reversed | frame | temporal backend | viewmodel uses engine depth hack |
+| Motion vectors | `_taaMotionVectors` | `RG16_FLOAT` | native render size | current-to-previous displacement in pixels; +Y down | frame/history | temporal backend | invalid history clears to zero |
+| Reactive mask | `_neuralReactiveMask` | `R8_UNORM` | native render size | 0..1 unstable coverage | frame | temporal backend | broad material classifier |
+| Transparency mask | `_neuralTransparencyMask` | `R8_UNORM` | native render size | 0..1 alpha/glass coverage | frame | temporal backend | excludes additive-only work |
+| Exposure | `TonemapPass::exposureBuffer` plus scalar | typed `R32_UINT` buffer containing float bits | one value/frame | manual scale is `exp2(r_exposure)`; buffer carries adapted luminance | persistent GPU buffer | temporal backend | current evaluation sees most recently completed adaptation |
+| Output | `_taaResolved` | `RGBA16_FLOAT` | current native output size | linear HDR before tone map/UI | frame | later tone map/post/UI | backend `false` return preserves TAA fallback |
 
 ## 4. Motion-vector math checklist
 

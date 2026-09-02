@@ -1,5 +1,20 @@
 # Test results
 
+## 2026-09-01 / b4d2225a + ND3-280 worktree / neutral backend interface
+
+- Build: `RelWithDebInfo`, VS2022 x64, DX12 only; pass.
+- Default path: `r_neuralBackend 0`; ten-second staged startup remained alive.
+- Validator path: `r_neuralBackend 1`, with legacy `r_taaMotionVectors 0` to prove forced input generation.
+
+| Test | Result | Evidence |
+|---|---|---|
+| Contract compile/lifecycle | PASS | Full configure/build included `NeuralTemporal.cpp`; staged executable hash `71ECE524E25533B168BB75AA0D8CFA262F7182DD5167A62D6BFA1F3087E9F886`. |
+| Disabled fallback | PASS | Default mode remained alive for ten seconds; no vendor dependency or GPU evaluation enabled. User-visible validator run retained normal rendering. |
+| Null/debug consumption | PASS | Automated run: 177 evaluated and 0 rejected. User-visible saved gameplay: 1,076 evaluated, 0 rejected, epoch/reset epoch 4, render/output 1725x985. |
+| Existing TAA fallback | PASS | Null backend always returns `false`; the existing `TemporalAAPass` executes unchanged. User confirmed normal gameplay, weapon, HUD, and objective presentation. |
+
+ND3-280 is `DONE`. Automated and visible validation prove complete frame consumption without changing presentation.
+
 ## 2026-09-01 / e6b0fed3 + ND3-270 worktree / temporal-history lifecycle
 
 - Tester/machine label: local Windows development machine; scripted transition tests and combined user visual check completed.

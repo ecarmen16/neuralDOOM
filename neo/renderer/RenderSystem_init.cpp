@@ -1715,6 +1715,7 @@ void R_InitCommands()
 	cmdSystem->AddCommand( "vid_restart", R_VidRestart_f, CMD_FL_RENDERER, "restarts renderSystem" );
 	cmdSystem->AddCommand( "neuralHistoryReset", R_NeuralHistoryReset_f, CMD_FL_RENDERER, "invalidate all temporal history on the next primary view" );
 	cmdSystem->AddCommand( "neuralHistoryStatus", R_NeuralHistoryStatus_f, CMD_FL_RENDERER, "print the temporal history epoch and pending reset reasons" );
+	cmdSystem->AddCommand( "neuralBackendStatus", []( const idCmdArgs& args ) { backEnd.PrintNeuralTemporalBackendStatus(); }, CMD_FL_RENDERER, "print neutral temporal backend validation status" );
 	cmdSystem->AddCommand( "listRenderEntityDefs", R_ListRenderEntityDefs_f, CMD_FL_RENDERER, "lists the entity defs" );
 	cmdSystem->AddCommand( "listRenderLightDefs", R_ListRenderLightDefs_f, CMD_FL_RENDERER, "lists the light defs" );
 	cmdSystem->AddCommand( "listModes", R_ListModes_f, CMD_FL_RENDERER, "lists all video modes" );

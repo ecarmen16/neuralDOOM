@@ -1344,6 +1344,7 @@ extern idCVar r_neuralHistoryTeleportDistance;
 extern idCVar r_neuralHistoryObjectTeleportDistance;
 extern idCVar r_neuralHistoryCutAngle;
 extern idCVar r_neuralHistoryFovThreshold;
+extern idCVar r_neuralBackend;
 
 extern idCVar r_useFilmicPostFX;
 extern idCVar r_useCRTPostFX;

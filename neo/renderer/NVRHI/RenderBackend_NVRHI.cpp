@@ -200,6 +200,12 @@ void idRenderBackend::Init()
 	commonPasses.Init( deviceManager->GetDevice() );
 	hiZGenPass = nullptr;
 	ssaoPass = nullptr;
+	neuralTemporalBackend = R_CreateNullNeuralTemporalBackend();
+	if( !neuralTemporalBackend->Initialize( deviceManager->GetDevice() ) )
+	{
+		common->Warning( "Could not initialize null neural temporal backend" );
+	}
+	ResizeNeuralTemporalBackend();
 
 	// Maximum resolution of one tile within tiled shadow map. Resolution must be power of two and
 	// square, since quad-tree for managing tiles will not work correctly otherwise. Furthermore
@@ -266,6 +272,13 @@ void idRenderBackend::Init()
 
 void idRenderBackend::Shutdown()
 {
+	if( neuralTemporalBackend != NULL )
+	{
+		neuralTemporalBackend->Shutdown();
+		delete neuralTemporalBackend;
+		neuralTemporalBackend = NULL;
+	}
+
 	// SRS - Clean up NVRHI resources before Sys_Quit(), otherwise non-zero exit code (destructors too late)
 
 	// Clear all cached pipeline data
@@ -2549,6 +2562,7 @@ idRenderBackend::idRenderBackend()
 {
 	hiZGenPass = nullptr;
 	ssaoPass = nullptr;
+	neuralTemporalBackend = NULL;
 
 	memset( &glConfig, 0, sizeof( glConfig ) );
 

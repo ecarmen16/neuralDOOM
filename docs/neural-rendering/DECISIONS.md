@@ -74,9 +74,14 @@
 
 ## Pending decisions
 
-- Exact linear/HDR scene-color stage used by the reconstruction backend.
-- Motion-vector format, units, sign, Y convention, and jitter treatment.
-- Previous-pose storage strategy for MD5 animation.
 - Official Streamline acquisition mechanism and source-tree layout.
 
 Resolve these only after `RECON_REPORT.md` and targeted captures provide evidence.
+
+## D-010 - Put vendor implementations behind an NVRHI temporal-frame contract
+
+**Status:** Accepted.
+
+**Reasoning:** The verified inputs already exist as engine-owned NVRHI resources. Passing those handles with measured conventions, matrices, jitter, exposure, dimensions, sample count, and reset epoch keeps shared rendering independent of D3D12/NGX/Streamline while giving a native adapter everything needed at one insertion point.
+
+**Consequence:** `neuralTemporalFrame_t` is the stable shared boundary. `idNeuralTemporalBackend` owns initialize/resize/reset/evaluate/shutdown behavior. The first implementation is a null/debug validator selected by `r_neuralBackend 1`; it always declines presentation and therefore falls back to existing TAA. Future vendor code must remain below this interface and behind an OFF-by-default build option.

@@ -53,6 +53,7 @@ idCVar r_neuralRigidMotionVectors( "r_neuralRigidMotionVectors", "0", CVAR_RENDE
 idCVar r_neuralSkinnedMotionVectors( "r_neuralSkinnedMotionVectors", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "generate skinned-object motion vectors; forced on by r_neuralDebug 2" );
 idCVar r_neuralViewmodelMotionVectors( "r_neuralViewmodelMotionVectors", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "include first-person viewmodel motion vectors; experimental and not forced by diagnostic modes" );
 idCVar r_neuralTemporalMasks( "r_neuralTemporalMasks", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "generate reactive and transparency masks; forced on by r_neuralDebug 3 or 4" );
+idCVar r_neuralBackend( "r_neuralBackend", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_NEW, "neutral temporal backend: 0 = disabled, 1 = validate frame contract with null/debug backend", 0, 1, idCmdSystem::ArgCompletion_Integer<0, 1> );
 idCVar r_forceZPassStencilShadows( "r_forceZPassStencilShadows", "0", CVAR_RENDERER | CVAR_BOOL, "force Z-pass rendering for performance testing" );
 idCVar r_useStencilShadowPreload( "r_useStencilShadowPreload", "0", CVAR_RENDERER | CVAR_BOOL, "use stencil shadow preload algorithm instead of Z-fail" );
 idCVar r_skipShaderPasses( "r_skipShaderPasses", "0", CVAR_RENDERER | CVAR_BOOL, "" );
@@ -71,7 +72,30 @@ void idRenderBackend::InvalidateTemporalHistory()
 {
 	prevMVP[0] = renderMatrix_identity;
 	prevMVP[1] = renderMatrix_identity;
+	neuralPreviousMVP[0] = renderMatrix_identity;
+	neuralPreviousMVP[1] = renderMatrix_identity;
 	prevViewsValid = false;
+	if( neuralTemporalBackend != NULL )
+	{
+		neuralTemporalBackend->ResetHistory( tr.GetTemporalHistoryEpoch() );
+	}
+}
+
+void idRenderBackend::ResizeNeuralTemporalBackend()
+{
+	if( neuralTemporalBackend != NULL && globalImages->currentRenderHDRImage != NULL )
+	{
+		neuralTemporalBackend->Resize( globalImages->currentRenderHDRImage->GetUploadWidth(), globalImages->currentRenderHDRImage->GetUploadHeight(), renderSystem->GetWidth(), renderSystem->GetHeight() );
+	}
+}
+
+void idRenderBackend::PrintNeuralTemporalBackendStatus() const
+{
+	common->Printf( "r_neuralBackend %d (%s)\n", r_neuralBackend.GetInteger(), r_neuralBackend.GetBool() ? "validate" : "disabled" );
+	if( neuralTemporalBackend != NULL )
+	{
+		neuralTemporalBackend->PrintStatus();
+	}
 }
 
 /*
@@ -5014,7 +5038,7 @@ idRenderBackend::DrawTemporalMasks
 void idRenderBackend::DrawTemporalMasks()
 {
 	const int debugMode = r_neuralDebug.GetInteger();
-	if( !r_neuralTemporalMasks.GetBool() && debugMode != 3 && debugMode != 4 )
+	if( !r_neuralTemporalMasks.GetBool() && debugMode != 3 && debugMode != 4 && !r_neuralBackend.GetBool() )
 	{
 		return;
 	}
@@ -5039,7 +5063,7 @@ void idRenderBackend::DrawMotionVectors()
 		return;
 	}
 
-	if( !R_UseTemporalAA() && r_motionBlur.GetInteger() <= 0 && r_neuralDebug.GetInteger() != 2 )
+	if( !R_UseTemporalAA() && r_motionBlur.GetInteger() <= 0 && r_neuralDebug.GetInteger() != 2 && !r_neuralBackend.GetBool() )
 	{
 		return;
 	}
@@ -5139,6 +5163,7 @@ void idRenderBackend::DrawMotionVectors()
 	// in stereo rendering, each eye needs to get a separate previous frame mvp
 	int mvpIndex = ( viewDef->renderView.viewEyeBuffer == 1 ) ? 1 : 0;
 	const idRenderMatrix previousViewMVP = prevMVP[mvpIndex];
+	neuralPreviousMVP[mvpIndex] = previousViewMVP;
 
 	// derive the matrix to go from current pixels to previous frame pixels
 	bool cameraMoved = false;
@@ -5168,7 +5193,7 @@ void idRenderBackend::DrawMotionVectors()
 	windowCoordParm[3] = h;
 	SetFragmentParm( RENDERPARM_WINDOWCOORD, windowCoordParm ); // rpWindowCoord
 
-	if( r_taaMotionVectors.GetBool() && prevViewsValid && cameraMoved )
+	if( ( r_taaMotionVectors.GetBool() || r_neuralBackend.GetBool() ) && prevViewsValid && cameraMoved )
 	{
 		RB_SetMVP( motionMatrix );
 
@@ -5185,10 +5210,10 @@ void idRenderBackend::DrawMotionVectors()
 		DrawElementsWithCounters( &unitSquareSurface );
 	}
 
-	const bool drawRigidMotionVectors = r_neuralRigidMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2;
-	const bool drawSkinnedMotionVectors = r_neuralSkinnedMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2;
-	const bool drawViewmodelMotionVectors = r_neuralViewmodelMotionVectors.GetBool();
-	if( r_taaMotionVectors.GetBool() && prevViewsValid && ( drawRigidMotionVectors || drawSkinnedMotionVectors || drawViewmodelMotionVectors ) )
+	const bool drawRigidMotionVectors = r_neuralRigidMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2 || r_neuralBackend.GetBool();
+	const bool drawSkinnedMotionVectors = r_neuralSkinnedMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2 || r_neuralBackend.GetBool();
+	const bool drawViewmodelMotionVectors = r_neuralViewmodelMotionVectors.GetBool() || r_neuralBackend.GetBool();
+	if( ( r_taaMotionVectors.GetBool() || r_neuralBackend.GetBool() ) && prevViewsValid && ( drawRigidMotionVectors || drawSkinnedMotionVectors || drawViewmodelMotionVectors ) )
 	{
 		renderLog.OpenBlock( "Render_ObjectMotionVectors" );
 
@@ -5269,6 +5294,56 @@ void idRenderBackend::DrawMotionVectors()
 
 	renderLog.CloseBlock();
 	renderLog.CloseMainBlock();
+}
+
+bool idRenderBackend::EvaluateNeuralTemporalBackend( const viewDef_t* _viewDef, int stereoEye )
+{
+	if( !r_neuralBackend.GetBool() || neuralTemporalBackend == NULL || _viewDef->viewEntitys == NULL || _viewDef->isSubview || ( _viewDef->renderView.rdflags & ( RDF_IRRADIANCE | RDF_NO_TEMPORAL_HISTORY ) ) )
+	{
+		return false;
+	}
+
+	const int mvpIndex = ( _viewDef->renderView.viewEyeBuffer == 1 ) ? 1 : 0;
+	const int previousFrame = _viewDef->taaFrameCount > 0 ? _viewDef->taaFrameCount - 1 : _viewDef->taaFrameCount;
+	neuralTemporalFrame_t frame = {};
+	frame.commandList = commandList;
+	frame.sceneColorHDR = globalImages->currentRenderHDRImage->GetTextureHandle();
+	frame.depth = globalImages->currentDepthImage->GetTextureHandle();
+	frame.motionVectors = globalImages->taaMotionVectorsImage->GetTextureHandle();
+	frame.reactiveMask = globalImages->neuralReactiveMaskImage->GetTextureHandle();
+	frame.transparencyMask = globalImages->neuralTransparencyMaskImage->GetTextureHandle();
+	frame.output = globalImages->taaResolvedImage->GetTextureHandle();
+	frame.exposure = toneMapPass != NULL ? toneMapPass->GetExposureBuffer() : NULL;
+	frame.currentViewProjection = _viewDef->worldSpace.unjitteredMVP;
+	frame.previousViewProjection = neuralPreviousMVP[mvpIndex];
+	frame.currentJitterPixels = GetCurrentPixelOffset( _viewDef->taaFrameCount );
+	frame.previousJitterPixels = GetCurrentPixelOffset( previousFrame );
+	frame.exposureScale = exp2f( r_exposure.GetFloat() );
+	frame.renderWidth = globalImages->currentRenderHDRImage->GetUploadWidth();
+	frame.renderHeight = globalImages->currentRenderHDRImage->GetUploadHeight();
+	frame.renderSampleCount = frame.sceneColorHDR->getDesc().sampleCount;
+	frame.outputWidth = renderSystem->GetWidth();
+	frame.outputHeight = renderSystem->GetHeight();
+	frame.stereoEye = stereoEye;
+	frame.historyEpoch = _viewDef->temporalHistoryEpoch;
+	frame.motionVectorConvention = NMVC_PREVIOUS_MINUS_CURRENT_PIXELS;
+	frame.depthConvention = NDC_DEVICE_ZERO_TO_ONE_NON_REVERSED;
+	frame.resetHistory = _viewDef->temporalHistoryResetReasons != NTRR_NONE;
+	frame.motionVectorsValid = true;
+	frame.masksValid = true;
+	frame.viewmodelIncluded = true;
+	frame.exposureIsAutomatic = r_hdrAutoExposure.GetBool();
+	frame.exposureBufferValid = frame.exposure != NULL;
+
+	if( frame.resetHistory )
+	{
+		neuralTemporalBackend->ResetHistory( frame.historyEpoch );
+	}
+
+	renderLog.OpenBlock( "Neural_TemporalBackend", colorGreen );
+	const bool presented = neuralTemporalBackend->Evaluate( frame );
+	renderLog.CloseBlock();
+	return presented;
 }
 
 void idRenderBackend::TemporalAAPass( const viewDef_t* _viewDef )
@@ -6327,12 +6402,20 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	DrawMotionVectors();
 
 	//-------------------------------------------------
+	// offer complete engine-owned inputs to the optional temporal backend
+	//-------------------------------------------------
+	const bool neuralTemporalPresented = EvaluateNeuralTemporalBackend( _viewDef, stereoEye );
+
+	//-------------------------------------------------
 	// resolve of HDR target using temporal anti aliasing before any tonemapping and post processing
 	//
 	// use this to eat all stochastic noise like from volumetric light sampling or SSAO
 	// runs at full resolution
 	//-------------------------------------------------
-	TemporalAAPass( _viewDef );
+	if( !neuralTemporalPresented )
+	{
+		TemporalAAPass( _viewDef );
+	}
 
 	//-------------------------------------------------
 	// tonemapping: convert back from HDR to LDR range
