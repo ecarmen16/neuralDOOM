@@ -2,6 +2,48 @@
 
 Append dated entries. Do not replace prior evidence.
 
+## 2026-09-01 - Signed motion-vector diagnostic
+
+### Repository state
+
+- Branch: `feature/neural-rendering-spike`.
+- Base checkpoint: `d6d361fa` (`renderer: add HUD-free LDR diagnostic`).
+- Dirty before task: no.
+
+### Files and symbols
+
+- `neo/renderer/RenderBackend.cpp:r_neuralDebug` adds mode `2`; `idRenderBackend::ExecuteBackEndCommands` presents `_taaMotionVectors` after GUI, and `DrawMotionVectors` generates the buffer in this diagnostic mode even when TAA and motion blur are disabled.
+- `neo/renderer/Passes/CommonPasses.h/.cpp:BlitSampler::MotionVectors` selects a dedicated fullscreen debug pixel shader while reusing the existing blit vertex shader, binding layout, sampler, and pipeline cache.
+- `neo/shaders/builtin/debug/motion_vectors.ps.hlsl` maps signed X/Y displacement into visible R/G channels.
+- `neo/shaders/shaders.cfg` includes the diagnostic shader in the normal ShaderMake build.
+
+### Visualization contract
+
+- Input remains `_taaMotionVectors`: native-resolution, one-sample `DXGI_FORMAT_R16G16_FLOAT` current-pixel to previous-pixel displacement in pixel units.
+- The shader clamps each component to `[-8, 8]`, maps X to red and Y to green using `encoded = motion * (0.5 / 8.0) + 0.5`, holds blue at `0.5`, and outputs alpha `1.0`.
+- Neutral gray therefore represents `(0, 0)`. Direction changes the red/green balance; saturation indicates a component reached at least eight pixels of displacement.
+- Mode `2` is display-only. It does not modify the stored vectors or their TAA consumer.
+
+### Validation
+
+- Configure: pass with the established VS2022 x64 DX12-only options.
+- Build: pass, `RelWithDebInfo`; ShaderMake completed 750 DXIL jobs including `builtin/debug/motion_vectors.ps.hlsl`.
+- Staged executable SHA-256: `44F8D73B9F574EC680BAD2B2556219CA5E878C827F61FDAE0C1F7A9017DDDFE6`.
+- User runtime validation: a static camera produced neutral gray; slow yaw produced a coherent signed field; lateral movement produced depth-dependent parallax; the excluded first-person weapon remained neutral.
+- Feature-off regression: user loaded the saved game with `r_neuralDebug 0` and confirmed normal world, HUD, menus, and gameplay with no crash.
+- RenderDoc capture: ignored `captures/neural/renderdoc-motion-debug/motion_debug_frame1811.rdc`, 483,723,622 bytes, SHA-256 `F3399F9FE722A2DB5EFAA9CB11E5A112C38526D116138CBE889EAF5C47D49479`.
+- Capture evidence: `_taaMotionVectors` is `R16G16_FLOAT`; `Render_MotionVectors` precedes `Neural_PresentMotionVectors`; the captured 1725x985 debug output contains the expected smooth signed camera field.
+
+### Known issues
+
+- Current vectors describe camera/static-world motion only. Rigid and skinned objects do not retain previous object or pose transforms.
+- The first-person weapon is deliberately excluded from the existing temporal mask and appears neutral in mode `2`; the final viewmodel policy remains pending.
+- The diagnostic uses a fixed eight-pixel component range. A later numeric inspection mode may add adjustable scale or per-pixel values if needed.
+
+### Next narrow task
+
+- Add previous-transform history for one reproducible rigid-object class and validate it against a moving door/lift or physics object with a static camera.
+
 ## 2026-09-01 - HUD-free LDR diagnostic
 
 ### Repository state

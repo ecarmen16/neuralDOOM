@@ -1,5 +1,41 @@
 # Test results
 
+## 2026-09-01 / d6d361fa + ND3-220 worktree / signed motion-vector diagnostic
+
+- Tester/machine label: local Windows development machine; runtime visually checked by user.
+- Branch and base commit: `feature/neural-rendering-spike`, `d6d361fa`.
+- Build configuration: `RelWithDebInfo`, VS2022 x64.
+- CMake options: established DX12-only configuration.
+- GPU and driver: NVIDIA GeForce RTX 5090, 610.47.
+- Resolution / HDR / AA: runtime tests at the current window size; validation capture at 1725x985; `_taaMotionVectors` is `R16G16_FLOAT`; TAA active.
+- Scene/save/map: resumable user save in Mars City Hangar.
+- Relevant cvars: `r_graphicsAPI dx12`, `r_neuralDebug 2`; capture additionally used `r_fullscreen 0` and `r_logLevel 1`.
+
+| Test | Result | Evidence / artifact path | Notes |
+|---|---|---|---|
+| Configure and build | PASS | build output; `docs/neural-rendering/LAST_BUILD.txt` | 750 DXIL jobs, including the new diagnostic shader; engine executable staged. |
+| T01 static camera/static world | PASS | user manual observation | Output settled to neutral gray, representing zero pixel displacement. |
+| T02 camera yaw | PASS | user manual observation and ignored RenderDoc frame 1811 | Smooth coherent signed field; no scene-color or GUI contamination. |
+| T03 lateral translation | PASS | user manual observation | Nearby geometry showed stronger variation than distant geometry. |
+| Weapon exclusion | PASS | user manual observation | Weapon remained neutral, matching the existing alpha exclusion policy. |
+| GPU resource/order | PASS | ignored `captures/neural/renderdoc-motion-debug/motion_debug_frame1811.rdc` | `R16G16_FLOAT` motion resource generated before dedicated debug presentation. |
+| Feature-off regression | PASS | user manual observation with `r_neuralDebug 0` | Loaded save; world, HUD, menus, and gameplay rendered normally with no crash. |
+
+### Performance
+
+- Baseline frame time: not measured.
+- Changed frame time: not measured.
+- Mode `0` adds no debug draw. Mode `2` adds one fullscreen visualization blit; motion generation is forced only if it would otherwise be disabled.
+
+### Regressions
+
+- None observed in mode `2` operation or the feature-off mode `0` regression check.
+- Rigid and skinned object motion remains unimplemented.
+
+### Conclusion
+
+ND3-220 passes for camera/static-world visualization and moves ND3-230 rigid-object history to `READY`.
+
 ## 2026-09-01 / 992b6355 + Phase 3 worktree / HUD-free LDR diagnostic
 
 - Tester/machine label: local Windows development machine; runtime visually checked by user.

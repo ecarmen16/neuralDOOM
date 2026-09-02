@@ -68,6 +68,9 @@ void CommonRenderPasses::Init( nvrhi::IDevice* device )
 	blitIndex = renderProgManager.FindShader( "builtin/blit", SHADER_STAGE_FRAGMENT, "", shaderMacros, true, LAYOUT_DRAW_VERT );
 	m_BlitArrayPS = renderProgManager.GetShader( blitIndex );
 
+	int motionVectorsIndex = renderProgManager.FindShader( "builtin/debug/motion_vectors", SHADER_STAGE_FRAGMENT, "", idList<shaderMacro_t>(), true, LAYOUT_DRAW_VERT );
+	m_MotionVectorsPS = renderProgManager.GetShader( motionVectorsIndex );
+
 	auto samplerDesc = nvrhi::SamplerDesc()
 					   .setAllFilters( false )
 					   .setAllAddressModes( nvrhi::SamplerAddressMode::Clamp );
@@ -191,6 +194,7 @@ void CommonRenderPasses::Shutdown()
 	m_BlitArrayPS = nullptr;
 	m_SharpenPS = nullptr;
 	m_SharpenArrayPS = nullptr;
+	m_MotionVectorsPS = nullptr;
 
 	m_BlackTexture = nullptr;
 	m_GrayTexture = nullptr;
@@ -248,6 +252,10 @@ void CommonRenderPasses::BlitTexture( nvrhi::ICommandList* commandList, const Bl
 			break;
 		case BlitSampler::Sharpen:
 			shader = isTextureArray ? m_SharpenArrayPS : m_SharpenPS;
+			break;
+		case BlitSampler::MotionVectors:
+			assert( !isTextureArray );
+			shader = m_MotionVectorsPS;
 			break;
 		default:
 			assert( false );

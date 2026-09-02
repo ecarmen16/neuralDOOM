@@ -41,7 +41,8 @@ enum class BlitSampler
 {
 	Point,
 	Linear,
-	Sharpen
+	Sharpen,
+	MotionVectors
 };
 
 struct BlitParameters
@@ -112,6 +113,7 @@ public:
 	nvrhi::ShaderHandle m_BlitArrayPS;
 	nvrhi::ShaderHandle m_SharpenPS;
 	nvrhi::ShaderHandle m_SharpenArrayPS;
+	nvrhi::ShaderHandle m_MotionVectorsPS;
 
 	nvrhi::TextureHandle m_BlackTexture;
 	nvrhi::TextureHandle m_GrayTexture;

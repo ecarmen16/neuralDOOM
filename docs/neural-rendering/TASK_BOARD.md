@@ -30,8 +30,8 @@ Statuses: `BLOCKED`, `READY`, `IN PROGRESS`, `VERIFY`, `DONE`, `DEFERRED`.
 |---|---|---|---|
 | ND3-200 | DONE | Add renderer debug/capture cvar scaffold | `r_neuralDebug` defaults to `0`; enabled/disabled runtime paths and GPU markers verified |
 | ND3-210 | DONE | Expose HUD-free scene color | `_neuralHudlessLDR` capture/present path verified around GUI in RenderDoc frame 1567 |
-| ND3-220 | READY | Validate and expose camera/static velocity | Signed debug vector tests T01–T03 |
-| ND3-230 | BLOCKED | Add rigid-object velocity | Tests T04–T05 |
+| ND3-220 | DONE | Validate and expose camera/static velocity | `r_neuralDebug 2`; signed static/yaw/strafe checks and RenderDoc frame 1811 |
+| ND3-230 | READY | Add rigid-object velocity | Tests T04–T05 using a reproducible door/lift or physics object |
 | ND3-240 | BLOCKED | Add MD5/skinned velocity | Tests T06–T07 |
 | ND3-250 | BLOCKED | Resolve viewmodel ordering/velocity | Test T08 and documented policy |
 | ND3-260 | BLOCKED | Add reactive/transparency masks | Tests T09–T13 |

@@ -48,7 +48,7 @@ extern DeviceManager* deviceManager;
 
 idCVar r_drawEyeColor( "r_drawEyeColor", "0", CVAR_RENDERER | CVAR_BOOL, "Draw a colored box, red = left eye, blue = right eye, grey = non-stereo" );
 idCVar r_motionBlur( "r_motionBlur", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "1 - 5, log2 of the number of motion blur samples" );
-idCVar r_neuralDebug( "r_neuralDebug", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_NEW, "neural renderer diagnostic output: 0 = disabled, 1 = HUD-free post-processed LDR", 0, 1, idCmdSystem::ArgCompletion_Integer<0, 1> );
+idCVar r_neuralDebug( "r_neuralDebug", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_NEW, "neural renderer diagnostic output: 0 = disabled, 1 = HUD-free post-processed LDR, 2 = signed motion vectors", 0, 2, idCmdSystem::ArgCompletion_Integer<0, 2> );
 idCVar r_forceZPassStencilShadows( "r_forceZPassStencilShadows", "0", CVAR_RENDERER | CVAR_BOOL, "force Z-pass rendering for performance testing" );
 idCVar r_useStencilShadowPreload( "r_useStencilShadowPreload", "0", CVAR_RENDERER | CVAR_BOOL, "use stencil shadow preload algorithm instead of Z-fail" );
 idCVar r_skipShaderPasses( "r_skipShaderPasses", "0", CVAR_RENDERER | CVAR_BOOL, "" );
@@ -4863,7 +4863,7 @@ void idRenderBackend::DrawMotionVectors()
 		return;
 	}
 
-	if( !R_UseTemporalAA() && r_motionBlur.GetInteger() <= 0 )
+	if( !R_UseTemporalAA() && r_motionBlur.GetInteger() <= 0 && r_neuralDebug.GetInteger() != 2 )
 	{
 		return;
 	}
@@ -5510,6 +5510,7 @@ void idRenderBackend::ExecuteBackEndCommands( const emptyCommand_t* cmds )
 	const bool timerQueryAvailable = glConfig.timerQueryAvailable;
 	drawView3D = false;
 	bool neuralHudlessLDRCaptured = false;
+	bool neuralMotionVectorsAvailable = false;
 
 	for( ; cmds != NULL; cmds = ( const emptyCommand_t* )cmds->next )
 	{
@@ -5544,6 +5545,7 @@ void idRenderBackend::ExecuteBackEndCommands( const emptyCommand_t* cmds )
 			case RC_DRAW_VIEW_3D:
 				drawView3D = true;
 				DrawView( cmds, 0 );
+				neuralMotionVectorsAvailable = r_neuralDebug.GetInteger() == 2;
 				c_draw3d++;
 				break;
 
@@ -5596,6 +5598,20 @@ void idRenderBackend::ExecuteBackEndCommands( const emptyCommand_t* cmds )
 		blitParms.sourceTexture = globalImages->neuralHudlessLDRImage->GetTextureHandle();
 		blitParms.targetFramebuffer = deviceManager->GetCurrentFramebuffer();
 		blitParms.targetViewport = nvrhi::Viewport( renderSystem->GetNativeWidth(), renderSystem->GetNativeHeight() );
+		commonPasses.BlitTexture( commandList, blitParms, &bindingCache );
+
+		renderLog.CloseBlock();
+	}
+	else if( neuralMotionVectorsAvailable )
+	{
+		OPTICK_GPU_EVENT( "Neural_PresentMotionVectors" );
+		renderLog.OpenBlock( "Neural_PresentMotionVectors", colorBlue );
+
+		BlitParameters blitParms;
+		blitParms.sourceTexture = globalImages->taaMotionVectorsImage->GetTextureHandle();
+		blitParms.targetFramebuffer = deviceManager->GetCurrentFramebuffer();
+		blitParms.targetViewport = nvrhi::Viewport( renderSystem->GetNativeWidth(), renderSystem->GetNativeHeight() );
+		blitParms.sampler = BlitSampler::MotionVectors;
 		commonPasses.BlitTexture( commandList, blitParms, &bindingCache );
 
 		renderLog.CloseBlock();
