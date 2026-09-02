@@ -615,6 +615,7 @@ void idCameraAnim::GetViewParms( renderView_t* view )
 	frameTime	= ( gameLocal.time - starttime ) * frameRate;
 	frame		= frameTime / 1000;
 	lerp		= ( frameTime % 1000 ) * 0.001f;
+	view->rdflags &= ~RDF_CAMERA_CUT;
 
 	// skip any frames where camera cuts occur
 	realFrame = frame;
@@ -629,24 +630,23 @@ void idCameraAnim::GetViewParms( renderView_t* view )
 		cut++;
 	}
 
-	if( g_debugCinematic.GetBool() )
+	int prevFrameTime = ( gameLocal.previousTime - starttime ) * frameRate;
+	int prevFrame = prevFrameTime / 1000;
+	int prevCut = 0;
+	for( i = 0; i < cameraCuts.Num(); i++ )
 	{
-		int prevFrameTime	= ( gameLocal.previousTime - starttime ) * frameRate;
-		int prevFrame		= prevFrameTime / 1000;
-		int prevCut;
-
-		prevCut = 0;
-		for( i = 0; i < cameraCuts.Num(); i++ )
+		if( prevFrame < cameraCuts[ i ] )
 		{
-			if( prevFrame < cameraCuts[ i ] )
-			{
-				break;
-			}
-			prevFrame++;
-			prevCut++;
+			break;
 		}
+		prevFrame++;
+		prevCut++;
+	}
 
-		if( prevCut != cut )
+	if( prevCut != cut )
+	{
+		view->rdflags |= RDF_CAMERA_CUT;
+		if( g_debugCinematic.GetBool() )
 		{
 			gameLocal.Printf( "%d: '%s' cut %d\n", gameLocal.framenum, GetName(), cut );
 		}

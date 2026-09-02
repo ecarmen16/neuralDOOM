@@ -246,6 +246,153 @@ idRenderSystemLocal::~idRenderSystemLocal()
 {
 }
 
+static const char* R_TemporalResetReasonsToString( int reasons )
+{
+	static idStr text;
+	text.Clear();
+
+	struct reasonName_t
+	{
+		int reason;
+		const char* name;
+	};
+	static const reasonName_t names[] =
+	{
+		{ NTRR_INITIALIZATION, "initialization" },
+		{ NTRR_LEVEL_LOAD, "level-load" },
+		{ NTRR_FRAMEBUFFER_RESIZE, "framebuffer-resize" },
+		{ NTRR_RENDER_WORLD, "render-world" },
+		{ NTRR_CAMERA_TELEPORT, "camera-teleport" },
+		{ NTRR_CAMERA_CUT, "camera-cut" },
+		{ NTRR_FOV_CHANGE, "fov-change" },
+		{ NTRR_VIEWPORT_CHANGE, "viewport-change" },
+		{ NTRR_MANUAL, "manual" }
+	};
+
+	for( int i = 0; i < ( int )ARRAY_COUNT( names ); i++ )
+	{
+		if( reasons & names[i].reason )
+		{
+			if( text.Length() > 0 )
+			{
+				text.Append( "|" );
+			}
+			text.Append( names[i].name );
+		}
+	}
+
+	return text.Length() > 0 ? text.c_str() : "none";
+}
+
+void idRenderSystemLocal::RequestTemporalHistoryReset( int reasons )
+{
+	if( reasons == NTRR_NONE )
+	{
+		return;
+	}
+
+	temporalHistoryEpoch++;
+	temporalHistoryPendingResetReasons |= reasons;
+	temporalHistoryViewValid = false;
+}
+
+void idRenderSystemLocal::PrepareTemporalHistory( viewDef_t* currentView )
+{
+	currentView->temporalHistoryEpoch = temporalHistoryEpoch;
+	currentView->temporalHistoryResetReasons = NTRR_NONE;
+
+	if( currentView->renderView.rdflags & ( RDF_IRRADIANCE | RDF_NO_TEMPORAL_HISTORY ) )
+	{
+		return;
+	}
+
+	int detectedReasons = NTRR_NONE;
+	const int viewWidth = currentView->viewport.x2 - currentView->viewport.x1 + 1;
+	const int viewHeight = currentView->viewport.y2 - currentView->viewport.y1 + 1;
+
+	if( temporalHistoryViewValid && temporalHistoryFrameNum != frameCount )
+	{
+		if( temporalHistoryWorld != currentView->renderWorld )
+		{
+			detectedReasons |= NTRR_RENDER_WORLD;
+		}
+		if( temporalHistoryViewWidth != viewWidth || temporalHistoryViewHeight != viewHeight )
+		{
+			detectedReasons |= NTRR_VIEWPORT_CHANGE;
+		}
+		if( idMath::Fabs( temporalHistoryView.fov_x - currentView->renderView.fov_x ) > r_neuralHistoryFovThreshold.GetFloat() ||
+			idMath::Fabs( temporalHistoryView.fov_y - currentView->renderView.fov_y ) > r_neuralHistoryFovThreshold.GetFloat() )
+		{
+			detectedReasons |= NTRR_FOV_CHANGE;
+		}
+
+		const idVec3 cameraDelta = currentView->renderView.vieworg - temporalHistoryView.vieworg;
+		const float teleportDistance = r_neuralHistoryTeleportDistance.GetFloat();
+		if( cameraDelta.LengthSqr() > teleportDistance * teleportDistance )
+		{
+			detectedReasons |= NTRR_CAMERA_TELEPORT;
+		}
+
+		const float cutDot = idMath::Cos( DEG2RAD( r_neuralHistoryCutAngle.GetFloat() ) );
+		for( int axis = 0; axis < 3; axis++ )
+		{
+			if( currentView->renderView.viewaxis[axis] * temporalHistoryView.viewaxis[axis] < cutDot )
+			{
+				detectedReasons |= NTRR_CAMERA_CUT;
+				break;
+			}
+		}
+	}
+
+	if( currentView->renderView.rdflags & RDF_CAMERA_CUT )
+	{
+		detectedReasons |= NTRR_CAMERA_CUT;
+	}
+
+	if( detectedReasons != NTRR_NONE )
+	{
+		temporalHistoryEpoch++;
+		temporalHistoryPendingResetReasons |= detectedReasons;
+	}
+
+	currentView->temporalHistoryEpoch = temporalHistoryEpoch;
+	currentView->temporalHistoryResetReasons = temporalHistoryPendingResetReasons;
+
+	if( r_neuralHistoryDebug.GetBool() && currentView->temporalHistoryResetReasons != NTRR_NONE )
+	{
+		common->Printf( "Neural temporal history reset: epoch %llu, reasons %s\n",
+			( unsigned long long )currentView->temporalHistoryEpoch,
+			R_TemporalResetReasonsToString( currentView->temporalHistoryResetReasons ) );
+	}
+
+	if( currentView->temporalHistoryResetReasons != NTRR_NONE )
+	{
+		temporalHistoryLastResetReasons = currentView->temporalHistoryResetReasons;
+		temporalHistoryLastResetFrame = frameCount;
+	}
+
+	temporalHistoryPendingResetReasons = NTRR_NONE;
+	temporalHistoryViewValid = true;
+	temporalHistoryWorld = currentView->renderWorld;
+	temporalHistoryView = currentView->renderView;
+	temporalHistoryViewWidth = viewWidth;
+	temporalHistoryViewHeight = viewHeight;
+	temporalHistoryFrameNum = frameCount;
+}
+
+void idRenderSystemLocal::PrintTemporalHistoryStatus() const
+{
+	const idStr pendingReasons = R_TemporalResetReasonsToString( temporalHistoryPendingResetReasons );
+	const idStr lastReasons = R_TemporalResetReasonsToString( temporalHistoryLastResetReasons );
+	common->Printf( "Neural temporal history: epoch %llu, pending %s, lastReset %s at frame %d, trackedView %s at frame %d\n",
+		( unsigned long long )temporalHistoryEpoch,
+		pendingReasons.c_str(),
+		lastReasons.c_str(),
+		temporalHistoryLastResetFrame,
+		temporalHistoryViewValid ? "valid" : "invalid",
+		temporalHistoryFrameNum );
+}
+
 /*
 =============
 idRenderSystemLocal::SetColor

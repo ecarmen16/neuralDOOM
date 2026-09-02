@@ -282,6 +282,7 @@ public:
 	idRenderMatrix			previousMotionVectorModelMatrix;
 	int						motionVectorFrameNum;
 	bool					motionVectorHistoryValid;
+	uint64					motionVectorHistoryEpoch;
 	idList<idJointMat, TAG_RENDER>	motionVectorJoints;
 	idList<idJointMat, TAG_RENDER>	previousMotionVectorJoints;
 	int						motionVectorJointFrameNum;
@@ -436,6 +437,20 @@ struct viewEntity_t
 	// parallelAddModels will build a chain of surfaces here that will need to
 	// be linked to the lights or added to the drawsurf list in a serial code section
 	drawSurf_t* 			drawSurfs;
+};
+
+enum neuralTemporalResetReason_t
+{
+	NTRR_NONE = 0,
+	NTRR_INITIALIZATION = BIT( 0 ),
+	NTRR_LEVEL_LOAD = BIT( 1 ),
+	NTRR_FRAMEBUFFER_RESIZE = BIT( 2 ),
+	NTRR_RENDER_WORLD = BIT( 3 ),
+	NTRR_CAMERA_TELEPORT = BIT( 4 ),
+	NTRR_CAMERA_CUT = BIT( 5 ),
+	NTRR_FOV_CHANGE = BIT( 6 ),
+	NTRR_VIEWPORT_CHANGE = BIT( 7 ),
+	NTRR_MANUAL = BIT( 8 )
 };
 
 // RB: viewEnvprobes are allocated on the frame temporary stack memory
@@ -637,6 +652,8 @@ struct viewDef_t
 	Framebuffer*		targetRender;				// SP: The framebuffer to render to
 
 	int					taaFrameCount;				// RB: so we have the same frame index in frontend and backend
+	uint64				temporalHistoryEpoch;		// engine-owned generation shared by all temporal inputs
+	int					temporalHistoryResetReasons;	// neuralTemporalResetReason_t bits active for this view
 };
 
 
@@ -992,6 +1009,13 @@ public:
 	};
 
 	void					OnFrame();
+	void					RequestTemporalHistoryReset( int reasons );
+	void					PrepareTemporalHistory( viewDef_t* viewDef );
+	void					PrintTemporalHistoryStatus() const;
+	uint64					GetTemporalHistoryEpoch() const
+	{
+		return temporalHistoryEpoch;
+	}
 
 public:
 	// renderer globals
@@ -1016,6 +1040,17 @@ public:
 	idRenderWorldLocal* 	primaryWorld;
 	renderView_t			primaryRenderView;
 	viewDef_t* 				primaryView;
+
+	uint64					temporalHistoryEpoch;
+	int						temporalHistoryPendingResetReasons;
+	int						temporalHistoryLastResetReasons;
+	int						temporalHistoryLastResetFrame;
+	bool					temporalHistoryViewValid;
+	idRenderWorldLocal*		temporalHistoryWorld;
+	renderView_t			temporalHistoryView;
+	int						temporalHistoryViewWidth;
+	int						temporalHistoryViewHeight;
+	int						temporalHistoryFrameNum;
 	// many console commands need to know which world they should operate on
 
 	const idMaterial* 		whiteMaterial;
@@ -1304,6 +1339,11 @@ extern idCVar r_neuralRigidMotionVectors;
 extern idCVar r_neuralSkinnedMotionVectors;
 extern idCVar r_neuralViewmodelMotionVectors;
 extern idCVar r_neuralTemporalMasks;
+extern idCVar r_neuralHistoryDebug;
+extern idCVar r_neuralHistoryTeleportDistance;
+extern idCVar r_neuralHistoryObjectTeleportDistance;
+extern idCVar r_neuralHistoryCutAngle;
+extern idCVar r_neuralHistoryFovThreshold;
 
 extern idCVar r_useFilmicPostFX;
 extern idCVar r_useCRTPostFX;

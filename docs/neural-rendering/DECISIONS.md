@@ -64,6 +64,14 @@
 
 **Consequence:** The renderer owns two native-resolution `R8` resources: `_neuralReactiveMask` and `_neuralTransparencyMask`. Reactive classification includes translucent, additive/emissive, dynamic/cinematic, GUI/subview, and decal-or-later material work. Transparency is the narrower alpha/glass subset. Both are geometry- and texture-aware, combine overlaps with maximum blending, and are not yet consumed by TAA or a vendor backend.
 
+## D-009 - Use one renderer-owned temporal-history epoch
+
+**Status:** Accepted.
+
+**Reasoning:** Camera matrices, TAA feedback, rigid transforms, and skinned palettes must invalidate on the same rendered frame. Clearing only the fullscreen TAA validity bit leaves object histories capable of emitting velocities across discontinuities. A monotonically increasing epoch can be captured into the frame-local view and compared by persistent entity histories without retaining frame-local GPU handles.
+
+**Consequence:** Level/save loads, framebuffer recreation, render-world changes, major viewport/FOV changes, camera teleports/cuts, and manual requests advance one epoch. Exact engine events are preferred; conservative transform thresholds cover camera and object teleports where no explicit event exists. Camera animation cut frames set `RDF_CAMERA_CUT`. Portal-sky captures use `RDF_NO_TEMPORAL_HISTORY`: they resolve from the current frame for valid tonemapping but do not advance primary camera/TAA history.
+
 ## Pending decisions
 
 - Exact linear/HDR scene-color stage used by the reconstruction backend.

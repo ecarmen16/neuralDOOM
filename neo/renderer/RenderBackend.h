@@ -139,6 +139,7 @@ public:
 	void				CheckCVars();
 
 	void				ClearCaches();
+	void				InvalidateTemporalHistory();
 
 	static void			ImGui_RenderDrawLists( ImDrawData* draw_data );
 

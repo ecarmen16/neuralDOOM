@@ -2,6 +2,53 @@
 
 Append dated entries. Do not replace prior evidence.
 
+## 2026-09-01 - Unified temporal-history reset lifecycle
+
+### Repository state
+
+- Branch: `feature/neural-rendering-spike`.
+- Base checkpoint: `e6b0fed3` (`renderer: add temporal classification masks`).
+- Dirty before task: no.
+
+### Files and symbols
+
+- `neo/renderer/RenderCommon.h:neuralTemporalResetReason_t` defines explicit reason bits and carries an epoch plus reset reasons in each frame-local `viewDef_t`.
+- `neo/renderer/RenderSystem.cpp:idRenderSystemLocal::PrepareTemporalHistory` owns primary-view tracking, threshold detection, epoch advancement, named telemetry, and the last consumed reset record.
+- `neo/renderer/RenderSystem_init.cpp` requests level-load resets, initializes the lifecycle, exposes conservative camera/object/FOV thresholds, and registers `neuralHistoryReset` plus `neuralHistoryStatus`.
+- `neo/renderer/NVRHI/Framebuffer_NVRHI.cpp:Framebuffer::ResizeFramebuffers` requests a resize epoch and immediately invalidates backend feedback before any same-frame resized draw.
+- `neo/renderer/RenderBackend.cpp:idRenderBackend::InvalidateTemporalHistory` invalidates both eye MVPs and TAA feedback validity. `DrawViewInternal` consumes frame-local reset reasons before motion vectors and temporal resolve.
+- `neo/renderer/tr_frontend_addmodels.cpp:R_AddSingleModel` requires epoch continuity for rigid and joint-palette history and suppresses rigid velocity across object translations larger than the configured teleport threshold.
+- `neo/d3xp/Camera.cpp:idCameraAnim::GetViewParms` maps authored cinematic cut frames to `RDF_CAMERA_CUT`.
+- `neo/d3xp/PlayerView.cpp:idPlayerView::SingleView` marks portal-sky capture views `RDF_NO_TEMPORAL_HISTORY`; they receive a current-frame-only TAA resolve without changing primary history.
+
+### Lifecycle contract
+
+- Epoch changes invalidate TAA feedback, previous camera matrices, rigid transforms, skinned poses, and viewmodel histories on the same frame.
+- Exact reset signals: renderer initialization, level/save load, framebuffer resize/device-mode recreation, render-world change, authored cinematic cut, and `neuralHistoryReset`.
+- Detected discontinuities: primary-camera translation over 96 world units/frame, any camera basis rotation over 45 degrees/frame, viewport dimensions changing, or instantaneous horizontal/vertical FOV change over 5 degrees.
+- Per-object translation over 64 world units/frame invalidates only that entity's rigid/skinned motion history; it does not flush unrelated scene history.
+- Thresholds are runtime cvars and intentionally conservative: `r_neuralHistoryTeleportDistance`, `r_neuralHistoryObjectTeleportDistance`, `r_neuralHistoryCutAngle`, and `r_neuralHistoryFovThreshold`.
+- `neuralHistoryStatus` reports current epoch, pending reasons, last consumed reasons/frame, and tracked-view validity. `r_neuralHistoryDebug 1` prints resets as they are consumed.
+
+### Validation
+
+- Build: pass, `RelWithDebInfo`; all 768 DXIL shaders current and the engine linked/staged successfully.
+- Final staged executable: 24,764,928 bytes; SHA-256 `EDB8BB8641CCD35FB8078C4634813B3D11DAFC79FB03476099DE4FCE1D456E21`.
+- Hidden DX12 map-load/manual sequence exited with code 0. Status advanced epoch 4 to 5 across `neuralHistoryReset`.
+- Hidden viewport/FOV/teleport/restart sequences exited with code 0. Named status evidence recorded initialization/level-load/framebuffer-resize, `fov-change`, `camera-teleport|camera-cut`, and another framebuffer-restart epoch.
+- Runtime logs are local and untracked under the engine save path: `temporal_history_sequence.log`, `temporal_history_transitions.log`, `temporal_history_camera.log`, `temporal_history_fov.log`, and `temporal_history_status.log`.
+- Combined visible T15-T17 check passed. After save resume, FOV discontinuity, and `vid_restart`, the user confirmed stable rendering; `neuralHistoryStatus` reported epoch 6, pending none, last reset `framebuffer-resize`, and a valid tracked view.
+
+### Known limitations
+
+- Camera/object teleport detection is threshold-based where the game does not emit an exact event. Very small teleports may need a future explicit gameplay signal; unusually large legitimate single-frame motion may conservatively discard one history sample.
+- Authored `.camera` cuts are exact, while arbitrary third-party scripted camera swaps fall back to world-space/FOV discontinuity detection.
+- Stereo retains the upstream shared `prevViewsValid` boolean; per-eye MVPs reset together, but a future stereo-focused validation may justify per-eye feedback validity.
+
+### Next narrow task
+
+- Introduce the neutral temporal-input/backend interface with a no-SDK null/debug implementation and an unchanged disabled path.
+
 ## 2026-09-01 - Reactive and transparency classification masks
 
 ### Repository state

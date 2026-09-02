@@ -99,6 +99,8 @@ void Framebuffer::Shutdown()
 
 void Framebuffer::ResizeFramebuffers( bool reloadImages )
 {
+	tr.RequestTemporalHistoryReset( NTRR_FRAMEBUFFER_RESIZE );
+	backEnd.InvalidateTemporalHistory();
 	backEnd.ClearCaches();
 
 	// RB: FIXME I think allocating new Framebuffers lead to a memory leak

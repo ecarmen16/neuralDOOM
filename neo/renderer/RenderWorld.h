@@ -236,6 +236,8 @@ const int RDF_NOSHADOWS		= BIT( 0 ); // force renderer to use faster lighting on
 const int RDF_NOAMBIENT		= BIT( 1 ); // don't render indirect lighting
 const int RDF_IRRADIANCE	= BIT( 2 ); // render into 256^2 HDR render target for irradiance/radiance GGX calculation
 const int RDF_UNDERWATER	= BIT( 3 ); // TODO enable automatic underwater caustics and fog
+const int RDF_CAMERA_CUT	= BIT( 4 ); // invalidate temporal history on this rendered frame
+const int RDF_NO_TEMPORAL_HISTORY = BIT( 5 ); // auxiliary scene capture must not update primary-view history
 
 typedef struct renderView_s
 {

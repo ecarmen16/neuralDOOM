@@ -67,6 +67,13 @@ extern idCVar stereoRender_swapEyes;
 // SRS - flag indicating whether we are drawing a 3d view vs. a 2d-only view (e.g. menu or pda)
 bool drawView3D;
 
+void idRenderBackend::InvalidateTemporalHistory()
+{
+	prevMVP[0] = renderMatrix_identity;
+	prevMVP[1] = renderMatrix_identity;
+	prevViewsValid = false;
+}
+
 /*
 ================
 SetVertexParm
@@ -5281,6 +5288,10 @@ void idRenderBackend::TemporalAAPass( const viewDef_t* _viewDef )
 	{
 		return;
 	}
+	if( viewDef->renderView.rdflags & RDF_NO_TEMPORAL_HISTORY )
+	{
+		return;
+	}
 
 	if( viewDef->renderView.rdflags & ( RDF_NOAMBIENT | RDF_IRRADIANCE ) )
 	{
@@ -5307,8 +5318,12 @@ void idRenderBackend::TemporalAAPass( const viewDef_t* _viewDef )
 		r_taaMaxRadiance.GetFloat(),
 		r_taaEnableHistoryClamping.GetBool()
 	};
-	taaPass->TemporalResolve( commandList, params, prevViewsValid, _viewDef );
-	prevViewsValid = true;
+	const bool trackHistory = !( _viewDef->renderView.rdflags & RDF_NO_TEMPORAL_HISTORY );
+	taaPass->TemporalResolve( commandList, params, trackHistory && prevViewsValid, _viewDef );
+	if( trackHistory )
+	{
+		prevViewsValid = true;
+	}
 
 	renderLog.CloseBlock();
 	renderLog.CloseMainBlock();
@@ -5917,6 +5932,15 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	//OPTICK_GPU_EVENT( "DrawView" );	// SRS - now in DrawView() for 3D vs. GUI
 
 	bool is3D = _viewDef->viewEntitys && !_viewDef->is2Dgui;
+	if( is3D && !_viewDef->isSubview && !( _viewDef->renderView.rdflags & RDF_NO_TEMPORAL_HISTORY ) &&
+		_viewDef->temporalHistoryResetReasons != NTRR_NONE )
+	{
+		prevViewsValid = false;
+		const int mvpIndex = ( _viewDef->renderView.viewEyeBuffer == 1 ) ? 1 : 0;
+		prevMVP[mvpIndex] = _viewDef->worldSpace.unjitteredMVP;
+		renderLog.OpenBlock( "Neural_TemporalHistoryReset", colorYellow );
+		renderLog.CloseBlock();
+	}
 
 	// ugly but still faster than building the string
 	if( !is3D )

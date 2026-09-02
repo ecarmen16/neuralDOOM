@@ -1082,6 +1082,7 @@ void idRenderWorldLocal::RenderScene( const renderView_t* renderView )
 	parms->isObliqueProjection = false;
 	parms->initialViewAreaOrigin = renderView->vieworg;
 	parms->renderWorld = this;
+	tr.PrepareTemporalHistory( parms );
 
 	// see if the view needs to reverse the culling sense in mirrors
 	// or environment cube sides

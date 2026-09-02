@@ -306,6 +306,11 @@ idCVar r_taaClampingFactor( "r_taaClampingFactor", "1.0", CVAR_RENDERER | CVAR_F
 idCVar r_taaNewFrameWeight( "r_taaNewFrameWeight", "0.1", CVAR_RENDERER | CVAR_FLOAT | CVAR_NEW, "" );
 idCVar r_taaMaxRadiance( "r_taaMaxRadiance", "10000", CVAR_RENDERER | CVAR_FLOAT | CVAR_NEW, "" );
 idCVar r_taaMotionVectors( "r_taaMotionVectors", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "" );
+idCVar r_neuralHistoryDebug( "r_neuralHistoryDebug", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "print temporal history resets and their reason" );
+idCVar r_neuralHistoryTeleportDistance( "r_neuralHistoryTeleportDistance", "96", CVAR_RENDERER | CVAR_FLOAT | CVAR_NEW, "camera translation in one frame that resets temporal history", 1.0f, 4096.0f );
+idCVar r_neuralHistoryObjectTeleportDistance( "r_neuralHistoryObjectTeleportDistance", "64", CVAR_RENDERER | CVAR_FLOAT | CVAR_NEW, "object translation in one frame that invalidates its motion history", 1.0f, 4096.0f );
+idCVar r_neuralHistoryCutAngle( "r_neuralHistoryCutAngle", "45", CVAR_RENDERER | CVAR_FLOAT | CVAR_NEW, "camera rotation in one frame that resets temporal history", 1.0f, 180.0f );
+idCVar r_neuralHistoryFovThreshold( "r_neuralHistoryFovThreshold", "5", CVAR_RENDERER | CVAR_FLOAT | CVAR_NEW, "instantaneous FOV change that resets temporal history", 0.1f, 90.0f );
 
 idCVar r_useCRTPostFX( "r_useCRTPostFX", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER | CVAR_NEW, "RetroArch CRT shader: 1 = Matthias CRT, 1 = New Pixie, 2 = Zfast", 0, 3 );
 idCVar r_crtCurvature( "r_crtCurvature", "2", CVAR_RENDERER | CVAR_FLOAT | CVAR_NEW, "rounded borders" );
@@ -1585,6 +1590,16 @@ void R_VidRestart_f( const idCmdArgs& args )
 	R_SetNewMode( false );
 }
 
+static void R_NeuralHistoryReset_f( const idCmdArgs& args )
+{
+	tr.RequestTemporalHistoryReset( NTRR_MANUAL );
+}
+
+static void R_NeuralHistoryStatus_f( const idCmdArgs& args )
+{
+	tr.PrintTemporalHistoryStatus();
+}
+
 /*
 =================
 R_InitMaterials
@@ -1698,6 +1713,8 @@ void R_InitCommands()
 	cmdSystem->AddCommand( "reportSurfaceAreas", R_ReportSurfaceAreas_f, CMD_FL_RENDERER, "lists all used materials sorted by surface area" );
 	cmdSystem->AddCommand( "showInteractionMemory", R_ShowInteractionMemory_f, CMD_FL_RENDERER, "shows memory used by interactions" );
 	cmdSystem->AddCommand( "vid_restart", R_VidRestart_f, CMD_FL_RENDERER, "restarts renderSystem" );
+	cmdSystem->AddCommand( "neuralHistoryReset", R_NeuralHistoryReset_f, CMD_FL_RENDERER, "invalidate all temporal history on the next primary view" );
+	cmdSystem->AddCommand( "neuralHistoryStatus", R_NeuralHistoryStatus_f, CMD_FL_RENDERER, "print the temporal history epoch and pending reset reasons" );
 	cmdSystem->AddCommand( "listRenderEntityDefs", R_ListRenderEntityDefs_f, CMD_FL_RENDERER, "lists the entity defs" );
 	cmdSystem->AddCommand( "listRenderLightDefs", R_ListRenderLightDefs_f, CMD_FL_RENDERER, "lists the light defs" );
 	cmdSystem->AddCommand( "listModes", R_ListModes_f, CMD_FL_RENDERER, "lists all video modes" );
@@ -1720,6 +1737,16 @@ void idRenderSystemLocal::Clear()
 	primaryWorld = NULL;
 	memset( &primaryRenderView, 0, sizeof( primaryRenderView ) );
 	primaryView = NULL;
+	temporalHistoryEpoch = 1;
+	temporalHistoryPendingResetReasons = NTRR_INITIALIZATION;
+	temporalHistoryLastResetReasons = NTRR_NONE;
+	temporalHistoryLastResetFrame = -1;
+	temporalHistoryViewValid = false;
+	temporalHistoryWorld = NULL;
+	memset( &temporalHistoryView, 0, sizeof( temporalHistoryView ) );
+	temporalHistoryViewWidth = 0;
+	temporalHistoryViewHeight = 0;
+	temporalHistoryFrameNum = -1;
 	defaultMaterial = NULL;
 	testImage = NULL;
 	ambientCubeImage = NULL;
@@ -2388,6 +2415,8 @@ idRenderSystemLocal::BeginLevelLoad
 */
 void idRenderSystemLocal::BeginLevelLoad()
 {
+	RequestTemporalHistoryReset( NTRR_LEVEL_LOAD );
+
 	// clear binding sets for previous level images and light data #676
 	backEnd.ClearCaches();
 

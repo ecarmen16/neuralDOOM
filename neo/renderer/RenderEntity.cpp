@@ -45,6 +45,7 @@ idRenderEntityLocal::idRenderEntityLocal()
 	lastModifiedFrameNum	= 0;
 	motionVectorFrameNum	= -1;
 	motionVectorHistoryValid = false;
+	motionVectorHistoryEpoch = 0;
 	motionVectorJointFrameNum = -1;
 	motionVectorJointHistoryValid = false;
 	dynamicModel			= NULL;

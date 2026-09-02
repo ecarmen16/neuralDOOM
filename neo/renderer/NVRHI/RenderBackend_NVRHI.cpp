@@ -248,9 +248,7 @@ void idRenderBackend::Init()
 	currentBindingSets.SetNum( currentBindingSets.Max() );
 	pendingBindingSetDescs.SetNum( pendingBindingSetDescs.Max() );
 
-	prevMVP[0] = renderMatrix_identity;
-	prevMVP[1] = renderMatrix_identity;
-	prevViewsValid = false;
+	InvalidateTemporalHistory();
 
 	currentVertexBuffer = nullptr;
 	currentIndexBuffer = nullptr;

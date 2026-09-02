@@ -456,6 +456,7 @@ void idPlayerView::SingleView( const renderView_t* view, idMenuHandler_HUD* hudM
 	{
 		renderView_t portalView = hackedView;
 		portalView.vieworg = gameLocal.portalSkyEnt.GetEntity()->GetPhysics()->GetOrigin();
+		portalView.rdflags |= RDF_NO_TEMPORAL_HISTORY;
 		gameRenderWorld->RenderScene( &portalView );
 		renderSystem->CaptureRenderToImage( "_currentRender" );
 

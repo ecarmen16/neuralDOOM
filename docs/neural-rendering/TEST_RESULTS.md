@@ -1,5 +1,35 @@
 # Test results
 
+## 2026-09-01 / e6b0fed3 + ND3-270 worktree / temporal-history lifecycle
+
+- Tester/machine label: local Windows development machine; scripted transition tests and combined user visual check completed.
+- Branch and base commit: `feature/neural-rendering-spike`, `e6b0fed3`.
+- Build configuration: `RelWithDebInfo`, VS2022 x64, DX12 only.
+- GPU and driver: NVIDIA GeForce RTX 5090, 610.47.
+- Scene/map: disposable `devmap game/mars_city2`.
+- Relevant controls: `neuralHistoryStatus`, `neuralHistoryReset`, `g_fov`, `r_screenFraction`, `setviewpos`, and `vid_restart`.
+
+| Test | Result | Evidence | Notes |
+|---|---|---|---|
+| Configure/build | PASS | established configure; final build output | All shaders current; C++ linked/staged; SHA-256 `EDB8BB8641CCD35FB8078C4634813B3D11DAFC79FB03476099DE4FCE1D456E21`. |
+| T15 map/save-load signal | PASS | scripted map load, user save resume, and `neuralHistoryStatus` | First tracked view consumed `initialization|level-load|framebuffer-resize`; resumed gameplay rendered normally without stale feedback. |
+| Manual reset propagation | PASS | `temporal_history_sequence.log` | Epoch advanced 4 to 5; subsequent status showed the request consumed by a rendered primary view. |
+| T16 camera teleport/cut | PASS | extreme disposable `setviewpos`, source review, and combined visible regression | Epoch advanced with named `camera-teleport|camera-cut`. Authored camera files now emit an exact cut bit; normal camera motion remained stable. |
+| Major FOV discontinuity | PASS | `g_fov 80 -> 120`, 30 rendered frames, named status | Epoch advanced and last reason reported `fov-change`. |
+| Render viewport change | PASS | `r_screenFraction 100 -> 50 -> 100` | Each changed viewport advanced the epoch after rendered-frame consumption. |
+| T17 framebuffer/video restart | PASS | hidden sequence plus user-visible `vid_restart` | Resize requested a new epoch and immediately cleared backend validity. User confirmed intact rendering; status reported epoch 6, pending none, last reset `framebuffer-resize`, and a valid tracked view. |
+| Portal-sky history isolation | PASS by focused review/build | `RDF_NO_TEMPORAL_HISTORY` path | Auxiliary view performs current-only resolve for tonemapping and cannot update primary MVP/feedback. |
+
+### Regressions and limits
+
+- No crash, early exit, or renderer error occurred in scripted map/FOV/teleport/viewport/restart sequences.
+- Existing missing-envprobe and reliable-message warnings on the disposable map are unchanged and unrelated.
+- User observed no crash, stale-frame flash, smear, ghost trail, or other visual regression during the combined save/FOV/restart check.
+
+### Conclusion
+
+The unified epoch, automated reset paths, and combined visible regression pass. ND3-270 is `DONE`.
+
 ## 2026-09-01 / 99b03cf5 + ND3-260 worktree / reactive and transparency masks
 
 - Tester/machine label: local Windows development machine; runtime visually checked by user.

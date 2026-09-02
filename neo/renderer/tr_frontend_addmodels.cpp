@@ -454,6 +454,7 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 	vEntity->previousJointCache = 0;
 	vEntity->jointMotionVectorHistoryValid = false;
 	vEntity->skinnedMotionVectorMoved = false;
+	const bool temporalHistoryEpochValid = entityDef->motionVectorHistoryEpoch == tr.GetTemporalHistoryEpoch();
 
 	// Joint cache handles are frame-local, so retain the previous CPU palette on the
 	// entity and upload it into this frame's cache for the motion-vector pass.
@@ -478,7 +479,7 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 		const int numJoints = jointModel->numInvertedJoints;
 		if( entityDef->motionVectorJointFrameNum != tr.frameCount )
 		{
-			entityDef->motionVectorJointHistoryValid = entityDef->motionVectorJointFrameNum == tr.frameCount - 1 &&
+			entityDef->motionVectorJointHistoryValid = temporalHistoryEpochValid && entityDef->motionVectorJointFrameNum == tr.frameCount - 1 &&
 				entityDef->motionVectorJoints.Num() == numJoints;
 
 			entityDef->previousMotionVectorJoints.SetNum( numJoints );
@@ -556,10 +557,23 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 
 	if( entityDef->motionVectorFrameNum != tr.frameCount )
 	{
-		entityDef->motionVectorHistoryValid = entityDef->motionVectorFrameNum == tr.frameCount - 1;
+		entityDef->motionVectorHistoryValid = temporalHistoryEpochValid && entityDef->motionVectorFrameNum == tr.frameCount - 1;
 		entityDef->previousMotionVectorModelMatrix = entityDef->motionVectorHistoryValid ? entityDef->motionVectorModelMatrix : entityDef->modelRenderMatrix;
 		entityDef->motionVectorModelMatrix = entityDef->modelRenderMatrix;
 		entityDef->motionVectorFrameNum = tr.frameCount;
+		entityDef->motionVectorHistoryEpoch = tr.GetTemporalHistoryEpoch();
+
+		if( entityDef->motionVectorHistoryValid )
+		{
+			const idVec3 previousOrigin( entityDef->previousMotionVectorModelMatrix[0][3], entityDef->previousMotionVectorModelMatrix[1][3], entityDef->previousMotionVectorModelMatrix[2][3] );
+			const idVec3 currentOrigin( entityDef->motionVectorModelMatrix[0][3], entityDef->motionVectorModelMatrix[1][3], entityDef->motionVectorModelMatrix[2][3] );
+			const float teleportDistance = r_neuralHistoryObjectTeleportDistance.GetFloat();
+			if( ( currentOrigin - previousOrigin ).LengthSqr() > teleportDistance * teleportDistance )
+			{
+				entityDef->motionVectorHistoryValid = false;
+				entityDef->previousMotionVectorModelMatrix = entityDef->motionVectorModelMatrix;
+			}
+		}
 	}
 
 	vEntity->previousModelRenderMatrix = entityDef->previousMotionVectorModelMatrix;
