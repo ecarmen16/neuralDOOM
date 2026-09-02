@@ -34,6 +34,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "../RenderCommon.h"
 #include "../RenderBackend.h"
+#include "../StreamlineIntegration.h"
 #include "../../framework/Common_local.h"
 #include "imgui.h"
 #include "../ImmediateMode.h"
@@ -172,6 +173,10 @@ void idRenderBackend::Init()
 		api = nvrhi::GraphicsAPI::D3D12;
 	}
 	deviceManager = DeviceManager::Create( api );
+	if( api == nvrhi::GraphicsAPI::D3D12 )
+	{
+		R_StreamlineInitialize();
+	}
 
 	// DG: make sure SDL has setup video so getting supported modes in R_SetNewMode() works
 #if defined( VULKAN_USE_PLATFORM_SDL )
@@ -182,6 +187,11 @@ void idRenderBackend::Init()
 	// DG end
 
 	R_SetNewMode( true );
+	if( R_StreamlineIsInitialized() )
+	{
+		void* nativeDevice = deviceManager->GetDevice()->getNativeObject( nvrhi::ObjectTypes::D3D12_Device );
+		R_StreamlineSetD3DDevice( nativeDevice );
+	}
 
 	// input and sound systems need to be tied to the new window
 	Sys_InitInput();
@@ -305,6 +315,9 @@ void idRenderBackend::Shutdown()
 
 	// Delete immediate mode buffer objects
 	fhImmediateMode::Shutdown();
+
+	// Streamline must release its feature/device state before GLimp destroys DXGI/D3D12.
+	R_StreamlineShutdown();
 
 #if defined( VULKAN_USE_PLATFORM_SDL )
 	VKimp_Shutdown( true );		// SRS - shutdown SDL on quit

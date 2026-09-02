@@ -1,5 +1,22 @@
 # Test results
 
+## 2026-09-01 / 71392b90 + ND3-320 worktree / Streamline core lifecycle
+
+- SDK build: `USE_STREAMLINE=ON`, official local Streamline `v2.12.0`.
+- Runtime controls: `r_streamlineEnable 1`, `r_streamlineApplicationId 0`, DX12, windowed, core-only mode.
+- GPU and driver: NVIDIA GeForce RTX 5090, 610.47.
+
+| Test | Result | Evidence |
+|---|---|---|
+| Default SDK-OFF build | PASS | Established configure/build helper compiled stubs and linked `RelWithDebInfo` without an SDK dependency. |
+| SDK-ON build/runtime staging | PASS | Isolated build linked and copied the four required local runtime DLLs beside the ignored executable. |
+| Early core initialization | PASS | Ignored `captures/neural/streamline-smoke/base/streamline_core.log`: `Streamline initialized in core-only mode`. |
+| Native D3D12 device handoff | PASS | Same log: RTX 5090 device created, followed by `Streamline accepted the native D3D12 device`. |
+| Startup fallback | PASS | Hidden process remained alive after ten seconds; DLSS was explicitly not requested with application ID 0. |
+| Ordered shutdown | PASS | A 120-frame scripted run processed engine `+quit` and exited normally with code 0 after the Streamline-enabled initialization path. |
+
+The reversible core lifecycle is validated. DLSS support/evaluation remains untested and unavailable until a valid NVIDIA-issued application ID is provided; native presentation remains the active fallback.
+
 ## 2026-09-01 / ND3-300 + ND3-310 worktree / official SDK gate
 
 - Official SDK: NVIDIA Streamline `v2.12.0`, kept under ignored local storage; release archive SHA-256 matched the vendor-published digest.

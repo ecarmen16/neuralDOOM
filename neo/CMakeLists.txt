@@ -1488,6 +1488,22 @@ if(USE_STREAMLINE)
 	target_compile_definitions(${APP_NAME} PRIVATE USE_STREAMLINE=1)
 	target_include_directories(${APP_NAME} PRIVATE "${STREAMLINE_SDK_PATH}/include")
 	target_link_libraries(${APP_NAME} "${STREAMLINE_SDK_PATH}/lib/x64/sl.interposer.lib")
+
+	set(STREAMLINE_RUNTIME_FILES
+		"sl.interposer.dll"
+		"sl.common.dll"
+		"sl.dlss.dll"
+		"nvngx_dlss.dll")
+	foreach(STREAMLINE_RUNTIME_FILE IN LISTS STREAMLINE_RUNTIME_FILES)
+		if(NOT EXISTS "${STREAMLINE_SDK_PATH}/bin/x64/${STREAMLINE_RUNTIME_FILE}")
+			message(FATAL_ERROR "Required Streamline runtime file not found: bin/x64/${STREAMLINE_RUNTIME_FILE}")
+		endif()
+		add_custom_command(TARGET ${APP_NAME} POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different
+				"${STREAMLINE_SDK_PATH}/bin/x64/${STREAMLINE_RUNTIME_FILE}"
+				"$<TARGET_FILE_DIR:${APP_NAME}>/${STREAMLINE_RUNTIME_FILE}"
+			COMMENT "Staging local Streamline runtime: ${STREAMLINE_RUNTIME_FILE}")
+	endforeach()
 endif()
 
 if(USE_DXIL_ON_DX12)

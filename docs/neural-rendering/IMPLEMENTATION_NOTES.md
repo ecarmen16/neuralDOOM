@@ -2,6 +2,17 @@
 
 Append dated entries. Do not replace prior evidence.
 
+## 2026-09-01 - Streamline core lifecycle and native DX12 device handoff
+
+- Added `neo/renderer/StreamlineIntegration.h/.cpp`. With `USE_STREAMLINE=OFF` the entry points are dependency-free stubs. With the SDK build enabled, `r_streamlineEnable 1` initializes Streamline before `R_SetNewMode` can create the swapchain.
+- Streamline preferences select manual hooking, frame-based resource tagging, host-managed command-list state, D3D12, a custom engine identity, and no OTA behavior. `r_streamlineApplicationId 0` deliberately loads core only; a positive NVIDIA-issued ID adds `kFeatureDLSS` to the requested feature list.
+- After NVRHI device creation, `idRenderBackend::Init` retrieves `D3D12_Device` from NVRHI and passes it to `slSetD3DDevice`. A DLSS-requested path then checks support using the device adapter LUID. `streamlineStatus` reports compile/request/init/device/feature state and exact Streamline result strings.
+- `idRenderBackend::Shutdown` now calls `slShutdown` after renderer resources are released but before `GLimp_Shutdown` destroys DXGI/D3D12. Any init/device failure logs a warning and retains the native renderer.
+- The SDK-enabled build stages `sl.interposer.dll`, `sl.common.dll`, `sl.dlss.dll`, and `nvngx_dlss.dll` beside its ignored executable. No runtime binary enters Git or the normal build.
+- Both SDK-OFF and SDK-ON `RelWithDebInfo` builds passed. Logged core-only startup recorded successful Streamline init and D3D12 device acceptance on the RTX 5090; an engine-driven `+quit` completed with exit code 0.
+
+Next: obtain/provide a valid NVIDIA application identity, then add the exact manual presentation hook and DLAA resource tagging/evaluation behind `r_neuralBackend 2`.
+
 ## 2026-09-01 - Official Streamline 2.12.0 dependency gate
 
 - NVIDIA's official GitHub release identifies v2.12.0 as current, published 2026-06-23. Annotated tag resolves to commit `e8aaa6eaac968711fb62473d4ae8256dde20919b`.
