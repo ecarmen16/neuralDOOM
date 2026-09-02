@@ -2,6 +2,48 @@
 
 Append dated entries. Do not replace prior evidence.
 
+## 2026-09-01 - HUD-free LDR diagnostic
+
+### Repository state
+
+- Branch: `feature/neural-rendering-spike`.
+- Base checkpoint: `992b6355` (`docs: record DX12 temporal capture evidence`).
+- Dirty before task: no.
+
+### Files and symbols
+
+- `neo/renderer/Image.h:idImageManager::neuralHudlessLDRImage` owns the preserved scene-only texture handle.
+- `neo/renderer/Image_intrinsic.cpp:idImageManager::CreateIntrinsicImages` creates `_neuralHudlessLDR` with the existing `R_LdrNativeImage` generator.
+- `neo/renderer/NVRHI/Framebuffer_NVRHI.cpp:Framebuffer::ReloadImages` recreates the texture with the other native-resolution targets.
+- `neo/renderer/RenderBackend.cpp:idRenderBackend::ExecuteBackEndCommands` snapshots `_currentRenderLDR` after `RC_POST_PROCESS`, before `RC_DRAW_VIEW_GUI`, and presents the snapshot after all overlay GUI work when `r_neuralDebug` is `1`.
+
+### Resource and mode contract
+
+- `_neuralHudlessLDR`: native render resolution, one mip, one sample, `DXGI_FORMAT_R8G8B8A8_UNORM`, display-referred/post-processed LDR.
+- Lifetime: intrinsic renderer image; resized through `Framebuffer::ReloadImages`; contents are refreshed once per applicable 3D frame only when debug mode `1` is active.
+- `r_neuralDebug 0` is the default. It performs no per-frame snapshot or debug-present work and preserves normal composition.
+- `r_neuralDebug 1` copies `_currentRenderLDR` after scene post-processing, allows GUI commands to execute normally, then overwrites the swapchain with the preserved scene-only copy. In-world GUIs and the first-person weapon remain because they are part of the 3D view; overlay HUD and menus are excluded.
+
+### Validation
+
+- Configure: pass with VS2022 x64 and the established DX12-only options.
+- Build: pass, `RelWithDebInfo`; staged executable is 24,733,696 bytes with SHA-256 `7CF004A5F949E743E6D137B1685F60B00E3BD995773FA2FBDE30D9C4080B59C3`.
+- Feature off: user loaded the saved scene with `r_neuralDebug 0` and confirmed normal gameplay, HUD, and menus with no rendering regression.
+- Feature on: user loaded the same scene with `r_neuralDebug 1` and confirmed the world and weapon rendered normally while overlay GUI was absent.
+- Live resize: user resized the window during mode `1`; the HUD-free scene continued rendering without a black frame, corruption, or crash.
+- RenderDoc 1.46 capture: ignored `captures/neural/renderdoc-hudless/hudless_frame1567.rdc`, 431,617,464 bytes, SHA-256 `08F4925EE8A9F28CE89FAF4525959AF9B73FF8F0D8DE367EAE6374A0029F0B40`.
+- Captured command order is `Render_PostProcessing` -> `Neural_CaptureHudlessLDR` -> `Render_DrawViewGUI` -> `Neural_PresentHudlessLDR`. The capture records a full 1280x720 `CopyTextureRegion` from `_currentRenderLDR` (resource 413) to `_neuralHudlessLDR` (resource 414), including NVRHI-generated copy-source/copy-destination transitions.
+
+### Known issues
+
+- The intrinsic texture is allocated even in mode `0` (3,686,400 bytes at 1280x720), although no disabled-mode copy or presentation work occurs.
+- This establishes a display-referred HUD-free output. It does not yet select the linear/HDR input stage for DLSS or define the final first-person weapon policy.
+- No comparative GPU timing has been recorded.
+
+### Next narrow task
+
+- Extend the diagnostic modes with a signed motion-vector view and numeric convention evidence for static camera, yaw, and lateral translation before changing the existing camera/static vector generation.
+
 ## 2026-08-31 - DX12 baseline and reconnaissance
 
 ### Repository state
@@ -34,7 +76,7 @@ Append dated entries. Do not replace prior evidence.
 
 - The active frame path, temporal resources, formats, conventions, native D3D12 escape points, and gaps are documented in `RECON_REPORT.md`.
 - Existing TAA motion is camera-only, current-to-previous displacement in pixel units.
-- `_currentRenderHDR` is the pre-tonemap scene candidate. `_currentRenderLDR` is HUD-free only immediately after the 3D tone-map pass; later GUI commands mutate it.
+- `_currentRenderHDR` is the pre-tonemap scene candidate. `_currentRenderLDR` remains HUD-free through scene post-processing; later GUI commands mutate it.
 - Existing history validity is initialized once and is not explicitly reset for map/camera/resolution discontinuities.
 - The first-person weapon is rendered in the 3D scene but excluded from TAA history via the HDR alpha mask.
 - The modern tone-map pass always computes adapted luminance even though `r_hdrAutoExposure` defaults off; this requires capture/readback validation before an exposure contract is defined.

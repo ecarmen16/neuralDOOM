@@ -48,6 +48,7 @@ extern DeviceManager* deviceManager;
 
 idCVar r_drawEyeColor( "r_drawEyeColor", "0", CVAR_RENDERER | CVAR_BOOL, "Draw a colored box, red = left eye, blue = right eye, grey = non-stereo" );
 idCVar r_motionBlur( "r_motionBlur", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "1 - 5, log2 of the number of motion blur samples" );
+idCVar r_neuralDebug( "r_neuralDebug", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_NEW, "neural renderer diagnostic output: 0 = disabled, 1 = HUD-free post-processed LDR", 0, 1, idCmdSystem::ArgCompletion_Integer<0, 1> );
 idCVar r_forceZPassStencilShadows( "r_forceZPassStencilShadows", "0", CVAR_RENDERER | CVAR_BOOL, "force Z-pass rendering for performance testing" );
 idCVar r_useStencilShadowPreload( "r_useStencilShadowPreload", "0", CVAR_RENDERER | CVAR_BOOL, "use stencil shadow preload algorithm instead of Z-fail" );
 idCVar r_skipShaderPasses( "r_skipShaderPasses", "0", CVAR_RENDERER | CVAR_BOOL, "" );
@@ -5508,6 +5509,7 @@ void idRenderBackend::ExecuteBackEndCommands( const emptyCommand_t* cmds )
 	// SRS - Save glConfig.timerQueryAvailable state so it can be disabled for RC_DRAW_VIEW_GUI then restored after it is finished
 	const bool timerQueryAvailable = glConfig.timerQueryAvailable;
 	drawView3D = false;
+	bool neuralHudlessLDRCaptured = false;
 
 	for( ; cmds != NULL; cmds = ( const emptyCommand_t* )cmds->next )
 	{
@@ -5559,6 +5561,17 @@ void idRenderBackend::ExecuteBackEndCommands( const emptyCommand_t* cmds )
 			{
 				// apply optional post processing
 				PostProcess( cmds );
+
+				if( r_neuralDebug.GetInteger() == 1 )
+				{
+					OPTICK_GPU_EVENT( "Neural_CaptureHudlessLDR" );
+					renderLog.OpenBlock( "Neural_CaptureHudlessLDR", colorBlue );
+
+					commandList->copyTexture( globalImages->neuralHudlessLDRImage->GetTextureHandle(), nvrhi::TextureSlice(), globalImages->ldrImage->GetTextureHandle(), nvrhi::TextureSlice() );
+					neuralHudlessLDRCaptured = true;
+
+					renderLog.CloseBlock();
+				}
 				break;
 			}
 
@@ -5573,6 +5586,20 @@ void idRenderBackend::ExecuteBackEndCommands( const emptyCommand_t* cmds )
 	}
 
 	DrawFlickerBox();
+
+	if( neuralHudlessLDRCaptured )
+	{
+		OPTICK_GPU_EVENT( "Neural_PresentHudlessLDR" );
+		renderLog.OpenBlock( "Neural_PresentHudlessLDR", colorBlue );
+
+		BlitParameters blitParms;
+		blitParms.sourceTexture = globalImages->neuralHudlessLDRImage->GetTextureHandle();
+		blitParms.targetFramebuffer = deviceManager->GetCurrentFramebuffer();
+		blitParms.targetViewport = nvrhi::Viewport( renderSystem->GetNativeWidth(), renderSystem->GetNativeHeight() );
+		commonPasses.BlitTexture( commandList, blitParms, &bindingCache );
+
+		renderLog.CloseBlock();
+	}
 
 	// stop rendering on this thread
 	uint64 backEndFinishTime = Sys_Microseconds();

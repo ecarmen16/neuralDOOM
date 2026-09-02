@@ -1,5 +1,42 @@
 # Test results
 
+## 2026-09-01 / 992b6355 + Phase 3 worktree / HUD-free LDR diagnostic
+
+- Tester/machine label: local Windows development machine; runtime visually checked by user.
+- Branch and base commit: `feature/neural-rendering-spike`, `992b6355`.
+- Build configuration: `RelWithDebInfo`, VS2022 x64.
+- CMake options: `FFMPEG=OFF`, `BINKDEC=ON`, `USE_DX12=ON`, `USE_VULKAN=OFF`; established `/wd4530` and Windows SDK DXC overrides.
+- GPU and driver: NVIDIA GeForce RTX 5090, 610.47.
+- Resolution / HDR / AA: 1280x720 validation capture; output resource `R8G8B8A8_UNORM`; TAA active.
+- Scene/save/map: resumable user save in Mars City Hangar.
+- Relevant cvars: `r_graphicsAPI dx12`; `r_neuralDebug 0` and `1`; RenderDoc capture additionally used `r_fullscreen 0` and `r_logLevel 1`.
+
+| Test | Result | Evidence / artifact path | Notes |
+|---|---|---|---|
+| DX12 configure | PASS | `docs/neural-rendering/LAST_CONFIGURE.txt` | VS2022 x64; DX12 only. |
+| RelWithDebInfo build | PASS | build output; `docs/neural-rendering/LAST_BUILD.txt` | Engine and staged executable produced successfully. |
+| Executable identity | PASS | staged `RBDoom3BFG.exe` | 24,733,696 bytes; SHA-256 `7CF004A5F949E743E6D137B1685F60B00E3BD995773FA2FBDE30D9C4080B59C3`. |
+| T18 feature disabled | PASS | user manual observation with `r_neuralDebug 0` | Normal world, HUD, and menus; no crash or visual regression observed. |
+| T14 HUD-free debug present | PASS | user manual observation with `r_neuralDebug 1` | World and weapon remain; overlay HUD and menus are absent. |
+| GPU ordering | PASS | ignored `captures/neural/renderdoc-hudless/hudless_frame1567.rdc` | Postprocess -> capture -> GUI -> HUD-free present; capture converted to XML successfully for marker inspection. |
+| Snapshot resource | PASS | same RenderDoc capture; XML conversion used for local inspection | Full 1280x720 copy from resource 413 `_currentRenderLDR` to resource 414 `_neuralHudlessLDR`; correct NVRHI barriers recorded. |
+| T17 live resize recreation | PASS | user manual observation in windowed mode `1` | HUD-free rendering continued after resizing with no black frame, corruption, or crash. |
+
+### Performance
+
+- Baseline frame time: not measured.
+- Changed frame time: not measured.
+- Mode `0` adds one allocated 1280x720 RGBA8 intrinsic texture but no per-frame copy. Mode `1` adds one full-resolution texture copy and one final fullscreen blit.
+
+### Regressions
+
+- None observed in feature-off or feature-on runtime checks.
+- Debug mode intentionally makes overlay menus invisible; `Alt+F4` was used to exit.
+
+### Conclusion
+
+ND3-200 and ND3-210 pass. Phase 3 has a measured HUD-free display-referred boundary; camera/static motion-vector validation is the next narrow task.
+
 ## 2026-08-31 / ea29c006 / upstream DX12 baseline
 
 - Tester/machine label: local Windows development machine; runtime visually checked by user.

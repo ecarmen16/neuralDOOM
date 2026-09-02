@@ -221,6 +221,7 @@ void Framebuffer::ReloadImages()
 {
 	backEnd.commandList->open();
 	globalImages->ldrImage->Reload( false, backEnd.commandList );
+	globalImages->neuralHudlessLDRImage->Reload( false, backEnd.commandList );
 	globalImages->currentRenderImage->Reload( false, backEnd.commandList );
 	globalImages->currentDepthImage->Reload( false, backEnd.commandList );
 	globalImages->currentRenderHDRImage->Reload( false, backEnd.commandList );

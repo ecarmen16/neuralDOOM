@@ -40,9 +40,17 @@
 
 **Consequence:** Local experiments are user-supplied and untracked. Official SDK integration must pass dependency/license review.
 
+## D-006 - Preserve display-referred scene color before overlay GUI
+
+**Status:** Accepted for the Phase 3 diagnostic and future composition boundary.
+
+**Reasoning:** Source and RenderDoc evidence show that scene post-processing completes in `_currentRenderLDR` before `RC_DRAW_VIEW_GUI` mutates the same resource. Copying at that command boundary retains the final scene treatment while excluding overlay HUD and menu pixels.
+
+**Consequence:** `_neuralHudlessLDR` is a native-resolution `R8G8B8A8_UNORM` snapshot. Debug mode `1` presents it after GUI execution to make separation directly observable. This decision does not select the linear/HDR input expected by a future temporal reconstruction backend.
+
 ## Pending decisions
 
-- Exact scene-color stage used by the reconstruction backend.
+- Exact linear/HDR scene-color stage used by the reconstruction backend.
 - Viewmodel policy: after-pass, separate pass, or shared pass with dedicated inputs.
 - Motion-vector format, units, sign, Y convention, and jitter treatment.
 - Previous-pose storage strategy for MD5 animation.

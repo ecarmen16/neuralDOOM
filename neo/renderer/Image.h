@@ -603,6 +603,7 @@ public:
 	idImage*			blueNoiseImage256;
 	idImage*			currentRenderHDRImage;
 	idImage*			ldrImage;						// tonemapped result which can be used for further post processing
+	idImage*			neuralHudlessLDRImage;			// post-processed LDR scene captured before overlay GUI rendering
 	idImage*			taaMotionVectorsImage;			// motion vectors for TAA projection
 	idImage*			taaResolvedImage;
 	idImage*			taaFeedback1Image;
