@@ -153,7 +153,8 @@ void Framebuffer::ResizeFramebuffers( bool reloadImages )
 
 	globalFramebuffers.taaMotionVectorsFBO = new Framebuffer( "_taaMotionVectors",
 			nvrhi::FramebufferDesc()
-			.addColorAttachment( globalImages->taaMotionVectorsImage->texture ) );
+			.addColorAttachment( globalImages->taaMotionVectorsImage->texture )
+			.setDepthAttachment( globalImages->currentDepthImage->texture ) );
 
 	globalFramebuffers.taaResolvedFBO = new Framebuffer( "_taaResolved",
 			nvrhi::FramebufferDesc()

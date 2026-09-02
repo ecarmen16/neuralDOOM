@@ -36,10 +36,15 @@ idRenderEntityLocal::idRenderEntityLocal()
 {
 	memset( &parms, 0, sizeof( parms ) );
 	memset( modelMatrix, 0, sizeof( modelMatrix ) );
+	modelRenderMatrix.Identity();
+	motionVectorModelMatrix.Identity();
+	previousMotionVectorModelMatrix.Identity();
 
 	world					= NULL;
 	index					= 0;
 	lastModifiedFrameNum	= 0;
+	motionVectorFrameNum	= -1;
+	motionVectorHistoryValid = false;
 	dynamicModel			= NULL;
 	dynamicModelFrameCount	= 0;
 	cachedDynamicModel		= NULL;

@@ -278,6 +278,10 @@ public:
 
 	float					modelMatrix[16];		// this is just a rearrangement of parms.axis and parms.origin
 	idRenderMatrix			modelRenderMatrix;
+	idRenderMatrix			motionVectorModelMatrix;
+	idRenderMatrix			previousMotionVectorModelMatrix;
+	int						motionVectorFrameNum;
+	bool					motionVectorHistoryValid;
 	idRenderMatrix			inverseBaseModelProject;// transforms the unit cube to exactly cover the model in world space
 
 	idRenderWorldLocal* 	world;
@@ -418,6 +422,9 @@ struct viewEntity_t
 
 	idRenderMatrix			mvp;
 	idRenderMatrix			unjitteredMVP;			// no TAA subpixel jittering
+	idRenderMatrix			previousModelRenderMatrix;
+	bool					motionVectorHistoryValid;
+	bool					rigidMotionVectorMoved;
 
 	// parallelAddModels will build a chain of surfaces here that will need to
 	// be linked to the lights or added to the drawsurf list in a serial code section

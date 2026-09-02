@@ -1,5 +1,31 @@
 # Test results
 
+## 2026-09-01 / c9c5e063 + ND3-230 worktree / rigid-object motion vectors
+
+- Tester/machine label: local Windows development machine; runtime visually checked by user.
+- Branch and base commit: `feature/neural-rendering-spike`, `c9c5e063`.
+- Build configuration: `RelWithDebInfo`, VS2022 x64, DX12 only.
+- GPU and driver: NVIDIA GeForce RTX 5090, 610.47.
+- Scene/save/map: resumable user save in Mars City Hangar with a visible moving rigid object.
+- Relevant cvars: diagnostic `r_neuralDebug 2`; feature-off `r_neuralDebug 0`; `r_neuralRigidMotionVectors` defaults to `0` and is forced by diagnostic mode `2`.
+
+| Test | Result | Evidence | Notes |
+|---|---|---|---|
+| Configure and build | PASS | build output; `docs/neural-rendering/LAST_BUILD.txt` | 754 DXIL jobs; C++ linked; executable staged. |
+| T04 stationary camera / moving rigid object | PASS | user manual observation | Moving object formed a distinct signed-color silhouette while the static environment remained neutral. |
+| T05 rigid physics object | PASS | user manual observation | Physics prop produced object-local velocity while moving and returned to neutral after settling; no persistent trail or crash reported. |
+| History initialization | PASS | source review and stable runtime | First/non-consecutive observation collapses previous transform to current. |
+| Feature-off regression | PASS | user manual observation with `r_neuralDebug 0` | Normal scene, HUD, menus, and gameplay; no crash. |
+
+### Regressions and limits
+
+- None observed in the tested opaque rigid path or feature-off runtime.
+- Perforated, translucent, skinned, GUI, subview, and viewmodel surfaces are intentionally excluded from this slice.
+
+### Conclusion
+
+ND3-230 passes T04, T05, and the feature-off regression. ND3-240 skinned pose history is now `READY`.
+
 ## 2026-09-01 / d6d361fa + ND3-220 worktree / signed motion-vector diagnostic
 
 - Tester/machine label: local Windows development machine; runtime visually checked by user.

@@ -499,6 +499,19 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 	vEntity->weaponDepthHack = renderEntity->weaponDepthHack;
 	vEntity->skipMotionBlur = renderEntity->skipMotionBlur;
 
+	if( entityDef->motionVectorFrameNum != tr.frameCount )
+	{
+		entityDef->motionVectorHistoryValid = entityDef->motionVectorFrameNum == tr.frameCount - 1;
+		entityDef->previousMotionVectorModelMatrix = entityDef->motionVectorHistoryValid ? entityDef->motionVectorModelMatrix : entityDef->modelRenderMatrix;
+		entityDef->motionVectorModelMatrix = entityDef->modelRenderMatrix;
+		entityDef->motionVectorFrameNum = tr.frameCount;
+	}
+
+	vEntity->previousModelRenderMatrix = entityDef->previousMotionVectorModelMatrix;
+	vEntity->motionVectorHistoryValid = entityDef->motionVectorHistoryValid;
+	vEntity->rigidMotionVectorMoved = vEntity->motionVectorHistoryValid &&
+		memcmp( &entityDef->motionVectorModelMatrix[0][0], &vEntity->previousModelRenderMatrix[0][0], sizeof( idRenderMatrix ) ) != 0;
+
 	memcpy( vEntity->modelMatrix, entityDef->modelMatrix, sizeof( vEntity->modelMatrix ) );
 	R_MatrixMultiply( entityDef->modelMatrix, viewDef->worldSpace.modelViewMatrix, vEntity->modelViewMatrix );
 

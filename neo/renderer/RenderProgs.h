@@ -451,6 +451,7 @@ enum
 
 	BUILTIN_DEBUG_LIGHTGRID,
 	BUILTIN_DEBUG_LIGHTGRID_SKINNED,
+	BUILTIN_RIGID_MOTION_VECTORS,
 
 	BUILTIN_DEBUG_OCTAHEDRON,
 	BUILTIN_DEBUG_OCTAHEDRON_SKINNED,
@@ -1100,6 +1101,11 @@ public:
 	void	BindShader_MotionVectors()
 	{
 		BindShader_Builtin( BUILTIN_TAA_MOTION_VECTORS );
+	}
+
+	void	BindShader_RigidMotionVectors()
+	{
+		BindShader_Builtin( BUILTIN_RIGID_MOTION_VECTORS );
 	}
 
 	void	BindShader_DebugShadowMap()

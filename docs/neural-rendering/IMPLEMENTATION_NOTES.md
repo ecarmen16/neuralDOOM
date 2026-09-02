@@ -2,6 +2,52 @@
 
 Append dated entries. Do not replace prior evidence.
 
+## 2026-09-01 - Rigid-object motion vectors
+
+### Repository state
+
+- Branch: `feature/neural-rendering-spike`.
+- Base checkpoint: `c9c5e063` (`renderer: add signed motion-vector diagnostic`).
+- Dirty before task: no.
+
+### Files and symbols
+
+- `neo/renderer/RenderCommon.h:idRenderEntityLocal` retains current and previous rigid model matrices plus the sampled renderer frame; `viewEntity_t` receives an SMP-safe previous-transform snapshot and validity/movement flags.
+- `neo/renderer/RenderEntity.cpp:idRenderEntityLocal::idRenderEntityLocal` initializes the new history state invalid, preventing first-frame velocity.
+- `neo/renderer/tr_frontend_addmodels.cpp:R_AddSingleModel` advances history once per consecutive renderer frame and collapses stale/reappearing history to the current transform.
+- `neo/renderer/RenderBackend.cpp:DrawMotionVectors` overlays moved opaque, non-skinned draw surfaces into `_taaMotionVectors` using the previous camera MVP and previous object transform.
+- `neo/renderer/NVRHI/Framebuffer_NVRHI.cpp:Framebuffer::ResizeFramebuffers` attaches `_currentDepth` read-only to the motion framebuffer for depth-equal rigid coverage.
+- `neo/renderer/RenderProgs.h/.cpp:BUILTIN_RIGID_MOTION_VECTORS` and `neo/shaders/builtin/debug/rigid_motion_vectors.*.hlsl` provide the geometry velocity program.
+- `neo/shaders/shaders.cfg` builds push-constant and constant-buffer variants of both shader stages.
+
+### Data and ordering contract
+
+- Rigid history is keyed to `tr.frameCount`; only consecutive rendered frames are valid. New entities and entities absent for one or more frames emit no object-local velocity on reappearance.
+- The vertex shader rasterizes with the current unjittered object MVP and projects the same local vertex with `previousViewMVP * previousModelRenderMatrix`.
+- The pixel shader writes `previousWindowPosition - currentWindowPosition` in pixel units, preserving the existing current-to-previous convention and `R16G16_FLOAT` format.
+- The overlay runs after the camera/depth reconstruction pass and uses current scene depth with equality testing. It is limited to opaque, non-skinned, non-GUI, non-viewmodel surfaces without subviews.
+- `r_neuralRigidMotionVectors` defaults to `0`; diagnostic mode `r_neuralDebug 2` forces the overlay. The default feature-off path therefore retains the prior camera-only vector behavior.
+
+### Validation
+
+- Configure: pass with the established VS2022 x64 DX12-only options.
+- Build: pass, `RelWithDebInfo`; ShaderMake completed 754 DXIL jobs, including both variants of each rigid-vector shader stage.
+- Final staged executable: 24,737,280 bytes; SHA-256 `745BB38CFE724F43378EAC09E9C7B72548D722F35224CDEF0F072113835D363C`.
+- User diagnostic validation: with a stationary camera, static surroundings remained neutral and a moving rigid object produced a distinct colored silhouette; no crash occurred.
+- User physics validation: a free rigid prop produced object-local velocity while moving, returned to neutral after settling, and left no reported persistent trail.
+- User feature-off validation: ordinary scene, HUD, menu, and gameplay rendering passed with `r_neuralDebug 0`.
+
+### Known limitations
+
+- Perforated and translucent materials are deliberately excluded because this slice does not yet reproduce material alpha testing.
+- Skinned surfaces are deliberately excluded; only rigid model-transform motion is represented.
+- Subpixel edge coverage can differ from the jittered depth raster because the velocity geometry uses the unjittered current MVP.
+- History reset policy beyond non-consecutive entity visibility remains a later lifecycle task.
+
+### Next narrow task
+
+- Retain the previous GPU joint palette for visible MD5 surfaces and add a skinned velocity shader without changing the verified rigid path.
+
 ## 2026-09-01 - Signed motion-vector diagnostic
 
 ### Repository state

@@ -49,6 +49,7 @@ extern DeviceManager* deviceManager;
 idCVar r_drawEyeColor( "r_drawEyeColor", "0", CVAR_RENDERER | CVAR_BOOL, "Draw a colored box, red = left eye, blue = right eye, grey = non-stereo" );
 idCVar r_motionBlur( "r_motionBlur", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "1 - 5, log2 of the number of motion blur samples" );
 idCVar r_neuralDebug( "r_neuralDebug", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_NEW, "neural renderer diagnostic output: 0 = disabled, 1 = HUD-free post-processed LDR, 2 = signed motion vectors", 0, 2, idCmdSystem::ArgCompletion_Integer<0, 2> );
+idCVar r_neuralRigidMotionVectors( "r_neuralRigidMotionVectors", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "generate rigid-object motion vectors; forced on by r_neuralDebug 2" );
 idCVar r_forceZPassStencilShadows( "r_forceZPassStencilShadows", "0", CVAR_RENDERER | CVAR_BOOL, "force Z-pass rendering for performance testing" );
 idCVar r_useStencilShadowPreload( "r_useStencilShadowPreload", "0", CVAR_RENDERER | CVAR_BOOL, "use stencil shadow preload algorithm instead of Z-fail" );
 idCVar r_skipShaderPasses( "r_skipShaderPasses", "0", CVAR_RENDERER | CVAR_BOOL, "" );
@@ -4962,6 +4963,7 @@ void idRenderBackend::DrawMotionVectors()
 
 	// in stereo rendering, each eye needs to get a separate previous frame mvp
 	int mvpIndex = ( viewDef->renderView.viewEyeBuffer == 1 ) ? 1 : 0;
+	const idRenderMatrix previousViewMVP = prevMVP[mvpIndex];
 
 	// derive the matrix to go from current pixels to previous frame pixels
 	bool cameraMoved = false;
@@ -4972,12 +4974,10 @@ void idRenderBackend::DrawMotionVectors()
 		idRenderMatrix	inverseMVP;
 		idRenderMatrix::Inverse( viewDef->worldSpace.unjitteredMVP, inverseMVP );
 
-		idRenderMatrix::Multiply( prevMVP[mvpIndex], inverseMVP, motionMatrix );
+		idRenderMatrix::Multiply( previousViewMVP, inverseMVP, motionMatrix );
 
 		cameraMoved = true;
 	}
-
-	prevMVP[mvpIndex] = viewDef->worldSpace.unjitteredMVP;
 
 	// make sure rpWindowCoord is set even without post processing surfaces in the view
 	int x = viewDef->viewport.x1;
@@ -5009,6 +5009,50 @@ void idRenderBackend::DrawMotionVectors()
 
 		DrawElementsWithCounters( &unitSquareSurface );
 	}
+
+	if( r_taaMotionVectors.GetBool() && prevViewsValid && ( r_neuralRigidMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2 ) )
+	{
+		renderLog.OpenBlock( "Render_RigidMotionVectors" );
+
+		float screenSizeParm[4] = { ( float )w, ( float )h, 0.0f, 0.0f };
+		SetFragmentParm( RENDERPARM_SCREENCORRECTIONFACTOR, screenSizeParm );
+
+		GL_State( GLS_DEPTHMASK | GLS_DEPTHFUNC_EQUAL | GLS_CULL_TWOSIDED );
+
+		GL_SelectTexture( 0 );
+		globalImages->blackImage->Bind();
+		renderProgManager.BindShader_RigidMotionVectors();
+
+		const viewEntity_t* motionSpace = NULL;
+		for( int surfNum = 0; surfNum < viewDef->numDrawSurfs; surfNum++ )
+		{
+			const drawSurf_t* surf = viewDef->drawSurfs[surfNum];
+			const viewEntity_t* space = surf->space;
+
+			if( !space->motionVectorHistoryValid || !space->rigidMotionVectorMoved ||
+				space->weaponDepthHack || space->skipMotionBlur || space->isGuiSurface ||
+				surf->jointCache || surf->material->HasSubview() || surf->material->Coverage() != MC_OPAQUE )
+			{
+				continue;
+			}
+
+			if( space != motionSpace )
+			{
+				idRenderMatrix previousObjectMVP;
+				idRenderMatrix::Multiply( previousViewMVP, space->previousModelRenderMatrix, previousObjectMVP );
+
+				RB_SetMVP( space->unjitteredMVP );
+				SetVertexParms( RENDERPARM_MODELMATRIX_X, previousObjectMVP[0], 4 );
+				motionSpace = space;
+			}
+
+			DrawElementsWithCounters( surf );
+		}
+
+		renderLog.CloseBlock();
+	}
+
+	prevMVP[mvpIndex] = viewDef->worldSpace.unjitteredMVP;
 
 	renderLog.CloseBlock();
 	renderLog.CloseMainBlock();
