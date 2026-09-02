@@ -2,6 +2,17 @@
 
 Append dated entries. Do not replace prior evidence.
 
+## 2026-09-01 - Official Streamline 2.12.0 dependency gate
+
+- NVIDIA's official GitHub release identifies v2.12.0 as current, published 2026-06-23. Annotated tag resolves to commit `e8aaa6eaac968711fb62473d4ae8256dde20919b`.
+- Official release asset `streamline-sdk-v2.12.0.zip` was downloaded to ignored local storage and matched the vendor-published SHA-256 `F5C0A3D870707DDDC3570FB4BCD3655CF48A8A68C3A9D342910CFA21B77DCF48`.
+- Streamline framework code uses an MIT-style license. NGX/DLSS files carry separate NVIDIA RTX SDK terms whose open-source-license limitation makes GPL binary redistribution unresolved; no SDK files enter Git and no distributable build is approved.
+- Official v2.12.0 programming guides require early `slInit`, explicit D3D device setup, frame-based resource tagging, correct native resource states, command-list state restoration, and per-present housekeeping. D-011 selects manual DX12 integration around NVRHI ownership.
+- `neo/CMakeLists.txt` now exposes `USE_STREAMLINE=OFF` and an empty `STREAMLINE_SDK_PATH`. Enabling it requires the official `include/sl.h` and x64 `sl.interposer.lib`; the normal build remains independent.
+- The established default/OFF DX12 configure and `RelWithDebInfo` build passed. A separate ignored `build-streamline` tree configured and built with `USE_STREAMLINE=ON` against the hash-pinned local SDK; its executable is 19,822,080 bytes with SHA-256 `438ADEEA28C02512029026CF3DC40CBA8E34B97DC39AF0067BF926536A0568F4`.
+
+Next: add the early-init/native-device adapter and explicit fallback without enabling DLSS evaluation yet.
+
 ## 2026-09-01 - Neutral temporal backend interface
 
 ### Repository state

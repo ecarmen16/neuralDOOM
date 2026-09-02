@@ -58,6 +58,12 @@ option(USE_SYSTEM_RAPIDJSON
 option(USE_DX12
 		"Use DirectX 12" ON)
 
+option(USE_STREAMLINE
+		"Enable the optional NVIDIA Streamline adapter (requires a local official SDK)" OFF)
+
+set(STREAMLINE_SDK_PATH "" CACHE PATH
+		"Path to an unpacked official NVIDIA Streamline SDK")
+
 option(USE_VULKAN
 		"Use Vulkan" ON)
 
@@ -1466,6 +1472,22 @@ endif()
 if(USE_DX12)
 	target_compile_definitions(${APP_NAME} PUBLIC USE_DX12=1)
 	target_link_libraries(${APP_NAME} nvrhi_d3d12)
+endif()
+
+if(USE_STREAMLINE)
+	if(NOT WIN32 OR NOT USE_DX12)
+		message(FATAL_ERROR "USE_STREAMLINE currently requires the Windows DX12 renderer")
+	endif()
+	if(NOT EXISTS "${STREAMLINE_SDK_PATH}/include/sl.h")
+		message(FATAL_ERROR "STREAMLINE_SDK_PATH must point to an unpacked official Streamline SDK (missing include/sl.h)")
+	endif()
+	if(NOT EXISTS "${STREAMLINE_SDK_PATH}/lib/x64/sl.interposer.lib")
+		message(FATAL_ERROR "Streamline x64 import library not found under STREAMLINE_SDK_PATH/lib/x64")
+	endif()
+
+	target_compile_definitions(${APP_NAME} PRIVATE USE_STREAMLINE=1)
+	target_include_directories(${APP_NAME} PRIVATE "${STREAMLINE_SDK_PATH}/include")
+	target_link_libraries(${APP_NAME} "${STREAMLINE_SDK_PATH}/lib/x64/sl.interposer.lib")
 endif()
 
 if(USE_DXIL_ON_DX12)

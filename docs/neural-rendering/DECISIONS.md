@@ -74,7 +74,7 @@
 
 ## Pending decisions
 
-- Official Streamline acquisition mechanism and source-tree layout.
+- Whether and how a GPL-compatible public binary distribution can include or depend on the separately licensed NGX/DLSS runtime.
 
 Resolve these only after `RECON_REPORT.md` and targeted captures provide evidence.
 
@@ -85,3 +85,11 @@ Resolve these only after `RECON_REPORT.md` and targeted captures provide evidenc
 **Reasoning:** The verified inputs already exist as engine-owned NVRHI resources. Passing those handles with measured conventions, matrices, jitter, exposure, dimensions, sample count, and reset epoch keeps shared rendering independent of D3D12/NGX/Streamline while giving a native adapter everything needed at one insertion point.
 
 **Consequence:** `neuralTemporalFrame_t` is the stable shared boundary. `idNeuralTemporalBackend` owns initialize/resize/reset/evaluate/shutdown behavior. The first implementation is a null/debug validator selected by `r_neuralBackend 1`; it always declines presentation and therefore falls back to existing TAA. Future vendor code must remain below this interface and behind an OFF-by-default build option.
+
+## D-011 - Provision Streamline locally and use manual DX12 integration
+
+**Status:** Accepted for private development; distribution blocked.
+
+**Reasoning:** NVIDIA's official v2.12.0 guide recommends manual hooking when an engine needs native interfaces and compatibility with third-party rendering layers. RBDOOM and NVRHI already own device, queue, swapchain, and presentation lifecycles, so explicit proxy boundaries are safer than globally replacing platform APIs. The framework source is permissively licensed, but NGX/DLSS is separately licensed and its open-source restriction is not assumed compatible with RBDOOM's GPL.
+
+**Consequence:** The official release zip is hash-pinned under ignored `local-proprietary/`. `USE_STREAMLINE` defaults OFF and requires an explicit `STREAMLINE_SDK_PATH`. No SDK source or binary is committed. The adapter must initialize before relevant DXGI calls, provide the native D3D12 device, use frame-based resource tagging, preserve NVRHI command-list state, and guarantee fallback. Public binary distribution remains prohibited by project policy until qualified license review resolves the conflict.

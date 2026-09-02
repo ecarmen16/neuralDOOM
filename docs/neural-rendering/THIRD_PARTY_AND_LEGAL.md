@@ -74,3 +74,26 @@ Local acquisition record:
 - RenderDoc is MIT-licensed and is used only for local DX12 frame capture/debugging.
 - It is not a build dependency, runtime dependency, tracked binary, or redistribution component of this project.
 - Captures remain local under ignored paths and must be checked for proprietary game content before any sharing.
+
+## Local optional SDK record
+
+### NVIDIA Streamline SDK 2.12.0
+
+| Field | Answer |
+|---|---|
+| Project and version/commit | Streamline SDK `v2.12.0`; tag commit `e8aaa6eaac968711fb62473d4ae8256dde20919b` |
+| Canonical source | `https://github.com/NVIDIA-RTX/Streamline/releases/tag/v2.12.0` |
+| License | Streamline framework: MIT-style `license.txt`; NGX/DLSS components: separate `external/ngx-sdk/license.txt` and `bin/x64/nvngx_dlss.license.txt` NVIDIA RTX SDK terms |
+| Build-time or runtime | Optional build headers/import library and runtime plugin/DLSS DLLs for private local DX12 testing |
+| Optional | `USE_STREAMLINE=OFF` by default; `STREAMLINE_SDK_PATH` has no default and is required only when enabled |
+| Binary redistribution | **Unresolved/blocked for this GPL project.** No NVIDIA binary is tracked, staged into Git, or approved for project distribution. |
+| Source obligations | Preserve Streamline's MIT notice. NVIDIA SDK terms include notices, restrictions, and an open-source-license limitation that requires qualified legal review before distributing a combined binary. |
+| Update strategy | Pin an official GitHub release tag, asset digest, programming guides, and licenses; do not use OTA/unversioned community packages for development baselines. |
+| Removal strategy | Configure with `USE_STREAMLINE=OFF` and delete ignored `local-proprietary/streamline-v2.12.0`; the baseline has no SDK dependency. |
+
+Local acquisition record:
+
+- Official asset: `streamline-sdk-v2.12.0.zip`, 231,958,617 bytes.
+- Vendor-published and verified SHA-256: `F5C0A3D870707DDDC3570FB4BCD3655CF48A8A68C3A9D342910CFA21B77DCF48`.
+- Local ignored target: `local-proprietary/streamline-v2.12.0/`.
+- The package and all DLLs remain untracked. Using the NGX/DLSS components is subject to NVIDIA's included terms; this engineering record is not legal advice.
