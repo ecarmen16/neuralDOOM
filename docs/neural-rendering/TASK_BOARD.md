@@ -44,7 +44,7 @@ Statuses: `BLOCKED`, `READY`, `IN PROGRESS`, `VERIFY`, `DONE`, `DEFERRED`.
 |---|---|---|---|
 | ND3-300 | DONE | Re-verify current Streamline/DLSS docs and license | Official v2.12.0 pinned; local development allowed; GPL binary redistribution explicitly blocked pending legal review |
 | ND3-310 | DONE | Add OFF-by-default SDK build option | Default DX12 and isolated Streamline 2.12.0 configurations built successfully; SDK-enabled executable hash recorded |
-| ND3-320 | IN PROGRESS | Integrate native DLAA | Full temporal test matrix |
+| ND3-320 | VERIFY | Integrate native DLAA | SDK evaluated 597 native-resolution frames with zero rejects; visible saved-game A/B pending |
 | ND3-330 | DEFERRED | Add DLSS quality modes/resolution plumbing | Correct dynamic sizes and UI |
 | ND3-340 | DEFERRED | Validate RenoDX interception compatibility | Local-only A/B report |
 | ND3-400 | DEFERRED | Implement official DLSS 5 backend | Public SDK and legal path required |

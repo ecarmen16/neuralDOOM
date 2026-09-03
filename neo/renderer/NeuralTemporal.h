@@ -38,10 +38,20 @@ struct neuralTemporalFrame_t
 
 	idRenderMatrix			currentViewProjection;
 	idRenderMatrix			previousViewProjection;
+	idRenderMatrix			cameraViewToClip;
+	idVec3					cameraPosition;
+	idVec3					cameraForward;
+	idVec3					cameraRight;
+	idVec3					cameraUp;
 	idVec2					currentJitterPixels;
 	idVec2					previousJitterPixels;
 
 	float					exposureScale;
+	float					cameraNear;
+	float					cameraFar;
+	float					cameraVerticalFov;
+	float					cameraAspectRatio;
+	uint32					frameIndex;
 	int						renderWidth;
 	int						renderHeight;
 	int						renderSampleCount;
@@ -74,5 +84,6 @@ public:
 };
 
 idNeuralTemporalBackend* R_CreateNullNeuralTemporalBackend();
+idNeuralTemporalBackend* R_CreateStreamlineNeuralTemporalBackend();
 
 #endif

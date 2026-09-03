@@ -19,5 +19,5 @@ bool R_StreamlineSetD3DDevice( void* nativeDevice );
 void R_StreamlineShutdown();
 bool R_StreamlineIsInitialized();
 bool R_StreamlineIsDLSSRequested();
+bool R_StreamlineIsDLSSSupported();
 void R_StreamlineStatus_f( const idCmdArgs& args );
-

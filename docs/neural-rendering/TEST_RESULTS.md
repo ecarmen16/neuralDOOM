@@ -1,5 +1,22 @@
 # Test results
 
+## 2026-09-02 / ND3-320 / native-resolution Streamline DLAA
+
+- Build: VS2022 x64 `RelWithDebInfo`, DX12; both SDK-OFF and ignored official Streamline v2.12.0 SDK-ON configurations.
+- Runtime: RTX 5090, custom-engine application ID `0`, `r_streamlineEnable 1`, `r_neuralBackend 2`, 1280x720 native-resolution DLAA Preset K.
+- Scene: disposable `devmap game/mars_city2`; engine log stored in the local save path and not tracked.
+
+| Test | Result | Evidence |
+|---|---|---|
+| Default SDK-OFF regression build | PASS | `build/RelWithDebInfo/RBDoom3BFG.exe` linked without Streamline headers, libraries, or runtime. |
+| SDK-ON build and staging | PASS | `build-streamline/RelWithDebInfo/RBDoom3BFG.exe` linked and staged only ignored local SDK DLLs. |
+| Feature/device/backend initialization | PASS | Streamline initialized with experimental custom-engine identity, accepted D3D12, reported DLSS supported, and initialized the DLAA backend. |
+| Native DLAA evaluation | PASS | `neuralBackendStatus`: 597 evaluated, 597 presented, 0 rejected, epoch 4, render/output 1280x720, last result `DLAA evaluated`. |
+| Ordered shutdown | PASS | Scripted map run processed `+quit` and shut down the renderer/game without a fatal error. |
+| Saved-game image-quality A/B | PENDING | One user-visible comparison remains before completing ND3-320. |
+
+No Streamline or NVIDIA binary is tracked. Public binary distribution remains blocked pending qualified license review.
+
 ## 2026-09-01 / 71392b90 + ND3-320 worktree / Streamline core lifecycle
 
 - SDK build: `USE_STREAMLINE=ON`, official local Streamline `v2.12.0`.

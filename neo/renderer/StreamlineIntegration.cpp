@@ -158,6 +158,11 @@ bool R_StreamlineIsDLSSRequested()
 	return streamlineState.dlssRequested;
 }
 
+bool R_StreamlineIsDLSSSupported()
+{
+	return streamlineState.dlssSupported;
+}
+
 void R_StreamlineStatus_f( const idCmdArgs& args )
 {
 	(void)args;

@@ -2,6 +2,17 @@
 
 Append dated entries. Do not replace prior evidence.
 
+## 2026-09-02 - Native-resolution Streamline DLAA vertical slice
+
+- Added `neo/renderer/NeuralTemporalStreamline.cpp:idStreamlineNeuralTemporalBackend` and selected it with `r_neuralBackend 2`. Mode `0` remains disabled, mode `1` remains the null validator, and Streamline plus its local official runtime remain build-time optional and OFF by default.
+- Extended `neuralTemporalFrame_t` with the unjittered camera projection, camera basis/position, near/far/FOV/aspect, and an engine frame index. `idRenderBackend::EvaluateNeuralTemporalBackend` fills those values from the rendered view; camera right is converted from idTech's left-axis convention.
+- The adapter configures native-resolution `sl::DLSSMode::eDLAA` with transformer Preset K, HDR input, NVIDIA auto exposure, and alpha upscaling disabled. It submits row-major unjittered camera/reprojection matrices, pixel jitter, normalized pixel-motion scale, camera data, depth convention, and unified history reset state.
+- Each evaluation transitions and tags `_currentRenderHDR` (`RGBA16_FLOAT`), `_currentDepth` (`D24_UNORM_S8_UINT`), `_taaMotionVectors` (`RG16_FLOAT`), both `R8_UNORM` classification masks, and UAV output `_taaResolved` (`RGBA16_FLOAT`). Tags use frame-based `eValidUntilEvaluate` lifetime. Streamline receives the native D3D12 command list, and NVRHI pipeline state is cleared after evaluation as required by the manual-hooking path.
+- Any unavailable SDK/device, invalid/native-resolution mismatch, matrix failure, option/tag/constant failure, or evaluation failure returns `false`, preserving the established native TAA path. A gap in evaluated engine frame indices forces a DLSS history reset, making live mode `0`/`2` A/B toggles safe. Backend status reports evaluated, presented, and rejected counts plus the most recent result.
+- Both `USE_STREAMLINE=OFF` and official-v2.12.0 `USE_STREAMLINE=ON` `RelWithDebInfo` builds passed. A disposable 1280x720 `game/mars_city2` run evaluated and presented 597 DLAA frames with zero rejects and exited cleanly. Existing missing-envprobe and reliable-message warnings were unchanged.
+
+Next: perform one saved-game native-TAA/DLAA visual A/B focused on fine edges, camera motion, weapon motion, particles, and HUD integrity; only then promote ND3-320 from `VERIFY` to `DONE`.
+
 ## 2026-09-01 - Streamline core lifecycle and native DX12 device handoff
 
 - Added `neo/renderer/StreamlineIntegration.h/.cpp`. With `USE_STREAMLINE=OFF` the entry points are dependency-free stubs. With the SDK build enabled, `r_streamlineEnable 1` initializes Streamline before `R_SetNewMode` can create the swapchain.

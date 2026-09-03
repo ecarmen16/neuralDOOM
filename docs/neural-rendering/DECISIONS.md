@@ -93,3 +93,11 @@ Resolve these only after `RECON_REPORT.md` and targeted captures provide evidenc
 **Reasoning:** NVIDIA's official v2.12.0 guide recommends manual hooking when an engine needs native interfaces and compatibility with third-party rendering layers. RBDOOM and NVRHI already own device, queue, swapchain, and presentation lifecycles, so explicit proxy boundaries are safer than globally replacing platform APIs. The framework source is permissively licensed, but NGX/DLSS is separately licensed and its open-source restriction is not assumed compatible with RBDOOM's GPL.
 
 **Consequence:** The official release zip is hash-pinned under ignored `local-proprietary/`. `USE_STREAMLINE` defaults OFF and requires an explicit `STREAMLINE_SDK_PATH`. No SDK source or binary is committed. The adapter must initialize before relevant DXGI calls, provide the native D3D12 device, use frame-based resource tagging, preserve NVRHI command-list state, and guarantee fallback. Public binary distribution remains prohibited by project policy until qualified license review resolves the conflict.
+
+## D-012 - Prove DLAA at native resolution before adding DLSS scaling modes
+
+**Status:** Accepted for the first official feature evaluation.
+
+**Reasoning:** Native-resolution DLAA exercises the full official DLSS temporal contract and exposes incorrect depth, motion, jitter, reset, mask, exposure, and layer inputs without simultaneously changing render resolution. It gives a direct image-quality verdict against the established native TAA path before resolution plumbing expands the test surface.
+
+**Consequence:** `r_neuralBackend 2` evaluates Streamline DLAA Preset K from linear HDR into the existing pre-tone-map `_taaResolved` target. NVIDIA auto exposure is used for this first slice; the engine exposure buffer remains in the neutral contract for later validation. DLSS Quality/Balanced/Performance modes remain ND3-330 and are not enabled until native DLAA passes visible motion/effects/HUD comparison.

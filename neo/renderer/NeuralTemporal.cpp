@@ -49,7 +49,7 @@ public:
 		evaluatedFrames++;
 		lastEpoch = frame.historyEpoch;
 
-		const bool valid = initialized && frame.commandList != NULL && frame.sceneColorHDR && frame.depth && frame.motionVectors && frame.reactiveMask && frame.transparencyMask && frame.output && frame.exposure && frame.renderWidth > 0 && frame.renderHeight > 0 && frame.renderSampleCount > 0 && frame.outputWidth > 0 && frame.outputHeight > 0 && frame.motionVectorsValid && frame.masksValid && frame.exposureBufferValid;
+		const bool valid = initialized && frame.commandList != NULL && frame.sceneColorHDR && frame.depth && frame.motionVectors && frame.reactiveMask && frame.transparencyMask && frame.output && frame.exposure && frame.renderWidth > 0 && frame.renderHeight > 0 && frame.renderSampleCount > 0 && frame.outputWidth > 0 && frame.outputHeight > 0 && frame.cameraNear > 0.0f && frame.cameraFar > frame.cameraNear && frame.cameraVerticalFov > 0.0f && frame.cameraAspectRatio > 0.0f && frame.motionVectorsValid && frame.masksValid && frame.exposureBufferValid;
 		if( !valid )
 		{
 			rejectedFrames++;
