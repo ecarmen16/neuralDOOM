@@ -50,3 +50,4 @@ neo/bin/
 !/tools/neural-rendering/**
 /docs/neural-rendering/LAST_CONFIGURE.txt
 /docs/neural-rendering/LAST_BUILD.txt
+/mod_D3HDP_Lite/
