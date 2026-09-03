@@ -1,20 +1,21 @@
 @echo off
 setlocal
 
-set "ND3_EXE=%~dp0RBDoom3BFG.exe"
-set "ND3_MOD=%~dp0mod_D3HDP_Lite"
-if not exist "%ND3_EXE%" (
-	echo RBDoom3BFG.exe was not found beside this launcher.
+set "ND_EXE=%~dp0neuralDoom.exe"
+if not exist "%ND_EXE%" set "ND_EXE=%~dp0RBDoom3BFG.exe"
+set "ND_MOD=%~dp0mod_D3HDP_Lite"
+if not exist "%ND_EXE%" (
+	echo neuralDoom.exe was not found beside this launcher.
 	pause
 	exit /b 1
 )
-if not exist "%ND3_MOD%" (
+if not exist "%ND_MOD%" (
 	echo mod_D3HDP_Lite was not found beside this launcher.
 	pause
 	exit /b 1
 )
 
-start "Neural Doom 3 - D3HDP" /D "%~dp0" "%ND3_EXE%" ^
+start "neuralDoom - D3HDP" /D "%~dp0" "%ND_EXE%" ^
 	+set fs_game mod_D3HDP_Lite ^
 	+set r_graphicsAPI dx12 ^
 	+set r_streamlineEnable 1 ^

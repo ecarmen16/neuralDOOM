@@ -49,4 +49,12 @@ Statuses: `BLOCKED`, `READY`, `IN PROGRESS`, `VERIFY`, `DONE`, `DEFERRED`.
 | ND3-340 | DONE | Validate RenoDX interception compatibility | Local ReShade log: feature 18 evaluated at 5120x1440; corrected launch produced a user-confirmed visible neural image; no external binaries tracked |
 | ND3-400 | DEFERRED | Implement official DLSS 5 backend | Public SDK and legal path required |
 
+## Distribution and setup track
+
+| ID | Status | Task | Exit evidence |
+|---|---|---|---|
+| ND3-500 | DONE | Rebrand downstream project as neuralDoom | SDK-OFF and SDK-ON targets built as `neuralDoom.exe`; visible version, README, tools, and launch profiles preserve RBDOOM attribution |
+| ND3-510 | DONE | Build unified local setup wizard | Real 6.9 GB BFG data and verified D3HDP archive passed; engine/runtime inventory complete; experimental NR acquisition explicitly refused |
+| ND3-520 | READY | Define downloadable component manifest | Pin canonical URLs, versions, hashes, licenses, and unattended install rules for every redistributable component |
+
 Codex should update statuses only from observed evidence and add links to reports/commits where useful.

@@ -1,3 +1,13 @@
+# neuralDoom
+
+neuralDoom is an experimental open-source Doom 3 BFG renderer project built on RBDOOM-3-BFG. It adds a reversible temporal-input interface, native DX12 Streamline/DLSS integration, and a local validation path for future neural-rendering technology.
+
+Run `Setup-NeuralDoom.cmd` after cloning to select a legally owned Doom 3 BFG Edition installation and assemble the local runtime. Retail game data, community texture assets, ReShade/RenoDX files, NVIDIA SDK/runtime binaries, and captures are never committed to this repository.
+
+neuralDoom is not affiliated with or endorsed by id Software, Bethesda, NVIDIA, the RBDOOM-3-BFG project, ReShade, or RenoDX. Upstream authorship, license terms, and the original RBDOOM documentation are preserved below.
+
+## Upstream RBDOOM-3-BFG documentation
+
 ```
     ____   ____   ____                           _____  ____   ______ ______
    / __ \ / __ ) / __ \ ____   ____   ____ ___  |__  / / __ ) / ____// ____/

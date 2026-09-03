@@ -130,13 +130,16 @@ function Invoke-NativeChecked {
     }
 }
 
-function Find-RBDoomExecutable {
+function Find-NeuralDoomExecutable {
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
         [string]$Configuration = 'RelWithDebInfo'
     )
 
     $preferred = @(
+        (Join-Path $RepoRoot "build\$Configuration\neuralDoom.exe"),
+        (Join-Path $RepoRoot "build\Release\neuralDoom.exe"),
+        (Join-Path $RepoRoot 'neuralDoom.exe'),
         (Join-Path $RepoRoot "build\$Configuration\RBDoom3BFG.exe"),
         (Join-Path $RepoRoot "build\Release\RBDoom3BFG.exe"),
         (Join-Path $RepoRoot 'RBDoom3BFG.exe')
@@ -150,7 +153,8 @@ function Find-RBDoomExecutable {
 
     $buildRoot = Join-Path $RepoRoot 'build'
     if (Test-Path $buildRoot) {
-        $found = Get-ChildItem $buildRoot -Filter 'RBDoom3BFG.exe' -File -Recurse -ErrorAction SilentlyContinue |
+        $found = Get-ChildItem $buildRoot -File -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -in @('neuralDoom.exe', 'RBDoom3BFG.exe') } |
             Sort-Object LastWriteTimeUtc -Descending |
             Select-Object -First 1
         if ($found) {
@@ -159,6 +163,15 @@ function Find-RBDoomExecutable {
     }
 
     return $null
+}
+
+function Find-RBDoomExecutable {
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        [string]$Configuration = 'RelWithDebInfo'
+    )
+
+    return Find-NeuralDoomExecutable -RepoRoot $RepoRoot -Configuration $Configuration
 }
 
 Enable-NeuralBuildToolPaths

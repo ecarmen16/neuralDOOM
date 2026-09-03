@@ -2,11 +2,21 @@
 
 Append dated entries. Do not replace prior evidence.
 
+## 2026-09-02 - neuralDoom identity and unified local setup
+
+- Renamed the downstream CMake target and visible engine development version to `neuralDoom`, retaining `RBDOOM 3 BFG 1.6.0` in the console identity and leaving the existing save path unchanged for compatibility. Updated the configure/build/run helpers and portable launch profiles to prefer `neuralDoom.exe` while retaining a legacy executable fallback.
+- Added `Setup-NeuralDoom.cmd` and `tools/neural-rendering/Setup-NeuralDoom.ps1`. The wizard starts from a user-selected, legally owned Doom 3 BFG folder, verifies retail resource presence, copies only missing local data, and reports the engine and optional local runtime layers.
+- The optional D3HDP path accepts the inspected local archive, verifies SHA-256 `E72ABB1C6C8C69FB28913D33709B298AC9553D4F52B10B0D02776BF00589BC4F`, rejects absolute/parent/unexpected archive paths, and extracts only `mod_D3HDP_Lite/`. It does not treat the pack as repository content.
+- The wizard intentionally does not acquire or copy an experimental NVIDIA Neural Rendering runtime. ReShade, RenoDX, NVIDIA runtimes, texture assets, game data, and screenshots stay ignored and untracked.
+- SDK-OFF and Streamline-enabled `RelWithDebInfo` builds passed with the exact `neuralDoom` target. The Streamline-enabled executable was staged locally at 19,838,464 bytes, SHA-256 `74BF93FF000AA42F75C91BB63BD7968BD68E9C8A1CC34E6086B1D77C1757EAEA`, and a DX12 feature-off `+quit` smoke launch exited with code 0.
+
+Next: convert the setup layers into a versioned component manifest only after canonical download URLs and redistribution terms are recorded; retain a manual, user-provided path for the experimental runtime.
+
 ## 2026-09-02 - Local experimental Neural Rendering compatibility checkpoint
 
 - ReShade/RenoDX remained an ignored, manual local validation layer. With the custom executable launched using explicit DX12, Streamline, native DLAA, 100% screen-fraction, normal Doom render mode, and TAA-routing controls, RenoDX intercepted the engine's NGX DLSS call and successfully evaluated experimental feature 18 at 5120x1440.
 - The user confirmed that this corrected launch produced a visibly new neural image. This supersedes the earlier ambiguous visual result, which did not use the same complete launch state.
-- Added `Launch-Neural-Doom3.cmd`, a portable double-click launcher that resolves `RBDoom3BFG.exe` relative to itself and supplies the verified options. It contains no machine-specific path and does not package any external runtime.
+- Added a portable double-click launcher that resolves the engine relative to itself and supplies the verified options. It contains no machine-specific path and does not package any external runtime.
 - Local add-on settings and binaries remain outside version control. Visual tuning, exact paired captures, and third-party texture-pack evaluation are separate follow-up work.
 
 Next: perform a representative still/motion/effects quality matrix, identify stable NR settings, and evaluate BFG-compatible community texture packs without adding proprietary game content to Git.

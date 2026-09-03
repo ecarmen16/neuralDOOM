@@ -10,11 +10,11 @@ param(
 $RepoRoot = Resolve-NeuralRepoRoot $RepoRoot
 $exe = Find-RBDoomExecutable -RepoRoot $RepoRoot -Configuration $Configuration
 if (-not $exe) {
-    throw 'RBDoom3BFG.exe was not found. Configure and build first.'
+    throw 'neuralDoom.exe was not found. Configure and build first.'
 }
 
 $args = @('+set', 'r_graphicsAPI', 'dx12') + $AdditionalArguments
-Write-Step 'Launching RBDOOM-3-BFG through DX12'
+Write-Step 'Launching neuralDoom through DX12'
 Write-Host "Working directory: $RepoRoot"
 Write-Host "Executable:        $exe"
 Write-Host "Arguments:         $($args -join ' ')"

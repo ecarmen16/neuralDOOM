@@ -51,3 +51,9 @@ neo/bin/
 /docs/neural-rendering/LAST_CONFIGURE.txt
 /docs/neural-rendering/LAST_BUILD.txt
 /mod_D3HDP_Lite/
+/DLSS5 Screenshots/
+/ReShade.log
+/reshade.ini
+/reshade-shaders/
+/renodx-dlss5.addon64
+/nvngx_dlss.dll.original

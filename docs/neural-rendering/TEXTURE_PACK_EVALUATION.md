@@ -27,7 +27,7 @@ Download D3HDP BFG Lite to a disposable local staging directory, inspect its arc
 
 - User-provided archive: `D3HDP_BFG_Lite.zip`, 2,143,217,579 bytes, SHA-256 `E72ABB1C6C8C69FB28913D33709B298AC9553D4F52B10B0D02776BF00589BC4F`.
 - Manifest inspection found only top-level `Readme.txt` and `mod_D3HDP_Lite/`; no absolute or parent-traversal paths were present. The only launcher-like payload is `mod_D3HDP_Lite/run_onRBDoom3.bat`; no executable, DLL, `.resources`, PK4, or nested archive was found.
-- The included RBDOOM launcher selects `+set fs_game mod_D3HDP_Lite`. `Launch-Neural-Doom3-D3HDP.cmd` reproduces that selection while retaining the verified DX12, Streamline, native DLAA/NR, 100%-resolution, and TAA-routing options.
+- The included RBDOOM launcher selects `+set fs_game mod_D3HDP_Lite`. `Launch-NeuralDoom-D3HDP.cmd` reproduces that selection while retaining the verified DX12, Streamline, native DLAA/NR, 100%-resolution, and TAA-routing options.
 - The pack is isolated under ignored `mod_D3HDP_Lite/`; it does not replace the custom executable, ReShade/Streamline files, or `base`.
 - Despite its visual-overhaul description, the manifest includes definitions, sounds, map extras, weapon definitions, and a documented shotgun reload adjustment. Visual comparisons must therefore watch for gameplay changes as well as texture/model quality.
 

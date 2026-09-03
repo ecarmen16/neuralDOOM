@@ -1,5 +1,30 @@
 # Test results
 
+## 2026-09-02 / working tree / neuralDoom setup and identity
+
+- Tester/machine label: local Windows development machine; automated setup/build/smoke validation.
+- Branch and base commit: `feature/neural-rendering-spike`, `ca0eeec5` plus the documented working-tree changes.
+- Build configuration: SDK-OFF and Streamline-enabled `RelWithDebInfo`, VS2022 x64.
+- CMake options: DX12 only; `APP_NAME=neuralDoom`; Streamline optional and OFF by default.
+- Game data: user-owned Doom 3 BFG installation at the established local Steam path; 6.9 GB source `base` scan.
+
+| Test | Result | Evidence / artifact path | Notes |
+|---|---|---|---|
+| Exact downstream target | PASS | `build/RelWithDebInfo/neuralDoom.exe`; `build-streamline/RelWithDebInfo/neuralDoom.exe` | Both configurations compiled successfully; only established upstream `StrCmp*` macro warnings observed. |
+| Unified setup, retail data | PASS | `tools/neural-rendering/Setup-NeuralDoom.ps1` console run | Located 384 source files; existing local destination was current; no copy failures. |
+| D3HDP validation | PASS | user archive plus ignored `mod_D3HDP_Lite/` | Verified pinned SHA-256 before recognizing the already-installed isolated mod. |
+| Runtime inventory | PASS | setup console run | Engine, Streamline, NGX DLSS, ReShade proxy, RenoDX add-on, and local NR runtime all detected without being copied or tracked. |
+| Feature-off smoke | PASS | staged ignored `neuralDoom.exe` | DX12 launch with `r_streamlineEnable 0` and `+quit` exited code 0. |
+| Staged identity | PASS | ignored `neuralDoom.exe` | 19,838,464 bytes; SHA-256 `74BF93FF000AA42F75C91BB63BD7968BD68E9C8A1CC34E6086B1D77C1757EAEA`. |
+
+### Regressions
+
+- None observed in the automated feature-off smoke. Full visual D3HDP/NR quality validation remains the user's active manual test.
+
+### Conclusion
+
+- ND3-500 and ND3-510 pass. Direct downloads remain gated on the ND3-520 component manifest and license/source review.
+
 ## 2026-09-02 / ND3-340 / local RenoDX DLSSNR interception
 
 - Local-only validation layer: ReShade 6.8.0.2155 and RenoDX DLSS5 Generic v4.1.5, loaded from ignored files beside the custom executable. No ReShade, RenoDX, NVIDIA NR runtime, retail data, or captured output is tracked.

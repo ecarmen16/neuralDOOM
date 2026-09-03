@@ -25,6 +25,27 @@ This file is an engineering checklist, not legal advice.
 - Document required versions and configuration, but link users to the original projects rather than repackaging binaries.
 - Never imply that an unofficial mod path is an NVIDIA-supported DLSS 5 integration.
 
+## Local optional content record
+
+### D3HDP BFG Lite
+
+| Field | Answer |
+|---|---|
+| Project/version | `D3HDP_BFG_Lite.zip`, inspected local release archive |
+| Canonical source | `https://www.moddb.com/downloads/d3hdp-bfg-lite` |
+| License | Redistribution terms unresolved; archive contents are not approved for repository or release bundling |
+| Runtime role | Optional local Doom 3 BFG visual/content mod selected with `fs_game mod_D3HDP_Lite` |
+| Optional | The normal neuralDoom launcher and engine work without it |
+| Binary redistribution | Not applicable to the inspected archive; content redistribution remains unresolved and blocked |
+| Update strategy | Require a pinned release SHA-256 and re-inspect the complete archive manifest before accepting another version |
+| Removal strategy | Delete the ignored local `mod_D3HDP_Lite/` folder and use `Launch-NeuralDoom.cmd` |
+
+Local validation record:
+
+- Archive size: 2,143,217,579 bytes.
+- Verified SHA-256: `E72ABB1C6C8C69FB28913D33709B298AC9553D4F52B10B0D02776BF00589BC4F`.
+- Setup accepts a user-provided archive, validates its digest and paths, and extracts only the isolated mod folder. It does not redistribute the archive.
+
 ## Dependency review template
 
 Before adding a dependency, record:

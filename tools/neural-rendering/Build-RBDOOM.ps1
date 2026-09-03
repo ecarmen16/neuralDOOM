@@ -21,18 +21,18 @@ if ($Parallel -gt 0) {
     $args += '--parallel'
 }
 
-Write-Step "Building RBDOOM-3-BFG ($Configuration)"
+Write-Step "Building neuralDoom on RBDOOM-3-BFG ($Configuration)"
 Invoke-NativeChecked 'cmake' $args
 
 $exe = Find-RBDoomExecutable -RepoRoot $RepoRoot -Configuration $Configuration
 if (-not $exe) {
-    Write-Warning 'Build returned success, but RBDoom3BFG.exe was not found automatically. Inspect the build tree.'
+    Write-Warning 'Build returned success, but neuralDoom.exe was not found automatically. Inspect the build tree.'
     exit 0
 }
 
 Write-Host "Executable: $exe" -ForegroundColor Green
 if ($StageExecutable) {
-    $staged = Join-Path $RepoRoot 'RBDoom3BFG.exe'
+    $staged = Join-Path $RepoRoot (Split-Path -Leaf $exe)
     Copy-Item $exe $staged -Force
     Write-Host "Staged:     $staged" -ForegroundColor Green
 }

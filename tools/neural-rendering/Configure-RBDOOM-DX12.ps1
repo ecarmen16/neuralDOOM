@@ -52,6 +52,7 @@ $args = @(
     '-B', $BuildDirectory,
     '-G', $Generator,
     '-A', 'x64',
+    '-DAPP_NAME=neuralDoom',
     '-DFFMPEG=OFF',
     '-DBINKDEC=ON',
     '-DUSE_DX12=ON',
@@ -60,7 +61,7 @@ $args = @(
     "-DDXC_CUSTOM_PATH=$DxcDirectory"
 )
 
-Write-Step 'Configuring RBDOOM-3-BFG for VS2022 x64, DX12 only'
+Write-Step 'Configuring neuralDoom on RBDOOM-3-BFG for VS2022 x64, DX12 only'
 Write-Host "cmake $($args -join ' ')"
 Invoke-NativeChecked 'cmake' $args
 

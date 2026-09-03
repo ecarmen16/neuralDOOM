@@ -101,3 +101,11 @@ Resolve these only after `RECON_REPORT.md` and targeted captures provide evidenc
 **Reasoning:** Native-resolution DLAA exercises the full official DLSS temporal contract and exposes incorrect depth, motion, jitter, reset, mask, exposure, and layer inputs without simultaneously changing render resolution. It gives a direct image-quality verdict against the established native TAA path before resolution plumbing expands the test surface.
 
 **Consequence:** `r_neuralBackend 2` evaluates Streamline DLAA Preset K from linear HDR into the existing pre-tone-map `_taaResolved` target. NVIDIA auto exposure is used for this first slice; the engine exposure buffer remains in the neutral contract for later validation. A minimal `r_neuralBackend 3` Quality path exists only to prove cross-resolution extents and fallback. Full scaling-mode UX and tuning remain deferred because 100% source resolution is preferred for the planned neural-rendering experiment on the RTX 5090.
+
+## D-013 - Brand the downstream project neuralDoom and keep dependencies layered
+
+**Status:** Accepted.
+
+**Reasoning:** The final project needs one recognizable install and launch surface while preserving the ability to update RBDOOM independently and remove experimental integrations. Retail data, community content, official SDK components, and experimental local validation files have different licenses and distribution rules and cannot be treated as one repository payload.
+
+**Consequence:** The downstream CMake target and visible development version use `neuralDoom`, with explicit RBDOOM attribution retained. `Setup-NeuralDoom` assembles owned game data and verified optional content locally. Experimental Neural Rendering runtimes are detected but never downloaded, copied, committed, or redistributed by the project until a public, documented, legally usable distribution path is verified.
