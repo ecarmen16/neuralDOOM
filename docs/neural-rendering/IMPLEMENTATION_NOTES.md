@@ -2,6 +2,15 @@
 
 Append dated entries. Do not replace prior evidence.
 
+## 2026-09-02 - Preliminary cross-resolution DLSS Quality diagnostic
+
+- Extended the Streamline backend selector with `r_neuralBackend 3` for a narrow DLSS Quality diagnostic. The renderer now reports the primary view's actual rendered viewport as the input extent while retaining the native `_taaResolved` output extent; mode `2` continues to require equal native dimensions for DLAA.
+- Preset K Quality options, frame tags, history reset, fallback, and the existing temporal inputs are shared with DLAA. Option and history state reset when the active Streamline mode or output dimensions change.
+- Both SDK-OFF and SDK-ON builds passed. A disposable `r_screenFraction 67` run reconstructed 857x482 into 1280x720 for 153 evaluated/presented frames with zero rejects and a clean shutdown.
+- This capability is retained as infrastructure evidence, not the visual objective. The RTX 5090 already renders Doom 3 with ample headroom; the intended path remains 100% scene resolution so future neural rendering can consume maximum source detail.
+
+Next: keep the normal runtime at mode `2`/100% and define the legally usable, documented NR evaluation boundary. Full mode UI, recommended-resolution selection, and performance tuning remain deferred.
+
 ## 2026-09-02 - Native-resolution Streamline DLAA vertical slice
 
 - Added `neo/renderer/NeuralTemporalStreamline.cpp:idStreamlineNeuralTemporalBackend` and selected it with `r_neuralBackend 2`. Mode `0` remains disabled, mode `1` remains the null validator, and Streamline plus its local official runtime remain build-time optional and OFF by default.
@@ -11,7 +20,7 @@ Append dated entries. Do not replace prior evidence.
 - Any unavailable SDK/device, invalid/native-resolution mismatch, matrix failure, option/tag/constant failure, or evaluation failure returns `false`, preserving the established native TAA path. A gap in evaluated engine frame indices forces a DLSS history reset, making live mode `0`/`2` A/B toggles safe. Backend status reports evaluated, presented, and rejected counts plus the most recent result.
 - Both `USE_STREAMLINE=OFF` and official-v2.12.0 `USE_STREAMLINE=ON` `RelWithDebInfo` builds passed. A disposable 1280x720 `game/mars_city2` run evaluated and presented 597 DLAA frames with zero rejects and exited cleanly. Existing missing-envprobe and reliable-message warnings were unchanged.
 
-Next: perform one saved-game native-TAA/DLAA visual A/B focused on fine edges, camera motion, weapon motion, particles, and HUD integrity; only then promote ND3-320 from `VERIFY` to `DONE`.
+Visible saved-game A/B completed: the user found native TAA and DLAA difficult to distinguish, with no reported rendering regression. ND3-320 is complete as temporal-contract infrastructure; DLAA is not treated as the project's transformative visual feature.
 
 ## 2026-09-01 - Streamline core lifecycle and native DX12 device handoff
 

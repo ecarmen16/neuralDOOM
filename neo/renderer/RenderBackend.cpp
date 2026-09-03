@@ -53,7 +53,7 @@ idCVar r_neuralRigidMotionVectors( "r_neuralRigidMotionVectors", "0", CVAR_RENDE
 idCVar r_neuralSkinnedMotionVectors( "r_neuralSkinnedMotionVectors", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "generate skinned-object motion vectors; forced on by r_neuralDebug 2" );
 idCVar r_neuralViewmodelMotionVectors( "r_neuralViewmodelMotionVectors", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "include first-person viewmodel motion vectors; experimental and not forced by diagnostic modes" );
 idCVar r_neuralTemporalMasks( "r_neuralTemporalMasks", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "generate reactive and transparency masks; forced on by r_neuralDebug 3 or 4" );
-idCVar r_neuralBackend( "r_neuralBackend", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_NEW, "neutral temporal backend: 0 = disabled, 1 = validate frame contract, 2 = Streamline DLAA", 0, 2, idCmdSystem::ArgCompletion_Integer<0, 2> );
+idCVar r_neuralBackend( "r_neuralBackend", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_NEW, "neutral temporal backend: 0 = disabled, 1 = validate frame contract, 2 = Streamline DLAA, 3 = Streamline DLSS Quality", 0, 3, idCmdSystem::ArgCompletion_Integer<0, 3> );
 idCVar r_forceZPassStencilShadows( "r_forceZPassStencilShadows", "0", CVAR_RENDERER | CVAR_BOOL, "force Z-pass rendering for performance testing" );
 idCVar r_useStencilShadowPreload( "r_useStencilShadowPreload", "0", CVAR_RENDERER | CVAR_BOOL, "use stencil shadow preload algorithm instead of Z-fail" );
 idCVar r_skipShaderPasses( "r_skipShaderPasses", "0", CVAR_RENDERER | CVAR_BOOL, "" );
@@ -91,7 +91,7 @@ void idRenderBackend::ResizeNeuralTemporalBackend()
 
 void idRenderBackend::PrintNeuralTemporalBackendStatus() const
 {
-	const char* mode = r_neuralBackend.GetInteger() == 2 ? "Streamline DLAA" : ( r_neuralBackend.GetInteger() == 1 ? "validate" : "disabled" );
+	const char* mode = r_neuralBackend.GetInteger() == 3 ? "Streamline DLSS Quality" : ( r_neuralBackend.GetInteger() == 2 ? "Streamline DLAA" : ( r_neuralBackend.GetInteger() == 1 ? "validate" : "disabled" ) );
 	common->Printf( "r_neuralBackend %d (%s)\n", r_neuralBackend.GetInteger(), mode );
 	if( neuralTemporalBackend != NULL )
 	{
@@ -5328,8 +5328,8 @@ bool idRenderBackend::EvaluateNeuralTemporalBackend( const viewDef_t* _viewDef, 
 	frame.cameraNear = _viewDef->renderView.cramZNear ? r_znear.GetFloat() * 0.25f : r_znear.GetFloat();
 	frame.cameraFar = 160000.0f;
 	frame.cameraVerticalFov = DEG2RAD( _viewDef->renderView.fov_y );
-	frame.renderWidth = globalImages->currentRenderHDRImage->GetUploadWidth();
-	frame.renderHeight = globalImages->currentRenderHDRImage->GetUploadHeight();
+	frame.renderWidth = _viewDef->viewport.x2 - _viewDef->viewport.x1 + 1;
+	frame.renderHeight = _viewDef->viewport.y2 - _viewDef->viewport.y1 + 1;
 	frame.renderSampleCount = frame.sceneColorHDR->getDesc().sampleCount;
 	frame.outputWidth = renderSystem->GetWidth();
 	frame.outputHeight = renderSystem->GetHeight();

@@ -1,5 +1,13 @@
 # Test results
 
+## 2026-09-02 / ND3-330 preliminary / DLSS Quality extent smoke test
+
+| Test | Result | Evidence |
+|---|---|---|
+| SDK-OFF and SDK-ON builds | PASS | Both VS2022 x64 DX12 `RelWithDebInfo` trees linked after adding mode `3` and view-extent reporting. |
+| 67%-to-native evaluation | PASS | `neuralBackendStatus`: 153 evaluated, 153 presented, 0 rejected; render 857x482, output 1280x720, last `DLSS Quality evaluated`. |
+| Project-priority review | DEFERRED | The RTX 5090 does not need reconstruction for Doom 3 performance. Quality mode remains an infrastructure diagnostic; the planned NR path should normally retain 100% source resolution. |
+
 ## 2026-09-02 / ND3-320 / native-resolution Streamline DLAA
 
 - Build: VS2022 x64 `RelWithDebInfo`, DX12; both SDK-OFF and ignored official Streamline v2.12.0 SDK-ON configurations.
@@ -13,7 +21,7 @@
 | Feature/device/backend initialization | PASS | Streamline initialized with experimental custom-engine identity, accepted D3D12, reported DLSS supported, and initialized the DLAA backend. |
 | Native DLAA evaluation | PASS | `neuralBackendStatus`: 597 evaluated, 597 presented, 0 rejected, epoch 4, render/output 1280x720, last result `DLAA evaluated`. |
 | Ordered shutdown | PASS | Scripted map run processed `+quit` and shut down the renderer/game without a fatal error. |
-| Saved-game image-quality A/B | PENDING | One user-visible comparison remains before completing ND3-320. |
+| Saved-game image-quality A/B | PASS / subtle | User found it difficult to see a difference from native TAA and reported no visible regression. This validates presentation but does not establish a compelling standalone visual gain. |
 
 No Streamline or NVIDIA binary is tracked. Public binary distribution remains blocked pending qualified license review.
 

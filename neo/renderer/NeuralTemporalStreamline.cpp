@@ -14,6 +14,7 @@ apply to this source tree.
 #pragma hdrstop
 
 #include "NeuralTemporal.h"
+#include "RenderCommon.h"
 #include "StreamlineIntegration.h"
 
 #if USE_STREAMLINE
@@ -26,7 +27,7 @@ apply to this source tree.
 class idStreamlineNeuralTemporalBackend : public idNeuralTemporalBackend
 {
 public:
-	idStreamlineNeuralTemporalBackend() : initialized( false ), optionsDirty( true ), resetPending( true ), evaluatedFrames( 0 ), presentedFrames( 0 ), rejectedFrames( 0 ), lastEpoch( 0 ), lastFrameIndex( 0 ), renderWidth( 0 ), renderHeight( 0 ), outputWidth( 0 ), outputHeight( 0 ), lastResult( "not attempted" ) {}
+	idStreamlineNeuralTemporalBackend() : initialized( false ), optionsDirty( true ), resetPending( true ), evaluatedFrames( 0 ), presentedFrames( 0 ), rejectedFrames( 0 ), lastEpoch( 0 ), lastFrameIndex( 0 ), configuredMode( 0 ), renderWidth( 0 ), renderHeight( 0 ), outputWidth( 0 ), outputHeight( 0 ), lastResult( "not attempted" ) {}
 
 	virtual bool Initialize( nvrhi::IDevice* device ) override
 	{
@@ -71,7 +72,10 @@ public:
 		rejectedFrames++;
 		return false;
 #else
-		const bool valid = initialized && frame.commandList != NULL && frame.sceneColorHDR && frame.depth && frame.motionVectors && frame.reactiveMask && frame.transparencyMask && frame.output && frame.renderWidth > 0 && frame.renderHeight > 0 && frame.renderSampleCount == 1 && frame.renderWidth == frame.outputWidth && frame.renderHeight == frame.outputHeight && frame.motionVectorsValid && frame.masksValid;
+		const int requestedMode = r_neuralBackend.GetInteger();
+		const bool nativeDLAA = requestedMode == 2;
+		const bool qualityDLSS = requestedMode == 3;
+		const bool valid = initialized && ( nativeDLAA || qualityDLSS ) && frame.commandList != NULL && frame.sceneColorHDR && frame.depth && frame.motionVectors && frame.reactiveMask && frame.transparencyMask && frame.output && frame.renderWidth > 0 && frame.renderHeight > 0 && frame.renderWidth <= frame.outputWidth && frame.renderHeight <= frame.outputHeight && frame.renderSampleCount == 1 && ( !nativeDLAA || ( frame.renderWidth == frame.outputWidth && frame.renderHeight == frame.outputHeight ) ) && frame.motionVectorsValid && frame.masksValid;
 		if( !valid )
 		{
 			rejectedFrames++;
@@ -82,17 +86,23 @@ public:
 		{
 			resetPending = true;
 		}
+		if( configuredMode != requestedMode || outputWidth != frame.outputWidth || outputHeight != frame.outputHeight )
+		{
+			optionsDirty = true;
+			resetPending = true;
+		}
 
 		if( optionsDirty )
 		{
 			sl::DLSSOptions options = {};
-			options.mode = sl::DLSSMode::eDLAA;
+			options.mode = nativeDLAA ? sl::DLSSMode::eDLAA : sl::DLSSMode::eMaxQuality;
 			options.outputWidth = frame.outputWidth;
 			options.outputHeight = frame.outputHeight;
 			options.preExposure = 1.0f;
 			options.exposureScale = frame.exposureScale;
 			options.colorBuffersHDR = sl::Boolean::eTrue;
 			options.dlaaPreset = sl::DLSSPreset::ePresetK;
+			options.qualityPreset = sl::DLSSPreset::ePresetK;
 			options.useAutoExposure = sl::Boolean::eTrue;
 			options.alphaUpscalingEnabled = sl::Boolean::eFalse;
 			const sl::Result optionsResult = slDLSSSetOptions( sl::ViewportHandle( 0 ), options );
@@ -101,7 +111,12 @@ public:
 				return Reject( "slDLSSSetOptions", optionsResult );
 			}
 			optionsDirty = false;
+			configuredMode = requestedMode;
 		}
+		renderWidth = frame.renderWidth;
+		renderHeight = frame.renderHeight;
+		outputWidth = frame.outputWidth;
+		outputHeight = frame.outputHeight;
 
 		sl::FrameToken* frameToken = NULL;
 		const sl::Result tokenResult = slGetNewFrameToken( frameToken, &frame.frameIndex );
@@ -211,14 +226,14 @@ public:
 		resetPending = false;
 		lastFrameIndex = frame.frameIndex;
 		presentedFrames++;
-		lastResult = "DLAA evaluated";
+		lastResult = nativeDLAA ? "DLAA evaluated" : "DLSS Quality evaluated";
 		return true;
 #endif
 	}
 
 	virtual void PrintStatus() const override
 	{
-		common->Printf( "Neural temporal backend: Streamline DLAA, initialized %s, evaluated %llu, presented %llu, rejected %llu, epoch %llu, render %dx%d, output %dx%d, last %s\n",
+		common->Printf( "Neural temporal backend: Streamline DLSS, initialized %s, evaluated %llu, presented %llu, rejected %llu, epoch %llu, render %dx%d, output %dx%d, last %s\n",
 			initialized ? "yes" : "no", evaluatedFrames, presentedFrames, rejectedFrames, lastEpoch, renderWidth, renderHeight, outputWidth, outputHeight, lastResult );
 	}
 
@@ -262,6 +277,7 @@ private:
 	uint64		rejectedFrames;
 	uint64		lastEpoch;
 	uint32		lastFrameIndex;
+	int			configuredMode;
 	int			renderWidth;
 	int			renderHeight;
 	int			outputWidth;

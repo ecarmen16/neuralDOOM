@@ -210,7 +210,7 @@ void idRenderBackend::Init()
 	commonPasses.Init( deviceManager->GetDevice() );
 	hiZGenPass = nullptr;
 	ssaoPass = nullptr;
-	neuralTemporalBackend = r_neuralBackend.GetInteger() == 2 ? R_CreateStreamlineNeuralTemporalBackend() : R_CreateNullNeuralTemporalBackend();
+	neuralTemporalBackend = r_neuralBackend.GetInteger() >= 2 ? R_CreateStreamlineNeuralTemporalBackend() : R_CreateNullNeuralTemporalBackend();
 	if( !neuralTemporalBackend->Initialize( deviceManager->GetDevice() ) )
 	{
 		common->Warning( "Could not initialize requested neural temporal backend; temporal evaluation will fall back to native TAA" );
