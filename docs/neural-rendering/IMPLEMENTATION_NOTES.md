@@ -2,6 +2,15 @@
 
 Append dated entries. Do not replace prior evidence.
 
+## 2026-09-02 - Local experimental Neural Rendering compatibility checkpoint
+
+- ReShade/RenoDX remained an ignored, manual local validation layer. With the custom executable launched using explicit DX12, Streamline, native DLAA, 100% screen-fraction, normal Doom render mode, and TAA-routing controls, RenoDX intercepted the engine's NGX DLSS call and successfully evaluated experimental feature 18 at 5120x1440.
+- The user confirmed that this corrected launch produced a visibly new neural image. This supersedes the earlier ambiguous visual result, which did not use the same complete launch state.
+- Added `Launch-Neural-Doom3.cmd`, a portable double-click launcher that resolves `RBDoom3BFG.exe` relative to itself and supplies the verified options. It contains no machine-specific path and does not package any external runtime.
+- Local add-on settings and binaries remain outside version control. Visual tuning, exact paired captures, and third-party texture-pack evaluation are separate follow-up work.
+
+Next: perform a representative still/motion/effects quality matrix, identify stable NR settings, and evaluate BFG-compatible community texture packs without adding proprietary game content to Git.
+
 ## 2026-09-02 - Preliminary cross-resolution DLSS Quality diagnostic
 
 - Extended the Streamline backend selector with `r_neuralBackend 3` for a narrow DLSS Quality diagnostic. The renderer now reports the primary view's actual rendered viewport as the input extent while retaining the native `_taaResolved` output extent; mode `2` continues to require equal native dimensions for DLAA.

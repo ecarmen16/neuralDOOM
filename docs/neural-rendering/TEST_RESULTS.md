@@ -1,5 +1,20 @@
 # Test results
 
+## 2026-09-02 / ND3-340 / local RenoDX DLSSNR interception
+
+- Local-only validation layer: ReShade 6.8.0.2155 and RenoDX DLSS5 Generic v4.1.5, loaded from ignored files beside the custom executable. No ReShade, RenoDX, NVIDIA NR runtime, retail data, or captured output is tracked.
+- Engine launch: DX12, Streamline enabled with experimental application ID `0`, `r_neuralBackend 2`, `r_screenFraction 100`, Doom render mode, and native TAA routing enabled.
+- Scene/output: saved gameplay at 5120x1440 native input and output.
+
+| Test | Result | Evidence |
+|---|---|---|
+| NGX interception | PASS | Local `ReShade.log` reports the engine DLSS/DLAA feature create and evaluate were intercepted. |
+| Experimental DLSSNR evaluation | PASS | Feature 18 initialized and evaluated successfully at 5120x1440 with full-resolution guides; the add-on reported successful frames and result `0x00000001 (ok)`. |
+| Runtime toggle | PASS | The local log records repeated F6 off/on transitions followed by successful feature recreation. |
+| Visible neural output | PASS | User confirmed the corrected launch produced a visibly new model-generated image. Previous near-inert runs are attributed to an inconsistent launch state, not absence of model execution. |
+
+Compatibility is proven for private local experimentation. Visual-quality tuning and a controlled screenshot matrix remain manual follow-up work; this result does not approve redistribution of the experimental runtime or add-on.
+
 ## 2026-09-02 / ND3-330 preliminary / DLSS Quality extent smoke test
 
 | Test | Result | Evidence |

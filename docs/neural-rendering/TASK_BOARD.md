@@ -46,7 +46,7 @@ Statuses: `BLOCKED`, `READY`, `IN PROGRESS`, `VERIFY`, `DONE`, `DEFERRED`.
 | ND3-310 | DONE | Add OFF-by-default SDK build option | Default DX12 and isolated Streamline 2.12.0 configurations built successfully; SDK-enabled executable hash recorded |
 | ND3-320 | DONE | Integrate native DLAA | SDK evaluated 597 native-resolution frames with zero rejects; saved-game A/B showed no visible regression and only subtle/no readily discernible change from native TAA |
 | ND3-330 | DEFERRED | Add full DLSS quality-mode/resolution plumbing | Preliminary 67%-to-native Quality mode evaluated 153 frames with zero rejects; not a project priority on RTX 5090 |
-| ND3-340 | DEFERRED | Validate RenoDX interception compatibility | Local-only A/B report |
+| ND3-340 | DONE | Validate RenoDX interception compatibility | Local ReShade log: feature 18 evaluated at 5120x1440; corrected launch produced a user-confirmed visible neural image; no external binaries tracked |
 | ND3-400 | DEFERRED | Implement official DLSS 5 backend | Public SDK and legal path required |
 
 Codex should update statuses only from observed evidence and add links to reports/commits where useful.
