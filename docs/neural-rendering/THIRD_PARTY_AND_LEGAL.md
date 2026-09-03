@@ -25,6 +25,16 @@ This file is an engineering checklist, not legal advice.
 - Document required versions and configuration, but link users to the original projects rather than repackaging binaries.
 - Never imply that an unofficial mod path is an NVIDIA-supported DLSS 5 integration.
 
+### Source reconnaissance record (2026-09-03)
+
+| Project | Inspected revision | License observed | Role and current distribution decision |
+|---|---|---|---|
+| ReShade | `358c345ca2fe64f86e67c694f8379c356627adcb` | BSD-3-Clause in upstream `LICENSE.md`; add-on headers also identify BSD-3-Clause or MIT | Public runtime/add-on API reference. The compatibility loader accepts a user-local renamed runtime; no ReShade source or binary is tracked or distributed yet. |
+| RenoDX | `66f4a40362cd7840bc0647734c434670539addb0` | MIT in upstream `LICENSE` | Public NGX hook utilities and ReShade add-on examples were inspected. The exact experimental DLSS5 generic add-on implementation was not present in the inspected public tree, so it is not reproduced or treated as an engine API. |
+| RHI | `3fd79d9f8b0a776788f0c065aa2a130da283c31c` | GPL-3.0 in upstream `LICENSE` | Installer/manager reference only. It installs a ReShade proxy/add-on/configuration and launches the target; no RHI code or binary is integrated. |
+
+The experimental `renodx-dlss5.addon64` and `nvngx_dlssnr.dll` remain unapproved for redistribution regardless of the licenses of the public manager/runtime projects around them.
+
 ## Local optional content record
 
 ### D3HDP BFG Lite

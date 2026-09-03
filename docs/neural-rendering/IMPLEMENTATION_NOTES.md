@@ -2,6 +2,17 @@
 
 Append dated entries. Do not replace prior evidence.
 
+## 2026-09-03 - Engine-owned experimental compatibility startup
+
+- Inspected public RHI commit `3fd79d9f8b0a776788f0c065aa2a130da283c31c`, RenoDX commit `66f4a40362cd7840bc0647734c434670539addb0`, and ReShade commit `358c345ca2fe64f86e67c694f8379c356627adcb`. RHI installs ReShade as the graphics proxy and then launches the game normally; it is a manager, not a process injector. The local DLSS5 add-on dynamically requests ReShade API functions and is not statically linked to ReShade.
+- Added `neo/renderer/NeuralCompatibility.cpp/.h`. `R_NeuralCompatibilityInitialize` runs before Streamline and D3D12 device creation when `r_neuralCompatibilityEnable 1` is explicitly requested. It loads only a user-local `neuraldoom-reshade64.dll`, verifies the public ReShade add-on exports, and leaves the normal path unchanged when disabled.
+- ReShade retains its public D3D12 hook/object lifecycle in this compatibility mode, but it is loaded deliberately by the engine rather than through a drop-in `dxgi.dll` proxy. This is not a native DLSSNR API integration and does not make the external add-on or experimental runtime an engine dependency.
+- Added `r_neuralCompatibilityProfile`. Empty preserves GUI/INI tuning. `working` applies the values from the user-validated NeuralDoom run before add-on initialization; `neutral` resets the strength controls to 1 while retaining NR-on, upscaling-off, preset/style, and guide defaults. `neuralCompatibilityStatus` reports startup state.
+- Added the reversible `Switch-NeuralDoom-ReShadeMode.cmd`/PowerShell helper and `Launch-NeuralDoom-EmbeddedNR.cmd`. The switch moves, never duplicates, the ignored local ReShade runtime and refuses ambiguous dual-runtime state.
+- Reconfigured and built both Streamline-enabled and SDK-OFF `RelWithDebInfo` targets successfully. A local startup probe loaded ReShade 6.8.0.2155 from `neuraldoom-reshade64.dll`, registered the DLSS5 add-on through ReShade API 18, preloaded the ignored NR runtime at D3D12 device initialization, created the 1280x720 ReShade runtime, and shut the D3D12 runtime down after the probe. No third-party binary or configuration entered Git.
+
+Next: run the embedded launcher through the saved combat scene and confirm the same visible feature-18 output, then capture stationary/motion/effects comparisons while tuning from the `working` profile.
+
 ## 2026-09-02 - neuralDoom identity and unified local setup
 
 - Renamed the downstream CMake target and visible engine development version to `neuralDoom`, retaining `RBDOOM 3 BFG 1.6.0` in the console identity and leaving the existing save path unchanged for compatibility. Updated the configure/build/run helpers and portable launch profiles to prefer `neuralDoom.exe` while retaining a legacy executable fallback.

@@ -55,5 +55,7 @@ neo/bin/
 /ReShade.log
 /reshade.ini
 /reshade-shaders/
+/ReShade/
 /renodx-dlss5.addon64
 /nvngx_dlss.dll.original
+/local-research/

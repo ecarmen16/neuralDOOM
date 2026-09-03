@@ -35,6 +35,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "../RenderCommon.h"
 #include "../RenderBackend.h"
 #include "../StreamlineIntegration.h"
+#include "../NeuralCompatibility.h"
 #include "../../framework/Common_local.h"
 #include "imgui.h"
 #include "../ImmediateMode.h"
@@ -175,6 +176,7 @@ void idRenderBackend::Init()
 	deviceManager = DeviceManager::Create( api );
 	if( api == nvrhi::GraphicsAPI::D3D12 )
 	{
+		R_NeuralCompatibilityInitialize();
 		R_StreamlineInitialize();
 	}
 

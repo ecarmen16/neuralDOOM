@@ -185,6 +185,7 @@ $runtimeFiles = @(
     'sl.dlss.dll',
     'nvngx_dlss.dll',
     'dxgi.dll',
+    'neuraldoom-reshade64.dll',
     'renodx-dlss5.addon64',
     'nvngx_dlssnr.dll'
 )
@@ -195,12 +196,30 @@ foreach ($runtimeFile in $runtimeFiles) {
     Write-Host "[$state] $runtimeFile" -ForegroundColor $color
 }
 
+$proxyReShadePresent = Test-Path -LiteralPath (Join-Path $RepoRoot 'dxgi.dll')
+$embeddedReShadePresent = Test-Path -LiteralPath (Join-Path $RepoRoot 'neuraldoom-reshade64.dll')
+if ($proxyReShadePresent -and $embeddedReShadePresent) {
+    Write-Warning 'Both ReShade startup modes are present. Keep exactly one of dxgi.dll or neuraldoom-reshade64.dll.'
+} elseif ($embeddedReShadePresent) {
+    Write-Host '[mode] ReShade will be loaded explicitly by neuralDoom.' -ForegroundColor Green
+} elseif ($proxyReShadePresent) {
+    Write-Host '[mode] ReShade is currently installed as a DXGI proxy. Run Switch-NeuralDoom-ReShadeMode.cmd to use embedded startup.' -ForegroundColor Yellow
+}
+
 Write-Host ''
 Write-Host 'neuralDoom never downloads or copies an experimental NVIDIA Neural Rendering runtime.' -ForegroundColor Yellow
 Write-Host 'Optional runtime installation remains a documented manual step until its distribution terms are verified.' -ForegroundColor Yellow
 Write-Host ''
 if (Test-Path -LiteralPath $d3hdpFolder) {
-    Write-Host 'Ready: double-click Launch-NeuralDoom-D3HDP.cmd' -ForegroundColor Green
+    if ($embeddedReShadePresent -and -not $proxyReShadePresent) {
+        Write-Host 'Ready: double-click Launch-NeuralDoom-EmbeddedNR-D3HDP.cmd' -ForegroundColor Green
+    } else {
+        Write-Host 'Ready: double-click Launch-NeuralDoom-D3HDP.cmd' -ForegroundColor Green
+    }
 } else {
-    Write-Host 'Ready: double-click Launch-NeuralDoom.cmd' -ForegroundColor Green
+    if ($embeddedReShadePresent -and -not $proxyReShadePresent) {
+        Write-Host 'Ready: double-click Launch-NeuralDoom-EmbeddedNR.cmd' -ForegroundColor Green
+    } else {
+        Write-Host 'Ready: double-click Launch-NeuralDoom.cmd' -ForegroundColor Green
+    }
 }

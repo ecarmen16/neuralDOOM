@@ -109,3 +109,11 @@ Resolve these only after `RECON_REPORT.md` and targeted captures provide evidenc
 **Reasoning:** The final project needs one recognizable install and launch surface while preserving the ability to update RBDOOM independently and remove experimental integrations. Retail data, community content, official SDK components, and experimental local validation files have different licenses and distribution rules and cannot be treated as one repository payload.
 
 **Consequence:** The downstream CMake target and visible development version use `neuralDoom`, with explicit RBDOOM attribution retained. `Setup-NeuralDoom` assembles owned game data and verified optional content locally. Experimental Neural Rendering runtimes are detected but never downloaded, copied, committed, or redistributed by the project until a public, documented, legally usable distribution path is verified.
+
+## D-014 - Treat embedded ReShade startup as a removable compatibility bridge
+
+**Status:** Accepted for local experimental validation only.
+
+**Reasoning:** Public RHI source shows that it installs a ReShade graphics proxy and launches the target normally. Public ReShade supports loading under a non-proxy filename and exposes the add-on API requested dynamically by the local DLSS5 add-on. Loading that runtime from NeuralDoom before D3D12 creation removes the manual proxy installation step while preserving the complete device, swapchain, overlay, configuration, and add-on lifecycle that the closed experimental bridge expects. Reimplementing that private add-on or calling an undocumented NR runtime interface would be less supportable and would cross the project's legal/API boundary.
+
+**Consequence:** `r_neuralCompatibilityEnable` defaults OFF and only loads an ignored, user-supplied `neuraldoom-reshade64.dll`. ReShade still performs D3D12 hooks internally; this is not described as a native Neural Rendering backend. The engine's neutral temporal contract and official Streamline backend remain independent. A later public, documented DLSSNR API replaces this bridge rather than inheriting its ReShade assumptions.

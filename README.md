@@ -4,6 +4,8 @@ neuralDoom is an experimental open-source Doom 3 BFG renderer project built on R
 
 Run `Setup-NeuralDoom.cmd` after cloning to select a legally owned Doom 3 BFG Edition installation and assemble the local runtime. Retail game data, community texture assets, ReShade/RenoDX files, NVIDIA SDK/runtime binaries, and captures are never committed to this repository.
 
+For the experimental local NR compatibility path, run `Switch-NeuralDoom-ReShadeMode.cmd` once to rename an existing local ReShade `dxgi.dll` to `neuraldoom-reshade64.dll`, then use `Launch-NeuralDoom-EmbeddedNR.cmd` (or its `-D3HDP` variant). NeuralDoom explicitly loads that local runtime before creating D3D12, so ReShade is no longer installed as a DXGI proxy. Running `Switch-NeuralDoom-ReShadeMode.cmd Proxy` reverses the move. This mode remains optional, unsupported, and dependent on user-supplied local components.
+
 neuralDoom is not affiliated with or endorsed by id Software, Bethesda, NVIDIA, the RBDOOM-3-BFG project, ReShade, or RenoDX. Upstream authorship, license terms, and the original RBDOOM documentation are preserved below.
 
 ## Upstream RBDOOM-3-BFG documentation
