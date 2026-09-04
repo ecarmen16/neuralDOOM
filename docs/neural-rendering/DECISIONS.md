@@ -108,7 +108,7 @@ Resolve these only after `RECON_REPORT.md` and targeted captures provide evidenc
 
 **Reasoning:** The final project needs one recognizable install and launch surface while preserving the ability to update RBDOOM independently and remove experimental integrations. Retail data, community content, official SDK components, and experimental local validation files have different licenses and distribution rules and cannot be treated as one repository payload.
 
-**Consequence:** The downstream CMake target and visible development version use `neuralDoom`, with explicit RBDOOM attribution retained. `Setup-NeuralDoom` assembles owned game data and verified optional content locally. Experimental Neural Rendering runtimes are detected but never downloaded, copied, committed, or redistributed by the project until a public, documented, legally usable distribution path is verified.
+**Consequence:** The downstream CMake target and visible development version use `neuralDoom`, with explicit RBDOOM attribution retained. `Setup-NeuralDoom` assembles owned game data and verified optional content locally. A runtime selected by the user may be downloaded from an entered HTTPS URL or copied from a browsed local file into the ignored install directory; no runtime URL or binary is carried by the source repository or neuralDoom release.
 
 ## D-014 - Treat embedded ReShade startup as a removable compatibility bridge
 

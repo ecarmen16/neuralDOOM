@@ -3,7 +3,12 @@ param(
     [string]$RepoRoot,
     [string]$GamePath,
     [string]$D3HDPArchivePath,
+    [string]$D3HDPArchiveUrl,
+    [string]$NRRuntimePath,
+    [string]$NRRuntimeUrl,
     [switch]$SkipD3HDP,
+    [switch]$SkipNRRuntime,
+    [switch]$ForceNRRuntime,
     [switch]$NonInteractive
 )
 
@@ -50,6 +55,202 @@ function Get-SetupFileSha256 {
     return ($hashLine -replace '\s', '').ToUpperInvariant()
 }
 
+function Get-SetupFileMd5 {
+    param([Parameter(Mandatory)][string]$Path)
+
+    return (Get-FileHash -LiteralPath $Path -Algorithm MD5).Hash.ToUpperInvariant()
+}
+
+function Select-SetupFolder {
+    param(
+        [Parameter(Mandatory)][string]$Description,
+        [string]$InitialDirectory
+    )
+
+    try {
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+        $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+        $dialog.Description = $Description
+        $dialog.ShowNewFolderButton = $false
+        if (-not [string]::IsNullOrWhiteSpace($InitialDirectory) -and
+            (Test-Path -LiteralPath $InitialDirectory -PathType Container)) {
+            $dialog.SelectedPath = $InitialDirectory
+        }
+        if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            return $dialog.SelectedPath
+        }
+    } catch {
+        Write-Verbose "Folder picker unavailable: $($_.Exception.Message)"
+    }
+    return $null
+}
+
+function Select-SetupFile {
+    param(
+        [Parameter(Mandatory)][string]$Title,
+        [Parameter(Mandatory)][string]$Filter,
+        [string]$InitialDirectory
+    )
+
+    try {
+        Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
+        $dialog = New-Object System.Windows.Forms.OpenFileDialog
+        $dialog.Title = $Title
+        $dialog.Filter = $Filter
+        $dialog.CheckFileExists = $true
+        $dialog.Multiselect = $false
+        if (-not [string]::IsNullOrWhiteSpace($InitialDirectory) -and
+            (Test-Path -LiteralPath $InitialDirectory -PathType Container)) {
+            $dialog.InitialDirectory = $InitialDirectory
+        }
+        if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            return $dialog.FileName
+        }
+    } catch {
+        Write-Verbose "File picker unavailable: $($_.Exception.Message)"
+    }
+    return $null
+}
+
+function Invoke-SetupDownload {
+    param(
+        [Parameter(Mandatory)][uri]$Uri,
+        [Parameter(Mandatory)][string]$Destination
+    )
+
+    if ($Uri.Scheme -ne 'https') {
+        throw "Only HTTPS downloads are accepted: $Uri"
+    }
+
+    $destinationDirectory = Split-Path -Parent $Destination
+    if (-not (Test-Path -LiteralPath $destinationDirectory -PathType Container)) {
+        New-Item -ItemType Directory -Path $destinationDirectory | Out-Null
+    }
+
+    $partialPath = "$Destination.partial"
+    if (Test-Path -LiteralPath $partialPath) {
+        Remove-Item -LiteralPath $partialPath -Force
+    }
+
+    try {
+        Write-Host "Downloading $Uri"
+        $oldProgressPreference = $ProgressPreference
+        $ProgressPreference = 'SilentlyContinue'
+        Invoke-WebRequest -Uri $Uri -OutFile $partialPath -MaximumRedirection 10 -UseBasicParsing -Headers @{
+            'User-Agent' = 'neuralDoom-Setup/1.0'
+        }
+        Move-Item -LiteralPath $partialPath -Destination $Destination -Force
+    } finally {
+        $ProgressPreference = $oldProgressPreference
+        if (Test-Path -LiteralPath $partialPath) {
+            Remove-Item -LiteralPath $partialPath -Force
+        }
+    }
+
+    return $Destination
+}
+
+function Resolve-SetupModDbArchive {
+    param(
+        [Parameter(Mandatory)][uri]$StartUri,
+        [Parameter(Mandatory)][string]$Destination
+    )
+
+    Invoke-SetupDownload -Uri $StartUri -Destination $Destination | Out-Null
+    & tar -tf $Destination *> $null
+    if ($LASTEXITCODE -eq 0) {
+        return $Destination
+    }
+
+    $landingHtml = Get-Content -LiteralPath $Destination -Raw
+    $mirrorMatch = [regex]::Match(
+        $landingHtml,
+        '(?i)href=["''][^"'']*(?<path>/downloads/mirror/265648/[^"'']+)["'']'
+    )
+    if (-not $mirrorMatch.Success) {
+        throw "ModDB returned a landing page without a recognized D3HDP mirror link. Open $StartUri in a browser or select an existing archive."
+    }
+
+    $mirrorPath = [System.Net.WebUtility]::HtmlDecode($mirrorMatch.Groups['path'].Value)
+    $mirrorUri = [uri]::new($StartUri, $mirrorPath)
+    Invoke-SetupDownload -Uri $mirrorUri -Destination $Destination | Out-Null
+    return $Destination
+}
+
+function Test-SetupD3HDPArchive {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $file = Get-Item -LiteralPath $Path
+    $sha256 = Get-SetupFileSha256 -Path $Path
+    if ($file.Length -eq 2143217579 -and
+        $sha256 -eq 'E72ABB1C6C8C69FB28913D33709B298AC9553D4F52B10B0D02776BF00589BC4F') {
+        return $true
+    }
+
+    $md5 = Get-SetupFileMd5 -Path $Path
+    if ($file.Length -eq 2143408902 -and $md5 -eq '1288283E5B0116EEA38BE993DA423725') {
+        return $true
+    }
+
+    throw "D3HDP archive is not a recognized release. Size $($file.Length), SHA-256 $sha256, MD5 $md5."
+}
+
+function Install-SetupNRRuntime {
+    param(
+        [string]$SourcePath,
+        [string]$SourceUrl,
+        [Parameter(Mandatory)][string]$Destination,
+        [Parameter(Mandatory)][string]$CacheDirectory
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($SourcePath) -and
+        -not [string]::IsNullOrWhiteSpace($SourceUrl)) {
+        throw 'Specify only one of -NRRuntimePath or -NRRuntimeUrl.'
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($SourceUrl)) {
+        $cachedRuntime = Join-Path $CacheDirectory 'nvngx_dlssnr.dll'
+        Invoke-SetupDownload -Uri ([uri]$SourceUrl) -Destination $cachedRuntime | Out-Null
+        $SourcePath = $cachedRuntime
+    }
+
+    if ([string]::IsNullOrWhiteSpace($SourcePath)) {
+        return $false
+    }
+
+    $SourcePath = $SourcePath.Trim('"')
+    if (-not (Test-Path -LiteralPath $SourcePath -PathType Leaf)) {
+        throw "DLSS Neural Rendering runtime does not exist: $SourcePath"
+    }
+    $SourcePath = (Resolve-Path -LiteralPath $SourcePath).Path
+    $runtimeFile = Get-Item -LiteralPath $SourcePath
+    if ($runtimeFile.Length -lt 1048576) {
+        throw "The selected runtime is unexpectedly small ($($runtimeFile.Length) bytes): $SourcePath"
+    }
+    $headerBytes = if ($PSVersionTable.PSVersion.Major -ge 6) {
+        @(Get-Content -LiteralPath $SourcePath -AsByteStream -TotalCount 2)
+    } else {
+        @(Get-Content -LiteralPath $SourcePath -Encoding Byte -TotalCount 2)
+    }
+    if ($headerBytes.Count -ne 2 -or $headerBytes[0] -ne 77 -or $headerBytes[1] -ne 90) {
+        throw "The selected runtime is not a Windows PE DLL: $SourcePath"
+    }
+
+    if ($SourcePath -ne $Destination) {
+        Copy-Item -LiteralPath $SourcePath -Destination $Destination -Force
+    }
+
+    $runtimeHash = Get-SetupFileSha256 -Path $Destination
+    Write-Host "[installed] nvngx_dlssnr.dll ($runtimeHash)" -ForegroundColor Green
+    $signature = Get-AuthenticodeSignature -LiteralPath $Destination
+    if ($signature.SignerCertificate) {
+        Write-Host "[signature] $($signature.Status): $($signature.SignerCertificate.Subject)"
+    } else {
+        Write-Host "[signature] $($signature.Status)" -ForegroundColor Yellow
+    }
+    return $true
+}
+
 function Find-SetupEngine {
     param(
         [Parameter(Mandatory)][string]$Root,
@@ -77,9 +278,13 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
 }
 $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
 
-$d3hdpSourcePage = 'https://www.moddb.com/downloads/d3hdp-bfg-lite'
-$d3hdpExpectedHash = 'E72ABB1C6C8C69FB28913D33709B298AC9553D4F52B10B0D02776BF00589BC4F'
+$d3hdpSourcePage = 'https://www.moddb.com/mods/d3hdp-bfg-lite/downloads/d3hdp-bfg-lite'
+if ([string]::IsNullOrWhiteSpace($D3HDPArchiveUrl)) {
+    $D3HDPArchiveUrl = 'https://www.moddb.com/downloads/start/265648'
+}
+$cacheDirectory = Join-Path $RepoRoot '.neuraldoom-cache'
 $d3hdpFolder = Join-Path $RepoRoot 'mod_D3HDP_Lite'
+$nrRuntimeDestination = Join-Path $RepoRoot 'nvngx_dlssnr.dll'
 
 Write-Host ''
 Write-Host '========================================' -ForegroundColor DarkCyan
@@ -91,7 +296,11 @@ if ([string]::IsNullOrWhiteSpace($GamePath)) {
     if ($NonInteractive) {
         throw '-GamePath is required with -NonInteractive.'
     }
-    $GamePath = Read-Host 'Path to your Doom 3 BFG Edition folder (the folder containing base)'
+    Write-Host 'Select your Doom 3 BFG Edition folder (the folder containing base).'
+    $GamePath = Select-SetupFolder -Description 'Select Doom 3 BFG Edition' -InitialDirectory 'C:\Program Files (x86)\Steam\steamapps\common'
+    if ([string]::IsNullOrWhiteSpace($GamePath)) {
+        $GamePath = Read-Host 'Doom 3 BFG Edition folder'
+    }
 }
 
 $GamePath = $GamePath.Trim('"')
@@ -122,14 +331,34 @@ if ($robocopyExit -gt 7) {
 }
 Write-Host "Retail data ready: $destinationBase" -ForegroundColor Green
 
-if (-not $SkipD3HDP) {
+if (-not $SkipD3HDP -and (Test-Path -LiteralPath $d3hdpFolder -PathType Container)) {
+    Write-SetupStep 'D3HDP BFG Lite is already installed; leaving it unchanged'
+} elseif (-not $SkipD3HDP) {
     if ([string]::IsNullOrWhiteSpace($D3HDPArchivePath)) {
-        $downloadCandidate = Join-Path (Join-Path $HOME 'Downloads') 'D3HDP_BFG_Lite.zip'
+        $userProfile = [Environment]::GetFolderPath('UserProfile')
+        $downloadCandidate = Join-Path (Join-Path $userProfile 'Downloads') 'D3HDP_BFG_Lite.zip'
         if (Test-Path -LiteralPath $downloadCandidate) {
             $D3HDPArchivePath = $downloadCandidate
         } elseif (-not $NonInteractive) {
-            Write-Host "Optional D3HDP source: $d3hdpSourcePage"
-            $D3HDPArchivePath = Read-Host 'D3HDP_BFG_Lite.zip path, or press Enter to skip'
+            Write-Host "Optional HD texture pack: $d3hdpSourcePage"
+            $d3hdpChoice = (Read-Host 'Download D3HDP [D], browse for an archive [B], or skip [S] (default D)').Trim()
+            if ([string]::IsNullOrWhiteSpace($d3hdpChoice) -or $d3hdpChoice -ieq 'D') {
+                $D3HDPArchivePath = Join-Path $cacheDirectory 'D3HDP_BFG_Lite.zip'
+                if (-not (Test-Path -LiteralPath $D3HDPArchivePath -PathType Leaf)) {
+                    Write-SetupStep 'Downloading D3HDP BFG Lite from ModDB'
+                    Resolve-SetupModDbArchive -StartUri ([uri]$D3HDPArchiveUrl) -Destination $D3HDPArchivePath | Out-Null
+                }
+            } elseif ($d3hdpChoice -ieq 'B') {
+                $D3HDPArchivePath = Select-SetupFile -Title 'Select D3HDP_BFG_Lite.zip' -Filter 'ZIP archives (*.zip)|*.zip|All files (*.*)|*.*' -InitialDirectory (Join-Path $userProfile 'Downloads')
+                if ([string]::IsNullOrWhiteSpace($D3HDPArchivePath)) {
+                    $D3HDPArchivePath = Read-Host 'D3HDP_BFG_Lite.zip path, or press Enter to skip'
+                }
+            }
+        } elseif (-not [string]::IsNullOrWhiteSpace($D3HDPArchiveUrl)) {
+            $D3HDPArchivePath = Join-Path $cacheDirectory 'D3HDP_BFG_Lite.zip'
+            if (-not (Test-Path -LiteralPath $D3HDPArchivePath -PathType Leaf)) {
+                Resolve-SetupModDbArchive -StartUri ([uri]$D3HDPArchiveUrl) -Destination $D3HDPArchivePath | Out-Null
+            }
         }
     }
 
@@ -139,36 +368,50 @@ if (-not $SkipD3HDP) {
             throw "D3HDP archive does not exist: $D3HDPArchivePath"
         }
         $D3HDPArchivePath = (Resolve-Path -LiteralPath $D3HDPArchivePath).Path
-        $archiveHash = Get-SetupFileSha256 -Path $D3HDPArchivePath
-        if ($archiveHash -ne $d3hdpExpectedHash) {
-            throw "D3HDP archive hash is not the verified release. Expected $d3hdpExpectedHash, received $archiveHash."
+        Test-SetupD3HDPArchive -Path $D3HDPArchivePath | Out-Null
+
+        $entries = @(& tar -tf $D3HDPArchivePath)
+        if ($LASTEXITCODE -ne 0 -or $entries.Count -eq 0) {
+            throw 'Could not inspect the D3HDP archive.'
+        }
+        $unsafeEntries = @($entries | Where-Object {
+            $_ -match '(^|/)\.\.(/|$)' -or
+            $_ -match '^[A-Za-z]:' -or
+            $_ -match '^/' -or
+            ($_ -ne 'Readme.txt' -and $_ -notlike 'mod_D3HDP_Lite/*')
+        })
+        if ($unsafeEntries.Count -gt 0) {
+            throw "D3HDP archive contains an unexpected path: $($unsafeEntries[0])"
         }
 
-        if (Test-Path -LiteralPath $d3hdpFolder) {
-            Write-SetupStep 'D3HDP BFG Lite is already installed; leaving it unchanged'
+        Write-SetupStep 'Extracting verified D3HDP BFG Lite into its isolated mod folder'
+        if (Test-SetupCommand '7z') {
+            Invoke-SetupNative '7z' @('x', '-y', "-o$RepoRoot", $D3HDPArchivePath, 'mod_D3HDP_Lite\*')
         } else {
-            $entries = @(& tar -tf $D3HDPArchivePath)
-            if ($LASTEXITCODE -ne 0 -or $entries.Count -eq 0) {
-                throw 'Could not inspect the D3HDP archive.'
-            }
-            $unsafeEntries = @($entries | Where-Object {
-                $_ -match '(^|/)\.\.(/|$)' -or
-                $_ -match '^[A-Za-z]:' -or
-                $_ -match '^/' -or
-                ($_ -ne 'Readme.txt' -and $_ -notlike 'mod_D3HDP_Lite/*')
-            })
-            if ($unsafeEntries.Count -gt 0) {
-                throw "D3HDP archive contains an unexpected path: $($unsafeEntries[0])"
-            }
-
-            Write-SetupStep 'Extracting verified D3HDP BFG Lite into its isolated mod folder'
-            if (Test-SetupCommand '7z') {
-                Invoke-SetupNative '7z' @('x', '-y', "-o$RepoRoot", $D3HDPArchivePath, 'mod_D3HDP_Lite\*')
-            } else {
-                Invoke-SetupNative 'tar' @('-xf', $D3HDPArchivePath, '-C', $RepoRoot, 'mod_D3HDP_Lite')
-            }
+            Invoke-SetupNative 'tar' @('-xf', $D3HDPArchivePath, '-C', $RepoRoot, 'mod_D3HDP_Lite')
         }
     }
+}
+
+if (-not $SkipNRRuntime -and
+    ($ForceNRRuntime -or -not (Test-Path -LiteralPath $nrRuntimeDestination -PathType Leaf))) {
+    if ([string]::IsNullOrWhiteSpace($NRRuntimePath) -and
+        [string]::IsNullOrWhiteSpace($NRRuntimeUrl) -and
+        -not $NonInteractive) {
+        Write-Host ''
+        Write-Host 'DLSS Neural Rendering runtime' -ForegroundColor Cyan
+        $nrChoice = (Read-Host 'Browse for nvngx_dlssnr.dll [B], download from a URL [U], or skip [S] (default B)').Trim()
+        if ([string]::IsNullOrWhiteSpace($nrChoice) -or $nrChoice -ieq 'B') {
+            $NRRuntimePath = Select-SetupFile -Title 'Select nvngx_dlssnr.dll' -Filter 'DLSS Neural Rendering runtime (nvngx_dlssnr.dll)|nvngx_dlssnr.dll|DLL files (*.dll)|*.dll' -InitialDirectory (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads')
+            if ([string]::IsNullOrWhiteSpace($NRRuntimePath)) {
+                $NRRuntimePath = Read-Host 'nvngx_dlssnr.dll path, or press Enter to skip'
+            }
+        } elseif ($nrChoice -ieq 'U') {
+            $NRRuntimeUrl = Read-Host 'HTTPS URL for nvngx_dlssnr.dll'
+        }
+    }
+
+    Install-SetupNRRuntime -SourcePath $NRRuntimePath -SourceUrl $NRRuntimeUrl -Destination $nrRuntimeDestination -CacheDirectory $cacheDirectory | Out-Null
 }
 
 Write-SetupStep 'Checking neuralDoom engine and optional local runtime components'
@@ -207,8 +450,12 @@ if ($proxyReShadePresent -and $embeddedReShadePresent) {
 }
 
 Write-Host ''
-Write-Host 'neuralDoom never downloads or copies an experimental NVIDIA Neural Rendering runtime.' -ForegroundColor Yellow
-Write-Host 'Optional runtime installation remains a documented manual step until its distribution terms are verified.' -ForegroundColor Yellow
+if (Test-Path -LiteralPath $nrRuntimeDestination -PathType Leaf) {
+    Write-Host 'DLSS Neural Rendering runtime is staged locally and ignored by Git.' -ForegroundColor Green
+} else {
+    Write-Host 'DLSS Neural Rendering runtime was skipped; rerun setup to browse for it or supply an HTTPS URL.' -ForegroundColor Yellow
+}
+Write-Host 'Third-party archives and runtime DLLs remain local installation inputs; they are not part of the source repository.' -ForegroundColor DarkGray
 Write-Host ''
 if (Test-Path -LiteralPath $d3hdpFolder) {
     if ($embeddedReShadePresent -and -not $proxyReShadePresent) {

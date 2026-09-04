@@ -55,7 +55,7 @@ Statuses: `BLOCKED`, `READY`, `IN PROGRESS`, `VERIFY`, `DONE`, `DEFERRED`.
 | ID | Status | Task | Exit evidence |
 |---|---|---|---|
 | ND3-500 | DONE | Rebrand downstream project as neuralDoom | SDK-OFF and SDK-ON targets built as `neuralDoom.exe`; visible version, README, tools, and launch profiles preserve RBDOOM attribution |
-| ND3-510 | DONE | Build unified local setup wizard | Real 6.9 GB BFG data and verified D3HDP archive passed; engine/runtime inventory complete; experimental NR acquisition explicitly refused |
-| ND3-520 | READY | Define downloadable component manifest | Pin canonical URLs, versions, hashes, licenses, and unattended install rules for every redistributable component |
+| ND3-510 | DONE | Build unified local setup wizard | Real 6.9 GB BFG data and verified D3HDP archive passed; engine/runtime inventory complete |
+| ND3-520 | VERIFY | Add guided local acquisition and public-source audit | D3HDP download plus NR file/URL staging implemented; local dry-run and 2,445-file source audit pass; clean-machine end-to-end run remains |
 
 Codex should update statuses only from observed evidence and add links to reports/commits where useful.

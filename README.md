@@ -2,7 +2,18 @@
 
 neuralDoom is an experimental open-source Doom 3 BFG renderer project built on RBDOOM-3-BFG. It adds a reversible temporal-input interface, native DX12 Streamline/DLSS integration, and a local validation path for future neural-rendering technology.
 
-Run `Setup-NeuralDoom.cmd` after cloning to select a legally owned Doom 3 BFG Edition installation and assemble the local runtime. Retail game data, community texture assets, ReShade/RenoDX files, NVIDIA SDK/runtime binaries, and captures are never committed to this repository.
+Run `Setup-NeuralDoom.cmd` after cloning to assemble a local installation. The guided setup lets you browse to a legally owned Doom 3 BFG Edition folder, downloads and verifies D3HDP BFG Lite from ModDB (or accepts an existing archive), and lets you either browse to `nvngx_dlssnr.dll` or enter an HTTPS URL. The selected runtime is copied into the neuralDoom install directory. Downloads, retail game data, community assets, ReShade/RenoDX files, NVIDIA SDK/runtime binaries, and captures remain ignored and are never committed to this repository.
+
+For unattended or repeatable local setup, call the PowerShell entry point directly:
+
+```powershell
+.\tools\neural-rendering\Setup-NeuralDoom.ps1 `
+    -GamePath 'D:\Games\DOOM 3 BFG Edition' `
+    -NRRuntimeUrl 'https://example.invalid/nvngx_dlssnr.dll' `
+    -NonInteractive
+```
+
+Use `-NRRuntimePath` instead when the DLL is already downloaded, and add `-ForceNRRuntime` to replace an older staged DLL during a future update. `-SkipD3HDP` and `-SkipNRRuntime` omit either optional layer. Run `Audit-NeuralDoom-PublicSource.cmd` before publishing to verify that no local runtime, game archive/data, capture, cache, or machine-specific path has entered Git.
 
 For the experimental local NR compatibility path, run `Switch-NeuralDoom-ReShadeMode.cmd` once to rename an existing local ReShade `dxgi.dll` to `neuraldoom-reshade64.dll`, then use `Launch-NeuralDoom-EmbeddedNR.cmd` (or its `-D3HDP` variant). NeuralDoom explicitly loads that local runtime before creating D3D12, so ReShade is no longer installed as a DXGI proxy. Running `Switch-NeuralDoom-ReShadeMode.cmd Proxy` reverses the move. This mode remains optional, unsupported, and dependent on user-supplied local components.
 

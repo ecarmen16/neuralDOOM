@@ -41,8 +41,8 @@ The experimental `renodx-dlss5.addon64` and `nvngx_dlssnr.dll` remain unapproved
 
 | Field | Answer |
 |---|---|
-| Project/version | `D3HDP_BFG_Lite.zip`, inspected local release archive |
-| Canonical source | `https://www.moddb.com/downloads/d3hdp-bfg-lite` |
+| Project/version | `D3HDP_BFG_Lite.zip`; previously inspected local release plus current July 2026 ModDB release |
+| Canonical source | `https://www.moddb.com/mods/d3hdp-bfg-lite/downloads/d3hdp-bfg-lite` |
 | License | Redistribution terms unresolved; archive contents are not approved for repository or release bundling |
 | Runtime role | Optional local Doom 3 BFG visual/content mod selected with `fs_game mod_D3HDP_Lite` |
 | Optional | The normal neuralDoom launcher and engine work without it |
@@ -52,9 +52,9 @@ The experimental `renodx-dlss5.addon64` and `nvngx_dlssnr.dll` remain unapproved
 
 Local validation record:
 
-- Archive size: 2,143,217,579 bytes.
-- Verified SHA-256: `E72ABB1C6C8C69FB28913D33709B298AC9553D4F52B10B0D02776BF00589BC4F`.
-- Setup accepts a user-provided archive, validates its digest and paths, and extracts only the isolated mod folder. It does not redistribute the archive.
+- Previously inspected archive: 2,143,217,579 bytes; verified SHA-256 `E72ABB1C6C8C69FB28913D33709B298AC9553D4F52B10B0D02776BF00589BC4F`.
+- Current ModDB page record (updated July 6, 2026): 2,143,408,902 bytes; publisher-hosted MD5 `1288283E5B0116EEA38BE993DA423725`.
+- Setup downloads through ModDB into an ignored local cache or accepts a user-provided archive, validates the recognized release and all paths, and extracts only the isolated mod folder. It does not redistribute the archive through Git or a neuralDoom release.
 
 ## Dependency review template
 

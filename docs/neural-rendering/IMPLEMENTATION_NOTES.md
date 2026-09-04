@@ -2,6 +2,16 @@
 
 Append dated entries. Do not replace prior evidence.
 
+## 2026-09-03 - Guided local assembly and public-source audit
+
+- Extended `Setup-NeuralDoom.cmd` / `tools/neural-rendering/Setup-NeuralDoom.ps1` into a guided local assembler. It opens native folder/file pickers when available, retains console fallback, and keeps noninteractive parameters for repeatable setup.
+- D3HDP BFG Lite now downloads from the canonical ModDB start endpoint into ignored `.neuraldoom-cache/`, follows the ModDB mirror landing page when necessary, validates either the previously tested release or the current July 2026 release by published size/digest, rechecks every archive path, and extracts only `mod_D3HDP_Lite/`.
+- The NR-runtime step accepts either `-NRRuntimePath` or an HTTPS `-NRRuntimeUrl`, stages the input under the fixed local filename `nvngx_dlssnr.dll`, validates that it is a plausible Windows PE file, reports its SHA-256 and Authenticode status, and relies on the existing DLL ignore rule to keep it out of source control. The project does not contain or prescribe a runtime URL.
+- Added `Audit-NeuralDoom-PublicSource.cmd` and `Test-NeuralDoom-PublicSource.ps1`. The audit checks tracked paths for retail resources/captures, known local runtime payloads, local-only component folders, and this machine's concrete paths.
+- Noninteractive setup against the established 6.9 GB Steam installation passed with zero retail-data copies; engine, Streamline, embedded ReShade, add-on, and NR-runtime inventory remained intact. The public-source audit passed across 2,445 tracked files with local artifacts ignored.
+
+Next: exercise the default ModDB download from a clean install directory and run one complete guided setup on a second machine or clean Windows user profile.
+
 ## 2026-09-03 - Engine-owned experimental compatibility startup
 
 - Inspected public RHI commit `3fd79d9f8b0a776788f0c065aa2a130da283c31c`, RenoDX commit `66f4a40362cd7840bc0647734c434670539addb0`, and ReShade commit `358c345ca2fe64f86e67c694f8379c356627adcb`. RHI installs ReShade as the graphics proxy and then launches the game normally; it is a manager, not a process injector. The local DLSS5 add-on dynamically requests ReShade API functions and is not statically linked to ReShade.
@@ -20,10 +30,10 @@ Next: capture stationary/motion/effects comparisons while tuning from the `worki
 - Renamed the downstream CMake target and visible engine development version to `neuralDoom`, retaining `RBDOOM 3 BFG 1.6.0` in the console identity and leaving the existing save path unchanged for compatibility. Updated the configure/build/run helpers and portable launch profiles to prefer `neuralDoom.exe` while retaining a legacy executable fallback.
 - Added `Setup-NeuralDoom.cmd` and `tools/neural-rendering/Setup-NeuralDoom.ps1`. The wizard starts from a user-selected, legally owned Doom 3 BFG folder, verifies retail resource presence, copies only missing local data, and reports the engine and optional local runtime layers.
 - The optional D3HDP path accepts the inspected local archive, verifies SHA-256 `E72ABB1C6C8C69FB28913D33709B298AC9553D4F52B10B0D02776BF00589BC4F`, rejects absolute/parent/unexpected archive paths, and extracts only `mod_D3HDP_Lite/`. It does not treat the pack as repository content.
-- The wizard intentionally does not acquire or copy an experimental NVIDIA Neural Rendering runtime. ReShade, RenoDX, NVIDIA runtimes, texture assets, game data, and screenshots stay ignored and untracked.
+- The initial wizard only inventoried the experimental runtime. The 2026-09-03 guided-assembly update supersedes that limitation with explicit local file/URL staging while keeping the resulting binary ignored and untracked.
 - SDK-OFF and Streamline-enabled `RelWithDebInfo` builds passed with the exact `neuralDoom` target. The Streamline-enabled executable was staged locally at 19,838,464 bytes, SHA-256 `74BF93FF000AA42F75C91BB63BD7968BD68E9C8A1CC34E6086B1D77C1757EAEA`, and a DX12 feature-off `+quit` smoke launch exited with code 0.
 
-Next: convert the setup layers into a versioned component manifest only after canonical download URLs and redistribution terms are recorded; retain a manual, user-provided path for the experimental runtime.
+Next: validate the full guided path from a clean local install while keeping all third-party payloads outside Git.
 
 ## 2026-09-02 - Local experimental Neural Rendering compatibility checkpoint
 
