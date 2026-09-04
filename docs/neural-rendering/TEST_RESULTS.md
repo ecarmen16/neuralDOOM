@@ -6,7 +6,7 @@
 - `RelWithDebInfo`, SDK-OFF: PASS. Reconfigured `build` and built the default executable successfully; the compatibility loader has no link-time ReShade dependency and defaults disabled.
 - Reversible local mode switch: PASS. The helper moved the ignored `dxgi.dll` to `neuraldoom-reshade64.dll` and left no proxy DLL beside the executable.
 - Embedded startup probe: PASS. `ReShade.log` identifies ReShade 6.8.0.2155 as loaded from `neuraldoom-reshade64.dll`; DLSS5 add-on version `0.2026.828.2110` registered with API 18; the local NR runtime was preloaded at device init; a ReShade runtime was created on the RTX 5090 at 1280x720.
-- Gameplay/visual parity with the earlier feature-18 pass: PENDING user QA.
+- Gameplay/visual parity with the earlier feature-18 pass: PASS. The user launched the embedded NR + D3HDP profile and confirmed that the NR path and F6 behavior still work in gameplay.
 
 ## 2026-09-02 / working tree / neuralDoom setup and identity
 

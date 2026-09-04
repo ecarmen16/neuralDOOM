@@ -52,6 +52,7 @@ neo/bin/
 /docs/neural-rendering/LAST_BUILD.txt
 /mod_D3HDP_Lite/
 /DLSS5 Screenshots/
+/NeuralDoom *.png
 /ReShade.log
 /reshade.ini
 /reshade-shaders/

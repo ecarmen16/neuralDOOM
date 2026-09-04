@@ -11,7 +11,9 @@ Append dated entries. Do not replace prior evidence.
 - Added the reversible `Switch-NeuralDoom-ReShadeMode.cmd`/PowerShell helper and `Launch-NeuralDoom-EmbeddedNR.cmd`. The switch moves, never duplicates, the ignored local ReShade runtime and refuses ambiguous dual-runtime state.
 - Reconfigured and built both Streamline-enabled and SDK-OFF `RelWithDebInfo` targets successfully. A local startup probe loaded ReShade 6.8.0.2155 from `neuraldoom-reshade64.dll`, registered the DLSS5 add-on through ReShade API 18, preloaded the ignored NR runtime at D3D12 device initialization, created the 1280x720 ReShade runtime, and shut the D3D12 runtime down after the probe. No third-party binary or configuration entered Git.
 
-Next: run the embedded launcher through the saved combat scene and confirm the same visible feature-18 output, then capture stationary/motion/effects comparisons while tuning from the `working` profile.
+The user subsequently ran the embedded NR + D3HDP launcher and confirmed the same visible gameplay NR/F6 behavior. ND3-350 is complete.
+
+Next: capture stationary/motion/effects comparisons while tuning from the `working` profile, then promote the selected values into named neuralDoom presets.
 
 ## 2026-09-02 - neuralDoom identity and unified local setup
 
