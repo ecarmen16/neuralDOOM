@@ -24,6 +24,32 @@ shader, AO-strength or HDR changes. `Test-NeuralDoom-Smoke.ps1` adds explicit
 borderless and base-FOV inputs to cover the actual desktop mode. Build/runtime
 results follow below. Next manual check: compare 70 and 80 in the same room.
 
+All three `RelWithDebInfo` builds pass from clean code commit `54d611a0`:
+
+| Build | SHA256 |
+|---|---|
+| Native RT | `416C4E90B02F8D7748BB615E65B6597C186C582642FF7A8FF932A4FE893E264B` |
+| DLAA/RT | `7F75F38D006EEC90A19D85A92E214F2AF656058089FFFC4B0555480D22CABEC9` |
+| Compiled OFF | `3831A3BB4516FD7D196185CC13CC28D9FF8202E3A81EAB47A776379F23827712` |
+
+Two focused smoke checks pass with full DX12 validation and 64 GPU samples:
+
+- `smoke-20260906-184111-789128cd`: DLAA, `-Borderless -Width 5120 -Height 1440
+  -FieldOfView 70 -RayTracedAO -DisplayOutput AutoHDR -ExpectedHDR Active`,
+  600 warmup frames. Actual render/output and PNG dimensions are 5120x1440;
+  HDR is active, DLAA presents with zero rejects, AO ON/OFF/ON and history reset
+  pass. AO samples initially shade 1,635 receivers with 1,055 occluded. Saved
+  isolated config contains `g_fov 70` and `r_fullscreen -2`.
+- `smoke-20260906-184140-bc32db51`: compiled OFF, 1280x720, `-FieldOfView 60`,
+  180 warmup frames. Gameplay, captures, history reset and exit pass; ray commands
+  skip and AO dispatch/counters stay zero.
+
+Public-source audit, whitespace and PowerShell syntax checks pass. Focused review
+confirms unchanged default FOV, old-range weapon interpolation, viewport-based
+projection and isolation from the user's saved settings. The menu's expanded
+range is reviewed in source; the automated scenarios set its existing `g_fov`
+cvar directly. This results-only commit does not rebuild the tested binaries.
+
 ## 2026-09-06 — First gameplay ray-traced ambient occlusion
 
 `RayTracingDiagnostic.cpp` now shares the validated static BSP extraction with a
