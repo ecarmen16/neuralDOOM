@@ -736,12 +736,14 @@ optional DLAA build. No new SDK was acquired. Final tested executable SHA-256:
 | Build tree | SDK / RT | SHA-256 |
 |---|---|---|
 | `build` | OFF / OFF | `BBBFF8101E1F5A42C332A8AC612BEE19945CAAF08B68E463427667C45D4E1C80` |
-| `build-rt` | OFF / ON | `27676C85FC0810C2908436EF76F43935F347E13E9F1D5EEB2CAEC8968E4F611A` |
-| `build-streamline` | ON / ON | `361602AB6BBAA17F16AEEFB0B80ED1521166497764CD3727F978EE50BE70EEC3` |
+| `build-rt` | OFF / ON | `FBE6B9D5D7A6FFD60E5088EEE851CC35D583F793A6FBDF1C7D87805B56C85F0B` |
+| `build-streamline` | ON / ON | `F5CEA4C225BAFB5D887AFB85E8375D36A02675CEE0761046466F74BEA6563FC5` |
 
-Runtime manifests retain the parent commit and dirty=true from validation.
-Post-commit build-manifest refresh must preserve these tested hashes. The new
-dogfood launcher selects these exact build-directory targets.
+The initial run manifests retain the parent commit and dirty=true from validation.
+The post-commit incremental link changed both RT-enabled executable hashes, which
+the identity check caught. The exact final files listed above were tested again
+at clean code commit `a65128be`, as recorded below. The default build hash stayed
+unchanged. The dogfood launcher selects these exact build-directory targets.
 
 ### Failures found and repaired
 
@@ -805,3 +807,22 @@ light's ray-traced visibility. Actual unsupported hardware, invalid-shader/devic
 loss recovery, other maps/mods and full path tracing remain unverified. The user
 playtest focuses on ultrawide HUD behavior, motion, lighting, saved settings and
 optional real HDR calibration.
+
+### Post-commit artifact verification
+
+Clean code commit `a65128be` was built in all three configurations. The initial
+RT-ON hashes were `27676C85FC0810C2908436EF76F43935F347E13E9F1D5EEB2CAEC8968E4F611A`
+(Native) and `361602AB6BBAA17F16AEEFB0B80ED1521166497764CD3727F978EE50BE70EEC3`
+(DLAA); the incremental link replaced them with the final hashes in the build
+table. No source changes were made during this verification.
+
+| Artifact | Repeated final-file scenario | Result |
+|---|---|---|
+| `smoke-20260906-150810-dabb8e80` | Native Scene, full DX12 validation, 2560x720 -> 1920x1080 | PASS: synthetic/world reference checks, local lighting, reset, resize and normal exit |
+| `smoke-20260906-150828-9d59f27c` | DLAA Scene, full DX12 validation, AutoHDR diagnostic, 4800x1350 -> 2560x720 | PASS: ray checks, DLAA presentation, finite HDR transport, SDR desktop bounds and resize |
+| `smoke-20260906-150859-2d05a02d` | Native MissingShader, full DX12 validation, 2560x720 | PASS: contained missing-bytecode failure followed by normal gameplay |
+
+The same parameters as the corresponding earlier rows were used. Ten additional
+PNGs passed CRC, decompression, dimensions and filter checks. Final manifests
+record clean code commit `a65128be`; this later results-only documentation update
+does not require rebuilding the already tested executables.
