@@ -61,6 +61,9 @@ option(USE_DX12
 option(USE_STREAMLINE
 		"Enable the optional NVIDIA Streamline adapter (requires a local official SDK)" OFF)
 
+option(USE_RAYTRACING
+		"Build optional native DX12 ray-intersection diagnostics" OFF)
+
 set(STREAMLINE_SDK_PATH "" CACHE PATH
 		"Path to an unpacked official NVIDIA Streamline SDK")
 
@@ -1474,6 +1477,15 @@ if(USE_DX12)
 	target_link_libraries(${APP_NAME} nvrhi_d3d12)
 endif()
 
+if(USE_RAYTRACING)
+	if(NOT USE_DX12 OR NOT USE_DXIL_ON_DX12)
+		message(FATAL_ERROR "USE_RAYTRACING diagnostics currently require DX12 with DXIL shaders")
+	endif()
+	target_compile_definitions(${APP_NAME} PRIVATE USE_RAYTRACING=1)
+	include(cmake/NvrhiRayTracingFix.cmake)
+	neuraldoom_fix_nvrhi_raytracing()
+endif()
+
 if(USE_STREAMLINE)
 	if(NOT WIN32 OR NOT USE_DX12)
 		message(FATAL_ERROR "USE_STREAMLINE currently requires the Windows DX12 renderer")
@@ -1528,6 +1540,9 @@ target_link_libraries(${APP_NAME} ShaderMakeBlob ${MASKED_OCCLUSION_LIBRARY} ${I
 add_subdirectory(shaders)
 add_dependencies(Shaders ShaderMake)
 add_dependencies(${APP_NAME} Shaders ${MASKED_OCCLUSION_LIBRARY} ${ISPC_TEXCOMP_LIBRARY})
+if(USE_RAYTRACING)
+	add_dependencies(${APP_NAME} RayTracingShaders)
+endif()
 
 # Identify the exact target and configuration for unattended build/run tooling.
 file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/neuraldoom-artifact-$<CONFIG>.txt"

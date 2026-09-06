@@ -549,7 +549,6 @@ void DeviceManager_DX12::DestroyDeviceAndSwapChain()
 {
 	OPTICK_SHUTDOWN();
 
-	m_RhiSwapChainBuffers.clear();
 	m_RendererString.clear();
 
 	ReleaseRenderTargets();
@@ -614,7 +613,17 @@ void DeviceManager_DX12::ReleaseRenderTargets()
 		return;
 	}
 
-	// Make sure that all frames have finished rendering
+	// Present queues work outside NVRHI, after its last command-list fence.
+	// Submit a fence after that work before releasing or resizing DXGI buffers.
+	nvrhi::CommandListHandle flush = m_NvrhiDevice->createCommandList();
+	if( !flush )
+	{
+		common->FatalError( "Unable to synchronize DX12 presentation before releasing render targets" );
+		return;
+	}
+	flush->open();
+	flush->close();
+	m_NvrhiDevice->executeCommandList( flush );
 	m_NvrhiDevice->waitForIdle();
 
 	// Release all in-flight references to the render targets

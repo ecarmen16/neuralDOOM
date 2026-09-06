@@ -9,14 +9,14 @@ The next implementation branch is `codex/rt-foundation`, prepared from the valid
 | Component | Verified state and implication |
 |---|---|
 | Hardware/API | New `rayTracingStatus` reports acceleration structures, ray-tracing pipelines and inline ray queries supported on the local RTX 5090, DX12, driver 610.47. `sceneImplemented=0` explicitly distinguishes capability from implementation. |
-| Graphics abstraction | Vendored `neo/extern/nvrhi/include/nvrhi/nvrhi.h` already exposes `createAccelStruct`, BLAS/TLAS builds, ray-tracing pipelines and `dispatchRays`. No corresponding scene construction or dispatch exists in `neo/renderer`. Use this existing abstraction. |
+| Graphics abstraction | Vendored `neo/extern/nvrhi/include/nvrhi/nvrhi.h` exposes acceleration structures and ray queries. `RayTracingDiagnostic.cpp` now uses this abstraction for on-demand known-ray tests and a static-world audit. Persistent gameplay scene construction is the next step. |
 | Shader compilation | `neo/compileshaders.cmake` currently requests shader model 6.0. An inline-ray-query experiment needs its own 6.5-or-later shader target and capability gate, without raising the baseline's requirements. Microsoft's [DXR specification](https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html) defines RayQuery from shader model 6.5 and the required traversal/build behavior. |
 | Geometry | `idRenderWorldLocal::localModels/entityDefs`, `Model_md5.cpp`, `VertexCache.h` and `NVRHI/BufferObject_NVRHI.cpp` expose useful scene data, but do not manage an RT scene. Current vertex/index buffers are not marked as acceleration-structure build inputs. Their lifetimes and offsets require explicit handling. |
 | Lighting/materials | `RenderBackend.cpp::AmbientPass`, `DrawInteractions`, `RenderInteractions`, `neo/shaders/BRDF.inc.hlsl` and the interaction/IBL shaders define the existing appearance. Reflection hits need material evaluation outside the current screen's G-buffer. |
 | Temporal/HDR | `_currentRenderHDR` is linear RGBA16F; depth, motion, normals/roughness, history epochs and separated overlay UI already exist. These are useful inputs, but require adapters and additional buffers for ray denoising. Native scRGB presentation is an independent output feature. |
 | Other backends | `DeviceManager_VK.cpp` has optional RT extension handling, controlled by `DeviceCreationParameters::enableRayTracingExtensions` (currently false by default). DX12 is the first validated target; shared scene and pass code should remain in NVRHI. Vulkan capability parity is not yet tested. |
 
-The configured Windows SDK 10.0.26100.0 DXC also compiled an isolated `cs_6_5` inline-RayQuery shader with warnings as errors. The local 3,532-byte DXIL artifact is ignored. This verifies compiler support only; it was not dispatched and does not establish a working ray scene.
+The configured Windows SDK 10.0.26100.0 DXC compiled the initial isolated `cs_6_5` probe. The subsequent RT-001A implementation now dispatches known rays and static-map panoramas on the GPU; see [RAY_TRACING_DIAGNOSTICS.md](RAY_TRACING_DIAGNOSTICS.md). It is an ephemeral diagnostic scene, not persistent gameplay RT.
 
 ## Implementation sequence and acceptance gates
 
@@ -47,4 +47,4 @@ Use the existing exact-artifact build manifests, bounded smoke runner and GPU ti
 
 Both SDK-OFF and the existing SDK-ON build must keep working. Exercise disabled, unsupported, missing-shader and device-loss paths, then map load, cut, resize and mode changes. Automated readbacks, captures and short motion sequences can establish correctness while the user is AFK. Preferred darkness, reflection strength, denoising softness and HDR display calibration remain eventual visual decisions.
 
-First next task: implement RT-001's synthetic-triangle intersection test and static-map scene audit behind an OFF option. No full path-tracing quality preset or frame-rate target is promised at this checkpoint.
+RT-001A implements the OFF-by-default synthetic test and static-map audit. Next, RT-001B must add persistent scene registration, stable mesh/instance identity, map-lifetime cleanup and a material mapping before RT-002's moving geometry and RT-003's selected-light shadows. No full path-tracing quality preset or frame-rate target is promised at this checkpoint.

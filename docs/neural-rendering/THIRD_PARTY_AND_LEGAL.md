@@ -114,6 +114,20 @@ Local acquisition record:
 
 ## Local optional SDK record
 
+### Existing NVRHI: local DX12 correctness patch (2026-09-06)
+
+No new dependency was added for native ray diagnostics. The existing vendored
+NVRHI retains its MIT notices and pinned submodule revision `dafbd407f6fb`.
+`neo/cmake/NvrhiRayTracingFix.cmake` compiles a corrected copy of
+`src/d3d12/d3d12-raytracing.cpp` in the build tree when RT is enabled, leaving
+the submodule unchanged. It initializes the internal AS input
+descriptor and set `DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY` in
+`SetInstanceDescs`. Native DX12 validation rejected the uninitialized TLAS layout
+with message 1162. This two-line patch covers prebuild, initial build and update;
+BLAS geometry still explicitly selects its existing array-of-pointers layout.
+The helper rejects changed patch context when updating NVRHI so the workaround
+can be reviewed then. No new vendor runtime is required.
+
 ### NVIDIA Streamline SDK 2.12.0
 
 | Field | Answer |

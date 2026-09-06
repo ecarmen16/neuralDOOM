@@ -692,3 +692,116 @@ Next: RT-001's OFF-by-default synthetic-triangle hit/miss readback and static-ma
 scene audit. Broader map/mod compatibility, moving lighting, denoiser selection and
 real HDR display calibration remain separate work. No path-tracing image-quality
 or frame-rate claim is established by this checkpoint.
+
+## 2026-09-06 - Native DXR intersections and presentation lifetime fixes
+
+RT-001A / ND3-661 on `codex/rt-foundation`, based on `5fab1f08`. The user requested
+continued unattended development and a concise later playtest. See
+`RAY_TRACING_DIAGNOSTICS.md` for the resource contract and `DOGFOOD_CHECKLIST.md`
+for the manual pass. This checkpoint adds on-demand GPU diagnostics, not gameplay
+ray-traced lighting or a persistent RT scene.
+
+### Source and build
+
+- `RayTracingDiagnostic.cpp::RayQueryDiagnostic`, `TestSynthetic` and
+  `TestStaticWorld`: owned vertex/index/AS resources, compute pipeline, GPU timing,
+  readback and independent CPU reference tests. Positions are float3 world units,
+  copied indices uint32, instance transforms row-major 3x4, input/output strides
+  48/16 bytes. No temporal/HDR texture format or motion convention changed.
+- `neo/CMakeLists.txt`, `neo/shaders/CMakeLists.txt` and
+  `neo/shaders/rt/ray_query.cs.hlsl`: `USE_RAYTRACING=OFF` default, DX12/DXIL gate,
+  standalone SM 6.5 compute target with warnings as errors. Existing SM 6.0 shaders
+  and SDK-OFF remain supported. `rayTracingStatus` identifies compiled diagnostics
+  separately from the still-unimplemented gameplay scene.
+- `neo/cmake/NvrhiRayTracingFix.cmake`: a reproducible two-line correction applied
+  to a build-tree copy of pinned NVRHI's ray-tracing translation unit. Original
+  submodule contents remain unchanged. Both RT build projects compile that copy;
+  the default build uses the original source. The patch preserves MIT notices.
+- `DeviceManager_DX12.cpp::ReleaseRenderTargets/DestroyDeviceAndSwapChain`: submit
+  an empty NVRHI graphics command list after external Present work, then wait for
+  its fence before freeing DXGI buffers. NVRHI's previous last-submission fence
+  could precede Present. The extra synchronization occurs at release/resize,
+  without adding a per-frame wait.
+- Configure/build helpers record the RT option. The smoke runner adds synthetic,
+  scene, disabled and missing-shader modes plus explicit validation level. The
+  playtest launcher verifies build SHA/configuration/features, selects Native or
+  DLAA and shares persistent isolated settings without overriding later HUD,
+  resolution or HDR choices. No retail data or vendor runtime enters Git.
+
+Configured with `Configure-RBDOOM-DX12.ps1 -BuildDirectory <tree> -RayTracing
+ON|OFF`, built with `Build-RBDOOM.ps1 -BuildDirectory <tree> -Configuration
+RelWithDebInfo`. All three PASS; existing official Streamline 2.12.0 supplies the
+optional DLAA build. No new SDK was acquired. Final tested executable SHA-256:
+
+| Build tree | SDK / RT | SHA-256 |
+|---|---|---|
+| `build` | OFF / OFF | `BBBFF8101E1F5A42C332A8AC612BEE19945CAAF08B68E463427667C45D4E1C80` |
+| `build-rt` | OFF / ON | `27676C85FC0810C2908436EF76F43935F347E13E9F1D5EEB2CAEC8968E4F611A` |
+| `build-streamline` | ON / ON | `361602AB6BBAA17F16AEEFB0B80ED1521166497764CD3727F978EE50BE70EEC3` |
+
+Runtime manifests retain the parent commit and dirty=true from validation.
+Post-commit build-manifest refresh must preserve these tested hashes. The new
+dogfood launcher selects these exact build-directory targets.
+
+### Failures found and repaired
+
+Initial NVRHI-only runs passed synthetic, world and missing-shader checks.
+`smoke-20260906-144211-ac731a8e` with `-ValidationLayers 2` failed with exit 2170.
+A bounded debugger capture, `debug-rt-20260906-144540`, identified native DX12
+message 1162: uninitialized `DescsLayout` in the TLAS prebuild descriptor. Storage
+initialization and explicit `D3D12_ELEMENTS_LAYOUT_ARRAY` fix the initial build
+and the instance-update path. BLAS still uses its explicit pointer-array layout.
+
+With that corrected, `debug-rt-20260906-144649` passed the ray checks but failed
+on resize with DX12 message 921, `OBJECT_DELETED_WHILE_STILL_IN_USE`, naming
+`SwapChainBuffer`. The same resize failed in the RT-OFF build
+(`smoke-20260906-144820-ab645b68`). The post-Present fence fixed this independent
+presentation-lifetime bug. Debugger helper output also encountered a console
+encoding error while printing its retained log; the DX12 messages were recovered
+from that file. All final native-debug smoke scenarios below complete normally.
+
+### Final unattended runtime evidence
+
+Artifacts are under the game checkout's ignored `captures/neural`, using
+`game/mars_city2`, RTX 5090 / NVIDIA 610.47, bridge OFF and isolated settings.
+Every row uses `-ValidationLayers 2 -ExpectedProbeLighting Local -GpuProfile`.
+The Native rows use 180 warmup frames and 64 GPU samples; DLAA uses 600 and 300.
+
+| Artifact | Scenario | Result |
+|---|---|---|
+| `smoke-20260906-145700-355f7385` | Native RT Scene, SDR 2560x720 -> 1920x1080 | PASS: three 24-ray synthetic tests, world/CPU comparison, resize/history reset and clean exit |
+| `smoke-20260906-145717-1e5a763d` | DLAA RT Scene, AutoHDR + HDR diagnostic, 4800x1350 -> 2560x720, HUD aspect 1.777778 | PASS: same ray checks, native DLAA evaluated/presented with zero rejection, finite FP16 composition and scRGB presentation, resize/history reset and SDR-desktop bounds |
+| `smoke-20260906-145747-0c74bf55` | Default RT-OFF build, BuildDisabled, SDR 2560x720 -> 1920x1080 | PASS: both RT commands skip and no RT build/trace work occurs; resize and normal rendering continue |
+| `smoke-20260906-145814-74403766` | Native RT build, MissingShader, SDR 2560x720 | PASS: empty bytecode in the run's own filesystem overlay produces the expected contained diagnostic failure before GPU work; gameplay/captures/reset continue |
+
+Both scene runs audit 104 BSP models, 2,237 included surfaces and 772 excluded
+surfaces: 87,848 positions and 82,833 triangles. Of 131,072 panorama rays, 130,777
+hit, including 65,536 behind-camera hits. All 32 CPU closest-distance samples
+agree; invalid-hit count is zero. The scene uses 5,242,880 bytes of AS allocations.
+Native one-shot GPU build/trace were 0.490656/0.018560 ms; DLAA run values were
+0.484640/0.013920 ms. These exclude CPU work and are diagnostic measurements under
+validation, not gameplay performance or path-tracing estimates.
+
+All final runs retain 98 complete local probe pairs, 93 populated grids, 11 empty
+areas, no active probe fallback and zero lighting-image warnings. Existing
+content/startup warnings remain. Thirteen final PNGs pass chunk CRC, full pixel
+stream decompression, dimensions and scanline-filter checks. The Native gameplay
+capture and a 360-degree depth panorama were visually inspected. No motion-quality
+or real HDR monitor acceptance is inferred from these still images; Windows HDR
+remains OFF. The DLAA HDR diagnostic is a transport test, not a normal art capture.
+
+### Review and next gate
+
+Focused review covered shader ABI, masks/transforms and closest-hit semantics,
+BLAS/TLAS update flags, queue barriers and ownership, all-area map enumeration,
+geometry limits, no-world and feature-OFF behavior, isolated failure injection,
+submodule reproducibility and Present ordering. Exact-build fixtures and all
+PowerShell syntax pass; both dogfood profiles pass manifest/runtime/data checks
+with `-ValidateOnly`. Whitespace and public-source checks precede the commit.
+
+RT-001B remains: persistent mesh/instance registration and material mapping, map
+lifetime rebuild/release, then moving/skinned/cutout geometry and one selected
+light's ray-traced visibility. Actual unsupported hardware, invalid-shader/device
+loss recovery, other maps/mods and full path tracing remain unverified. The user
+playtest focuses on ultrawide HUD behavior, motion, lighting, saved settings and
+optional real HDR calibration.

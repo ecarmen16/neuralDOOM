@@ -1,0 +1,99 @@
+[CmdletBinding()]
+param(
+    [string]$RepoRoot,
+    [ValidateSet('Native', 'DLAA')][string]$Profile,
+    [string]$BuildDirectory,
+    [ValidateSet('Debug', 'Release', 'RelWithDebInfo', 'MinSizeRel')]
+    [string]$Configuration = 'RelWithDebInfo',
+    [switch]$ValidateOnly
+)
+
+. (Join-Path $PSScriptRoot 'Common.ps1')
+$RepoRoot = Resolve-NeuralRepoRoot $RepoRoot
+if (-not $Profile) {
+    if ($ValidateOnly) { throw '-ValidateOnly requires -Profile Native or DLAA.' }
+    Write-Host 'neuralDoom playtest'
+    Write-Host '1. Native rendering'
+    Write-Host '2. Native DLAA'
+    $selection = Read-Host 'Choose 1 or 2 (Enter = Native)'
+    switch ($selection) {
+        '' { $Profile = 'Native' }
+        '1' { $Profile = 'Native' }
+        '2' { $Profile = 'DLAA' }
+        default { throw 'Choose 1 or 2.' }
+    }
+}
+if (-not $BuildDirectory) {
+    $BuildDirectory = Join-Path $RepoRoot $(if ($Profile -eq 'DLAA') { 'build-streamline' } else { 'build-rt' })
+}
+$BuildDirectory = Resolve-NeuralFullPath $BuildDirectory
+$exe = Find-NeuralDoomExecutable -RepoRoot $RepoRoot -BuildDirectory $BuildDirectory -Configuration $Configuration
+if (-not $exe) { throw 'The configured executable is missing. Build before playtesting.' }
+$manifestPath = Join-Path $BuildDirectory "neuraldoom-build-$Configuration.json"
+if (-not (Test-Path -LiteralPath $manifestPath)) { throw 'Run Build-RBDOOM.ps1 to record the executable identity first.' }
+$manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+if ($manifest.sha256 -ne (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -or
+    $manifest.executable -ne $exe -or $manifest.configuration -ne $Configuration) {
+    throw 'The executable does not match its build manifest. Rebuild before playtesting.'
+}
+if ($manifest.features.dx12 -ne 'ON' -or $manifest.features.rayTracing -ne 'ON') {
+    throw 'This checklist requires a DX12 build configured with -RayTracing ON.'
+}
+if ($Profile -eq 'DLAA') {
+    if ($manifest.features.streamline -ne 'ON') { throw 'DLAA requires the existing official Streamline build.' }
+    foreach ($dll in @('sl.interposer.dll', 'sl.common.dll', 'sl.dlss.dll', 'nvngx_dlss.dll')) {
+        if (-not (Test-Path -LiteralPath (Join-Path (Split-Path $exe) $dll))) { throw "Missing SDK component: $dll" }
+    }
+}
+if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot 'base/maps/mars_city2.resources'))) {
+    throw 'Run this launcher from the game checkout containing your local BFG data.'
+}
+$saveRoot = Join-Path $RepoRoot 'captures/dogfood'
+$saveBase = Join-Path $saveRoot 'base'
+$firstRun = -not (Test-Path -LiteralPath (Join-Path $saveBase 'D3BFGConfig.cfg'))
+$backend = if ($Profile -eq 'DLAA') { 2 } else { 0 }
+$sdk = if ($Profile -eq 'DLAA') { 1 } else { 0 }
+$launchArgs = @(
+    '+set', 'fs_basepath', ('"' + $RepoRoot + '"'), '+set', 'fs_savepath', ('"' + $saveRoot + '"'),
+    '+set', 'r_graphicsAPI', 'dx12', '+set', 'r_neuralCompatibilityEnable', '0',
+    '+set', 'r_streamlineEnable', $sdk, '+set', 'r_streamlineApplicationId', '0',
+    '+set', 'r_neuralBackend', $backend, '+set', 'com_allowConsole', '1',
+    '+set', 'logFileName', "dogfood-$Profile.log", '+set', 'logFile', '2',
+    '+exec', 'neural_dogfood.cfg'
+)
+# Seed display settings once. Later HUD, resolution and HDR edits must survive relaunch.
+if ($firstRun) {
+    $launchArgs += @('+set', 'r_fullscreen', '0', '+set', 'r_windowWidth', '2560',
+        '+set', 'r_windowHeight', '720', '+set', 'r_hdrOutput', '0')
+}
+if ([Text.Encoding]::UTF8.GetByteCount(($launchArgs -join ' ')) -ge 1024) {
+    throw 'Launch arguments exceed the engine limit; use a shorter checkout path.'
+}
+Write-Host "Profile:    $Profile"
+Write-Host "Executable: $exe"
+Write-Host "Commit:     $($manifest.commit) (dirty=$($manifest.dirty))"
+Write-Host "Settings:   $saveRoot"
+Write-Host 'Checklist:  docs/neural-rendering/DOGFOOD_CHECKLIST.md'
+if ($ValidateOnly) {
+    Write-Host 'PASS: exact executable, manifest, feature flags, runtime files and local map data. No game started.'
+    return
+}
+$existingGame = $null
+try { $existingGame = [Threading.Mutex]::OpenExisting('DOOM3') }
+catch [Threading.WaitHandleCannotBeOpenedException] { }
+if ($null -ne $existingGame) {
+    $existingGame.Dispose()
+    throw 'Another Doom 3 instance is running. Close it before starting this playtest.'
+}
+New-Item -ItemType Directory -Path $saveBase -Force | Out-Null
+@(
+    'set r_screenFraction 100', 'set r_renderMode 0', 'set r_useTemporalAA 1', 'set r_antiAliasing 2',
+    'set com_fixedTic 0', 'set s_noSound 0', 'set r_hdrDiagnostic 0',
+    'neuralBackendStatus', 'hdrStatus', 'rayTracingStatus'
+) | Set-Content -LiteralPath (Join-Path $saveBase 'neural_dogfood.cfg') -Encoding ASCII
+$manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $saveRoot "build-$Profile.json") -Encoding UTF8
+# Interactive launch explicitly requested by the person running this helper.
+$process = Start-Process -FilePath $exe -ArgumentList $launchArgs -WorkingDirectory $RepoRoot -WindowStyle Normal -PassThru
+$process.WaitForExit()
+$process.Refresh()
+if ($process.ExitCode -ne 0) { throw "Game exited with code $($process.ExitCode). See $saveBase/dogfood-$Profile.log" }

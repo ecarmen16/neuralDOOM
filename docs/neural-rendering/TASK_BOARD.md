@@ -18,7 +18,15 @@ Working branch: `codex/rt-foundation`, prepared from the completed `codex/probe-
 | ND3-660C | DONE | Opt-in GPU timing export and unattended lighting baseline | Eight Native ultrawide variant runs, two DLAA baseline runs, disabled/lifecycle/CSV validation; missing probes and further scene coverage remain follow-up |
 | ND3-660D | DONE | Restore local lighting data and audit probe/grid readiness | SDK-OFF/ON builds and Native/DLAA ultrawide checks pass; 98 complete probe pairs, 93 populated grids, 11 empty areas, zero lighting-image warnings; broader map/art review remains |
 | ND3-700 | DONE | Native RT/path-tracing reconnaissance and staged plan | Actual NVRHI capabilities queried on RTX 5090; isolated shader-model-6.5 compile passes; exact scene/material/compiler gaps documented |
-| RT-001 | READY | OFF-by-default ray intersection prototype and static-scene audit | Next: known-ray readbacks, behind-camera geometry, AS ownership/synchronization, unsupported and disabled fallback |
+| RT-001A | DONE | OFF-by-default GPU intersection tests and static-world audit | 24 known rays including TLAS update; 82,833 map triangles, 131,072 panorama rays, 32 CPU reference matches; Native/DLAA and disabled/missing-shader checks with native DX12 validation |
+| ND3-661 | DONE | Synchronize DX12 presentation before releasing resized backbuffers | Reproduced debug-runtime failure with RT compiled out; post-Present fence fixes Native, DLAA/scRGB and default-build resize/shutdown checks |
+| RT-001B | READY | Persistent scene registration and material mapping | Next: stable mesh/instance IDs, owned persistent AS resources, map cleanup/rebuild; then rigid/skinned/cutout coverage and selected-light ray shadows |
+
+The implemented diagnostics and exact resource contract are in
+[RAY_TRACING_DIAGNOSTICS.md](RAY_TRACING_DIAGNOSTICS.md). The user's short manual
+pass is [DOGFOOD_CHECKLIST.md](DOGFOOD_CHECKLIST.md), launched with
+`Launch-NeuralDoom-Dogfood.cmd` in the game checkout. The full RT-001 persistent
+scene gate remains open; no gameplay ray-traced lighting is claimed.
 
 See `UNATTENDED_WORKFLOW.md` for the implemented controls and test commands, and the 2026-09-06 entry in `TEST_RESULTS.md` for exact evidence and failures.
 

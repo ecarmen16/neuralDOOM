@@ -21,6 +21,8 @@ param(
     [ValidateSet('Baseline', 'NoSSAO', 'NoSSR', 'Shadow4')][string]$LightingVariant = 'Baseline',
     [ValidateRange(180, 3600)][int]$WarmupFrames = 180,
     [ValidateSet('Any', 'Local', 'Fallback')][string]$ExpectedProbeLighting = 'Any',
+    [ValidateSet('None', 'BuildDisabled', 'Synthetic', 'Scene', 'MissingShader')][string]$RayTracingDiagnostics = 'None',
+    [ValidateRange(0, 2)][int]$ValidationLayers = 1,
     [switch]$PassThru
 )
 
@@ -61,6 +63,8 @@ $result.expectedProbeLighting = $ExpectedProbeLighting
 $result.probeLighting = $null
 $result.lightGrid = $null
 $result.rayTracingCapabilities = $null
+$result.rayTracingDiagnostics = $RayTracingDiagnostics
+$result.validationLayers = $ValidationLayers
 if (-not $GpuProfile -and $LightingVariant -ne 'Baseline') { throw 'Lighting variants require -GpuProfile.' }
 $process = $null
 try {
@@ -106,7 +110,22 @@ try {
             "set r_useSSR $([int]($LightingVariant -ne 'NoSSR'))",
             "set r_shadowMapSamples $(if ($LightingVariant -eq 'Shadow4') { 4 } else { 16 })")
     }
-    $scriptLines += @('rayTracingStatus', 'probeLightingStatus', 'devmap game/mars_city2', "wait $WarmupFrames", 'hdrStatus', 'neuralHistoryStatus', 'neuralBackendStatus', 'probeLightingStatus', 'screenshot screenshots/before.png')
+    $scriptLines += @('rayTracingStatus', 'probeLightingStatus')
+    if ($RayTracingDiagnostics -ne 'None') {
+        $compiled = $manifest.features.rayTracing -eq 'ON'
+        if (($RayTracingDiagnostics -eq 'BuildDisabled') -eq $compiled) { throw 'RT diagnostic expectation does not match the selected build.' }
+        if ($RayTracingDiagnostics -eq 'MissingShader') {
+            # Deliberate missing-bytecode fault in this run's own filesystem overlay.
+            $shaderDirectory = New-Item -ItemType Directory -Path (Join-Path $saveBase.FullName 'renderprogs2/dxil/rt') -Force
+            [IO.File]::WriteAllBytes((Join-Path $shaderDirectory.FullName 'ray_query.cs.dxil'), [byte[]]@())
+        }
+        $scriptLines += 'rayTracingTest'
+        if ($RayTracingDiagnostics -ne 'MissingShader') { $scriptLines += 'rayTracingScene' }
+    }
+    $scriptLines += @('devmap game/mars_city2', "wait $WarmupFrames")
+    if ($RayTracingDiagnostics -in @('Synthetic', 'Scene')) { $scriptLines += 'rayTracingTest' }
+    if ($RayTracingDiagnostics -eq 'Scene') { $scriptLines += @('rayTracingScene', 'rayTracingTest') }
+    $scriptLines += @('hdrStatus', 'neuralHistoryStatus', 'neuralBackendStatus', 'probeLightingStatus', 'screenshot screenshots/before.png')
     if ($GpuProfile) {
         # Let the screenshot stall and its queued frames drain before requesting samples.
         $scriptLines += @('wait 30', "set r_gpuProfileFrames $Frames", "wait $($Frames + 60)")
@@ -128,6 +147,7 @@ try {
     $launchArgs = @(
         '+set', 'fs_basepath', ('"' + $RepoRoot + '"'), '+set', 'fs_savepath', ('"' + $runRoot + '"'),
         '+set', 'r_graphicsAPI', 'dx12', '+set', 'r_fullscreen', '0',
+        '+set', 'r_useValidationLayers', $ValidationLayers,
         '+set', 'r_windowWidth', $Width, '+set', 'r_windowHeight', $Height,
         '+set', 'r_neuralCompatibilityEnable', '0', '+set', 'r_streamlineEnable', $sdk,
         '+set', 'r_streamlineApplicationId', '0', '+set', 'r_neuralBackend', $backend,
@@ -147,6 +167,22 @@ try {
     $log = Get-Content -LiteralPath (Join-Path $saveBase.FullName 'smoke.log') -Raw
     if ($log -notmatch 'NEURAL_SMOKE_COMPLETE') { throw 'Gameplay script did not complete.' }
     if ($log -match '(?im)FATAL ERROR|D3D12 device removed|Unknown command') { throw 'Engine log contains fatal/device/command errors.' }
+    if ($RayTracingDiagnostics -eq 'BuildDisabled') {
+        if ($log -notmatch 'RT_TEST status=SKIP reason=build-disabled' -or $log -notmatch 'RT_SCENE status=SKIP reason=build-disabled' -or $log -match 'RT_BUILD|RT_TRACE') { throw 'Disabled RT build did not preserve the no-work path.' }
+    } elseif ($RayTracingDiagnostics -eq 'MissingShader') {
+        if ($log -notmatch 'RT_DIAGNOSTIC_ERROR reason=missing-shader' -or $log -notmatch 'RT_TEST status=FAIL reason=initialization-or-trace' -or $log -match 'RT_BUILD|RT_TRACE') { throw 'Missing RT shader did not fail safely before GPU work.' }
+    } elseif ($RayTracingDiagnostics -in @('Synthetic', 'Scene')) {
+        $expectedTests = if ($RayTracingDiagnostics -eq 'Scene') { 3 } else { 2 }
+        if ([regex]::Matches($log, 'RT_TEST status=PASS phases=2 rays=24 mismatches=0').Count -ne $expectedTests -or $log -match 'RT_\w+ status=FAIL|RT_DIAGNOSTIC_ERROR') { throw 'Ray intersection or instance-update checks failed.' }
+        if ($log -notmatch 'RT_SCENE status=SKIP reason=no-world') { throw 'Missing safe no-world RT diagnostic result.' }
+        if ($RayTracingDiagnostics -eq 'Scene') {
+            $scene = [regex]::Match($log, 'RT_SCENE status=PASS models=(\d+) surfaces=(\d+) excluded=(\d+) triangles=(\d+) rays=131072 hits=(\d+) behindHits=(\d+) referenceRays=32 mismatches=0 invalid=0')
+            if (-not $scene.Success -or [int]$scene.Groups[4].Value -le 0 -or [int]$scene.Groups[6].Value -le 0) { throw 'Static-world ray tracing did not pass reference and behind-camera checks.' }
+            $result.rayTracingScene = [pscustomobject]@{ triangles = [int]$scene.Groups[4].Value; rays = 131072; hits = [int]$scene.Groups[5].Value; behindHits = [int]$scene.Groups[6].Value; referenceRays = 32 }
+            $rtCapture = Join-Path $saveBase.FullName 'screenshots/rt_static_world.png'
+            if (-not (Test-Path -LiteralPath $rtCapture)) { throw 'Missing ray-traced static-world panorama.' }
+        }
+    }
     $probes = [regex]::Matches($log, 'PROBE_LIGHTING world=1 map=(\S+) probes=(\d+) irradianceReady=(\d+) radianceReady=(\d+) complete=(\d+) defaulted=(\d+) unloaded=(\d+)')
     $selections = [regex]::Matches($log, 'PROBE_SELECTION valid=1 area=(-?\d+) diffuseFallback=(\d) specularFallbacks=(\d) activeSpecularFallbacks=(\d)')
     if ($probes.Count -lt 2 -or $selections.Count -lt 2) { throw 'Missing gameplay probe-lighting diagnostics.' }

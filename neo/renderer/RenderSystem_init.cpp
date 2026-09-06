@@ -1609,7 +1609,12 @@ static void R_RayTracingStatus_f( const idCmdArgs& args )
 		device->queryFeatureSupport( nvrhi::Feature::RayTracingAccelStruct ),
 		device->queryFeatureSupport( nvrhi::Feature::RayTracingPipeline ),
 		device->queryFeatureSupport( nvrhi::Feature::RayQuery ) );
-	common->Printf( "Hardware/API capabilities only; no scene ray-tracing pass is implemented.\n" );
+#if defined( USE_RAYTRACING )
+	common->Printf( "Native RT diagnostics: compiled=1; explicit console commands only.\n" );
+#else
+	common->Printf( "Native RT diagnostics: compiled=0.\n" );
+#endif
+	common->Printf( "No gameplay ray-traced lighting pass is implemented.\n" );
 }
 
 /*

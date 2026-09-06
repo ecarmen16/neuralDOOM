@@ -61,7 +61,7 @@ $manifest = [ordered]@{
     configuration = $Configuration
     executable = $exe
     sha256 = $hash
-    features = [ordered]@{ dx12 = $cache['USE_DX12']; vulkan = $cache['USE_VULKAN']; streamline = $cache['USE_STREAMLINE'] }
+    features = [ordered]@{ dx12 = $cache['USE_DX12']; vulkan = $cache['USE_VULKAN']; streamline = $cache['USE_STREAMLINE']; rayTracing = $cache['USE_RAYTRACING'] }
 }
 $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
 $docs = Join-Path $RepoRoot 'docs\neural-rendering'

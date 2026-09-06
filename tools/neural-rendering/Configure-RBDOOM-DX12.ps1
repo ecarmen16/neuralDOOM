@@ -4,7 +4,8 @@ param(
     [string]$BuildDirectory,
     [switch]$Clean,
     [string]$Generator = 'Visual Studio 17 2022',
-    [string]$DxcDirectory
+    [string]$DxcDirectory,
+    [ValidateSet('ON', 'OFF')][string]$RayTracing
 )
 
 . (Join-Path $PSScriptRoot 'Common.ps1')
@@ -62,6 +63,7 @@ $args = @(
 )
 
 Write-Step 'Configuring neuralDoom on RBDOOM-3-BFG for VS2022 x64, DX12 only'
+if ($PSBoundParameters.ContainsKey('RayTracing')) { $args += "-DUSE_RAYTRACING=$RayTracing" }
 Write-Host "cmake $($args -join ' ')"
 Invoke-NativeChecked 'cmake' $args
 
