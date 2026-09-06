@@ -1,5 +1,11 @@
 # Native HDR presentation prototype
 
+Update 2026-09-06: after the user enabled Windows HDR, the final DLAA/RTAO run
+verified active native scRGB output at 4800x1350 and after resize to 2560x720,
+with finite, nonnegative presentation below the configured highlight ceiling.
+See the first gameplay AO entry in `TEST_RESULTS.md`. Physical monitor
+calibration and preferred brightness still need the user's visual check.
+
 Implemented on `codex/native-hdr`, based on the `9174f4ca` modernization checkpoint. HDR is optional and defaults OFF. The source repository is now the neuralDoom task checkout; the existing game installation remains a separate build/test checkout with matching source. No runtime, game data or SDK payload is part of this change.
 
 ## Controls and behavior

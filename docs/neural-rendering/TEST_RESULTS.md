@@ -27,9 +27,51 @@ camera quality still require the user's short visual check.
 
 Focused review covers shader binding ABI, depth agreement, immutable AS lifetime,
 deferred initialization, resize rebinding, baseline SSAO retention and live
-rollback. Final clean-build Native/DLAA/HDR and compiled-OFF evidence follows
-after the implementation commit. Full material registration, dynamic/cutout
-occluders and authored-light ray shadows remain the next tasks.
+rollback. Full material registration, dynamic/cutout occluders and authored-light
+ray shadows remain the next tasks.
+
+### Final artifact checks
+
+All three `RelWithDebInfo` builds pass from clean implementation commit
+`f13d3be3`. These final executables were tested without subsequent rebuilding:
+
+| Build | SHA256 |
+|---|---|
+| `build-rt` Native RT | `23A22E48DE3C70C693E3BA4EEC0122A32BA026AAFCF2E110820617701D5BC492` |
+| `build-streamline` DLAA/RT | `2BC46C706E2D697DABF2CF6F0151B7176630C8DC2BB75746198261258FD85A81` |
+| `build` RT compiled OFF | `5C744D1A506D6231355B06BDD4CC4C5A1C2A7D5E2E45870A6196752F65B0C66F` |
+
+Every smoke row uses full DX12 validation, local probe lighting, 64 GPU timing
+samples, history reset and normal exit. AO rows include live OFF/ON comparison
+and 600 warmup frames; compiled OFF uses 180 warmup frames.
+
+| Artifact under ignored `captures/neural` | Scenario | Result |
+|---|---|---|
+| `smoke-20260906-181359-47661d1b` | Native AO + synthetic ray checks, 2560x720 -> 1920x1080 | PASS: both 24-ray checks; shaded/occluded samples 350/220 initially and 741/487 after resize; frames stop at 782 while disabled |
+| `smoke-20260906-181424-fd99b123` | DLAA AO + native HDR, 4800x1350 -> 2560x720, HUD aspect 1.777778 | PASS: 1,232/797 shaded/occluded samples initially, 354/223 after resize; frames stop at 781 while disabled; DLAA presentation has zero rejection |
+| `smoke-20260906-181910-b778744e` | Compiled OFF, 2560x720 -> 1920x1080 | PASS: ray diagnostics skip; AO frames/counters remain zero; raster rendering and resize pass |
+| `ao-lifecycle-final` | Native AO, two consecutive Mars City 2 loads, 1280x720 | PASS: exactly two static AS builds, dispatch counters restart at each load, both scenes shade and exit normally |
+
+The user enabled Windows HDR during this task. The DLAA run confirms
+`windowsHDR=1`, `active=1`, scRGB FP16 and 10-bit display metadata. Actual HDR
+transport is tested with `diagnostic=0`: scRGB maxima are 11.046875/11.734375
+before resize and 10.0 afterward, below the configured 12.5 scRGB / 1,000-nit
+ceiling. Presentation has zero invalid or negative values. Intermediate DLAA
+composition has negative overshoot after resize; the final presentation clamps
+it. Monitor brightness, artistic quality and motion artifacts remain manual.
+
+Eleven final smoke PNGs pass CRC/decompression checks; Native ON/OFF and resized
+DLAA/HDR previews were inspected. Both RTX launcher profiles pass exact-artifact,
+SDK-file and map-data validation. The default-build runner initially hit a
+PowerShell StrictMode error when its failure-filter returned no rows; wrapping
+that filter in an array fixed reporting, and the final rerun passes. A debug-event
+wrapper exceeded its 60-second budget during the second map load; the equivalent
+unwrapped two-load run passes with full DX12 validation retained.
+
+The follow-up changes only that test-reporting fix and documentation. Build
+manifests retain the clean implementation commit above; no renderer/shader or
+executable changed after the final checks. Public-source/whitespace checks and
+PowerShell syntax validation pass. The five-minute dogfood checklist is ready.
 
 ## 2026-09-06 / modernization foundation working tree
 

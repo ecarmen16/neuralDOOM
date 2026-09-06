@@ -190,7 +190,7 @@ try {
             $ao[3].matched -le 0 -or $ao[3].occluded -le 0) {
             throw 'Ray-traced AO did not shade static receivers, stop on disable, or resume after enable/resize.'
         }
-    } elseif ($ao.Count -ne 2 -or ($ao | Where-Object { $_.active -or $_.frames -ne 0 }).Count -gt 0) {
+    } elseif ($ao.Count -ne 2 -or @($ao | Where-Object { $_.active -or $_.frames -ne 0 }).Count -gt 0) {
         throw 'Disabled AO unexpectedly allocated or dispatched gameplay rays.'
     }
     if ($RayTracingDiagnostics -eq 'BuildDisabled') {

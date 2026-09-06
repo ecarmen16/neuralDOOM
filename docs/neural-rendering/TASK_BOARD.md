@@ -14,14 +14,14 @@ Working branch: `codex/rt-foundation`, prepared from the completed `codex/probe-
 | ND3-610 | DONE | Initial bounded gameplay smoke runner | Native/null/DLAA runs, reset epochs, frame progress, isolated PNGs and structured JSON; wider scenarios remain follow-up |
 | ND3-620 | VERIFY | Shared temporal contract validation | Both builds and null/DLAA runtime pass; negative-case injection coverage remains |
 | ND3-660A | VERIFY | HUD layout, size and menu controls | Menu changes, archive persistence, relaunch and resolution changes tested; broader notification/combat HUD states remain |
-| ND3-660B | VERIFY | Native scRGB presentation, HDR tone mapping and calibration controls | SDK-OFF/ON builds; GPU composition/presentation diagnostics and resize checks; Windows HDR is off so actual HDR display review remains |
+| ND3-660B | VERIFY | Native scRGB presentation, HDR tone mapping and calibration controls | SDK-OFF/ON builds; finite FP16/scRGB and resize checks; active Windows HDR verified with DLAA/RTAO; visual monitor calibration remains |
 | ND3-660C | DONE | Opt-in GPU timing export and unattended lighting baseline | Eight Native ultrawide variant runs, two DLAA baseline runs, disabled/lifecycle/CSV validation; missing probes and further scene coverage remain follow-up |
 | ND3-660D | DONE | Restore local lighting data and audit probe/grid readiness | SDK-OFF/ON builds and Native/DLAA ultrawide checks pass; 98 complete probe pairs, 93 populated grids, 11 empty areas, zero lighting-image warnings; broader map/art review remains |
 | ND3-700 | DONE | Native RT/path-tracing reconnaissance and staged plan | Actual NVRHI capabilities queried on RTX 5090; isolated shader-model-6.5 compile passes; exact scene/material/compiler gaps documented |
 | RT-001A | DONE | OFF-by-default GPU intersection tests and static-world audit | 24 known rays including TLAS update; 82,833 map triangles, 131,072 panorama rays, 32 CPU reference matches; Native/DLAA and disabled/missing-shader checks with native DX12 validation |
 | ND3-661 | DONE | Synchronize DX12 presentation before releasing resized backbuffers | Reproduced debug-runtime failure with RT compiled out; post-Present fence fixes Native, DLAA/scRGB and default-build resize/shutdown checks |
 | RT-001B | READY | Persistent scene registration and material mapping | Next: stable mesh/instance IDs, owned persistent AS resources, map cleanup/rebuild; then rigid/skinned/cutout coverage and selected-light ray shadows |
-| RT-AO | VERIFY | Opt-in static-world ray-traced ambient occlusion | Native DX12 gameplay, sampled occlusion, live rollback/resume and resize pass; final clean-build Native/DLAA/HDR and compiled-OFF checks pending |
+| RT-AO | DONE | Opt-in static-world ray-traced ambient occlusion prototype | Clean Native/DLAA/compiled-OFF builds; sampled occlusion, live rollback/resume, ultrawide resize, active HDR and two map lifetimes pass; visual acceptance remains |
 
 The implemented diagnostics and exact resource contract are in
 [RAY_TRACING_DIAGNOSTICS.md](RAY_TRACING_DIAGNOSTICS.md). The user's short manual
