@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$RepoRoot,
+    [string]$BuildDirectory,
     [ValidateSet('Debug', 'Release', 'RelWithDebInfo', 'MinSizeRel')]
     [string]$Configuration = 'RelWithDebInfo',
     [string[]]$AdditionalArguments = @()
@@ -8,7 +9,7 @@ param(
 
 . (Join-Path $PSScriptRoot 'Common.ps1')
 $RepoRoot = Resolve-NeuralRepoRoot $RepoRoot
-$exe = Find-RBDoomExecutable -RepoRoot $RepoRoot -Configuration $Configuration
+$exe = Find-RBDoomExecutable -RepoRoot $RepoRoot -Configuration $Configuration -BuildDirectory $BuildDirectory
 if (-not $exe) {
     throw 'neuralDoom.exe was not found. Configure and build first.'
 }

@@ -1529,3 +1529,7 @@ add_subdirectory(shaders)
 add_dependencies(Shaders ShaderMake)
 add_dependencies(${APP_NAME} Shaders ${MASKED_OCCLUSION_LIBRARY} ${ISPC_TEXCOMP_LIBRARY})
 
+# Identify the exact target and configuration for unattended build/run tooling.
+file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/neuraldoom-artifact-$<CONFIG>.txt"
+	CONTENT "$<TARGET_FILE:${APP_NAME}>\n")
+

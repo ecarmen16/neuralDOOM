@@ -75,6 +75,14 @@ public:
 		const int requestedMode = r_neuralBackend.GetInteger();
 		const bool nativeDLAA = requestedMode == 2;
 		const bool qualityDLSS = requestedMode == 3;
+		const char* contractError = R_ValidateNeuralTemporalFrame( frame );
+		if( contractError != NULL )
+		{
+			rejectedFrames++;
+			lastResult = contractError;
+			resetPending = true;
+			return false;
+		}
 		const bool valid = initialized && ( nativeDLAA || qualityDLSS ) && frame.commandList != NULL && frame.sceneColorHDR && frame.depth && frame.motionVectors && frame.reactiveMask && frame.transparencyMask && frame.output && frame.renderWidth > 0 && frame.renderHeight > 0 && frame.renderWidth <= frame.outputWidth && frame.renderHeight <= frame.outputHeight && frame.renderSampleCount == 1 && ( !nativeDLAA || ( frame.renderWidth == frame.outputWidth && frame.renderHeight == frame.outputHeight ) ) && frame.motionVectorsValid && frame.masksValid;
 		if( !valid )
 		{

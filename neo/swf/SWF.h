@@ -185,6 +185,11 @@ public:
 		swfScale = scale;
 	}
 
+	void SetHUDLayout( bool enabled )
+	{
+		useHUDLayout = enabled;
+	}
+
 	void SetForceNonPCGetPlatform()
 	{
 		forceNonPCPlatform = true;
@@ -224,6 +229,8 @@ private:
 	uint16			frameRate;
 	float			renderBorder;
 	float			swfScale;
+	bool			useHUDLayout;
+	float			hudRenderScale;
 
 	idVec2			scaleToVirtual;
 

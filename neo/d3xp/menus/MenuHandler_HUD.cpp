@@ -132,6 +132,10 @@ idMenuHandler_HUD::Initialize
 void idMenuHandler_HUD::Initialize( const char* swfFile, idSoundWorld* sw )
 {
 	idMenuHandler::Initialize( swfFile, sw );
+	if( gui != NULL )
+	{
+		gui->SetHUDLayout( true );
+	}
 
 	//---------------------
 	// Initialize the menus

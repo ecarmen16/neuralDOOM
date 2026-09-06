@@ -86,4 +86,7 @@ public:
 idNeuralTemporalBackend* R_CreateNullNeuralTemporalBackend();
 idNeuralTemporalBackend* R_CreateStreamlineNeuralTemporalBackend();
 
+// Returns a static diagnostic string, or NULL for the supported frame contract.
+const char* R_ValidateNeuralTemporalFrame( const neuralTemporalFrame_t& frame );
+
 #endif

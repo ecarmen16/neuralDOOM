@@ -54,6 +54,8 @@ idSWF::idSWF( const char* filename_, idSoundWorld* soundWorld_, bool exportJSON,
 	atlasMaterial = NULL;
 
 	swfScale = 1.0f;
+	useHUDLayout = false;
+	hudRenderScale = 1.0f;
 	scaleToVirtual.Set( 1.0f, 1.0f );
 
 	random.SetSeed( Sys_Milliseconds() );

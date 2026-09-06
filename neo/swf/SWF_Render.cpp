@@ -35,6 +35,9 @@ idCVar swf_stopat( "swf_stopat", "0", CVAR_FLOAT, "stop at a specific frame" );
 
 idCVar swf_titleSafe( "swf_titleSafe", "0.005", CVAR_FLOAT, "space between UI elements and screen edge", 0.0f, 0.075f );
 
+idCVar swf_hudScale( "swf_hudScale", "1", CVAR_FLOAT | CVAR_ARCHIVE | CVAR_NEW, "uniform gameplay HUD scale; menus and world GUIs are unaffected", 0.5f, 1.5f );
+idCVar swf_hudMaxAspect( "swf_hudMaxAspect", "0", CVAR_FLOAT | CVAR_ARCHIVE | CVAR_NEW, "maximum gameplay HUD width divided by height; 0 uses the full screen, 1.777778 centers a 16:9 HUD on ultrawide displays", 0.0f, 4.0f );
+
 idCVar swf_forceAlpha( "swf_forceAlpha", "0", CVAR_FLOAT, "force an alpha value on all elements, useful to show invisible animating elements", 0.0f, 1.0f );
 
 // RB begin
@@ -140,6 +143,8 @@ void idSWF::Render( idRenderSystem* gui, int time, bool isSplitscreen )
 	const float sysWidth = renderSystem->GetWidth() * ( pixelAspect > 1.0f ? pixelAspect : 1.0f );
 	const float sysHeight = renderSystem->GetHeight() / ( pixelAspect < 1.0f ? pixelAspect : 1.0f );
 	float scale = swfScale * sysHeight / ( float )frameHeight;
+	hudRenderScale = useHUDLayout && !isSplitscreen ? swf_hudScale.GetFloat() : 1.0f;
+	scale *= hudRenderScale;
 
 	swfRenderState_t renderState;
 	renderState.stereoDepth = ( stereoDepthType_t )mainspriteInstance->GetStereoDepth();
@@ -327,6 +332,15 @@ void idSWF::RenderSprite( idRenderSystem* gui, idSWFSpriteInstance* spriteInstan
 				const float pixelAspect = renderSystem->GetPixelAspect();
 				const float sysWidth = renderSystem->GetWidth() * ( pixelAspect > 1.0f ? pixelAspect : 1.0f );
 				const float sysHeight = renderSystem->GetHeight() / ( pixelAspect < 1.0f ? pixelAspect : 1.0f );
+				// Only ordinary HUD edge anchors use the centered safe width. Absolute
+				// anchors and full-screen overlays retain their original screen bounds.
+				float hudInset = 0.0f;
+				if( useHUDLayout && !isSplitscreen && swf_hudMaxAspect.GetFloat() > 0.0f )
+				{
+					const float hudWidth = Min( sysWidth, sysHeight * Max( 1.0f, swf_hudMaxAspect.GetFloat() ) );
+					hudInset = 0.5f * ( sysWidth - hudWidth );
+				}
+
 
 				if( display.spriteInstance->name.Icmp( "_fullScreen" ) == 0 )
 				{
@@ -352,14 +366,14 @@ void idSWF::RenderSprite( idRenderSystem* gui, idSWFSpriteInstance* spriteInstan
 				}
 				else if( display.spriteInstance->name.Icmp( "_topLeft" ) == 0 )
 				{
-					renderState2.matrix.tx = ( display.matrix.tx + widthAdj ) * renderState.matrix.xx;
+					renderState2.matrix.tx = hudInset + ( display.matrix.tx + widthAdj ) * renderState.matrix.xx;
 					renderState2.matrix.ty = ( display.matrix.ty + heightAdj ) * renderState.matrix.yy;
 					display.spriteInstance->SetAlignment( spriteInstance->xOffset + xOffset, spriteInstance->yOffset + yOffset );
 				}
 				else if( display.spriteInstance->name.Icmp( "_left" ) == 0 )
 				{
 					float prevX = renderState2.matrix.tx;
-					renderState2.matrix.tx = ( display.matrix.tx + widthAdj ) * renderState.matrix.xx;
+					renderState2.matrix.tx = hudInset + ( display.matrix.tx + widthAdj ) * renderState.matrix.xx;
 					xOffset = ( ( renderState2.matrix.tx - prevX ) / renderState.matrix.xx );
 					display.spriteInstance->SetAlignment( spriteInstance->xOffset + xOffset, spriteInstance->yOffset + yOffset );
 				}
@@ -373,7 +387,7 @@ void idSWF::RenderSprite( idRenderSystem* gui, idSWFSpriteInstance* spriteInstan
 				else if( display.spriteInstance->name.Icmp( "_bottomLeft" ) == 0 )
 				{
 					float prevX = renderState2.matrix.tx;
-					renderState2.matrix.tx = ( display.matrix.tx + widthAdj ) * renderState.matrix.xx;
+					renderState2.matrix.tx = hudInset + ( display.matrix.tx + widthAdj ) * renderState.matrix.xx;
 					xOffset = ( ( renderState2.matrix.tx - prevX ) / renderState.matrix.xx );
 
 
@@ -395,14 +409,14 @@ void idSWF::RenderSprite( idRenderSystem* gui, idSWFSpriteInstance* spriteInstan
 				}
 				else if( display.spriteInstance->name.Icmp( "_topRight" ) == 0 )
 				{
-					renderState2.matrix.tx = ( ( float )sysWidth - ( ( ( float )frameWidth - display.matrix.tx + widthAdj ) * renderState.matrix.xx ) );
+					renderState2.matrix.tx = ( ( float )sysWidth - hudInset - ( ( ( float )frameWidth - display.matrix.tx + widthAdj ) * renderState.matrix.xx ) );
 					renderState2.matrix.ty = ( display.matrix.ty + heightAdj ) * renderState.matrix.yy;
 					display.spriteInstance->SetAlignment( spriteInstance->xOffset + xOffset, spriteInstance->yOffset + yOffset );
 				}
 				else if( display.spriteInstance->name.Icmp( "_right" ) == 0 )
 				{
 					float prevX = renderState2.matrix.tx;
-					renderState2.matrix.tx = ( ( float )sysWidth - ( ( ( float )frameWidth - display.matrix.tx + widthAdj ) * renderState.matrix.xx ) );
+					renderState2.matrix.tx = ( ( float )sysWidth - hudInset - ( ( ( float )frameWidth - display.matrix.tx + widthAdj ) * renderState.matrix.xx ) );
 					xOffset = ( ( renderState2.matrix.tx - prevX ) / renderState.matrix.xx );
 					display.spriteInstance->SetAlignment( spriteInstance->xOffset + xOffset, spriteInstance->yOffset + yOffset );
 				}
@@ -415,7 +429,7 @@ void idSWF::RenderSprite( idRenderSystem* gui, idSWFSpriteInstance* spriteInstan
 				}
 				else if( display.spriteInstance->name.Icmp( "_bottomRight" ) == 0 )
 				{
-					renderState2.matrix.tx = ( ( float )sysWidth - ( ( ( float )frameWidth - display.matrix.tx + widthAdj ) * renderState.matrix.xx ) );
+					renderState2.matrix.tx = ( ( float )sysWidth - hudInset - ( ( ( float )frameWidth - display.matrix.tx + widthAdj ) * renderState.matrix.xx ) );
 					renderState2.matrix.ty = ( ( float )sysHeight - ( ( ( float )frameHeight - display.matrix.ty + heightAdj ) * renderState.matrix.yy ) );
 					display.spriteInstance->SetAlignment( spriteInstance->xOffset + xOffset, spriteInstance->yOffset + yOffset );
 				}

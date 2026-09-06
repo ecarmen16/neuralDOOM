@@ -1,5 +1,42 @@
 # Test results
 
+## 2026-09-06 / modernization foundation working tree
+
+Base `76ff35b5`, branch `codex/modernization-foundation`. Automated checks used disposable `game/mars_city2` runs and local owned BFG data. The experimental ReShade/NR compatibility layer was disabled. Results prove the checks listed here, not an NR aesthetic comparison or monitor HDR capability.
+
+| Check | Result | Evidence |
+|---|---|---|
+| DX12 SDK-OFF configure/build | PASS | `Configure-RBDOOM-DX12.ps1`; `Build-RBDOOM.ps1 -Configuration RelWithDebInfo -Parallel 8`; ignored `captures/neural/modernization-build-off.log` |
+| DX12 SDK-ON configure/build | PASS | Same helpers with `-BuildDirectory build-streamline`; existing pinned SDK cache retained; `captures/neural/modernization-build-on.log` |
+| Exact artifact and failure-path fixtures | PASS | `Test-NeuralBuildIdentity.ps1`: custom target/directory, missing output despite stale alternatives, missing configuration, successful compiler with absent target, stale success-manifest removal |
+| PowerShell parsing | PASS | Parser invoked inside the test script with terminating errors; all helper scripts parsed |
+| Native 1280x720 / default HUD | PASS | `smoke-20260906-110603-1c1b7b8d`: exit 0, 64 primary-view frames between probes, reset epoch advanced, both PNG dimensions checked |
+| Null validation 2560x720 / centered HUD at 1.15 scale | PASS | `smoke-20260906-110625-9b80130a`: 124 primary-view frames, 297 evaluated / 0 rejected, epoch 4 to 5, captures |
+| DLAA 2560x720 / centered HUD | PASS with normal driver access | `smoke-20260906-110951-68fca31c`: 297 evaluated / 297 presented / 0 rejected; 124 primary-view frames and reset/capture checks |
+| Native 2560x720 / original full-width HUD | PASS | `smoke-20260906-111057-b094f1ec`: 64 frames, exit/reset/capture checks; inspected screenshot shows original edge placement |
+| Native 1680x720 / centered 16:9 HUD | PASS | `smoke-20260906-111120-9631580d`: 64 frames, exit/reset/capture checks; screenshot inspected |
+| DLAA requested on SDK-OFF build | SKIP as intended | `smoke-20260906-111142-a336f3f3`: explicit missing-SDK result, no process launched |
+
+Run directories above are under ignored `captures/neural/`. Build identities: SDK-OFF SHA-256 `254E2D567BAF2955F0D95F549EC03298A182189FA363FBBF5CE332A626D67BF6`; SDK-ON `BD7A34163B0E953DE0EB49F337316208D0A688CC8A635A3DE72862836469FE6F`. JSON manifests record the dirty development state and exact executable. No runtime binaries or game data are tracked.
+
+### Failures encountered and corrected or characterized
+
+- Sandbox MSBuild failed first on its temporary directory and then Windows SDK discovery permissions. Normal Windows SDK access produced successful builds.
+- An early build/run overlap locked the executable at link time; the test-owned process exited and the sequential rebuild passed. Do not build and run the same target simultaneously.
+- The first runner exceeded Win32's 1024-byte command-line storage and lost its trailing scenario invocation; it timed out and cleaned up its process. Runtime settings were moved into the generated cfg and a byte-length guard was added.
+- The next run completed gameplay but failed capture validation because Windows screenshots wrote into `fs_basepath`. `R_ReadPixelsRGB8` now uses `fs_savepath` consistently; subsequent captures stayed in each isolated run. Early diagnostic captures remain ignored local artifacts.
+- Sandboxed SDK-ON run `smoke-20260906-110845-35674ded` reported `eErrorFeatureMissing`, 297 rejected evaluations, and native fallback, so the runner correctly failed the DLAA expectation. The same executable passed with normal driver access. This was not hidden as a successful DLAA run.
+
+### Visual inspection and limits
+
+Inspected 32:9 centered/scaled, 32:9 original full-width, and 21:9 centered captures. Health/ammo placement moves inward as intended while the world remains full-width. These are different wall-clock animation samples, not pixel-equivalence proofs. No user playtest was requested.
+
+Upstream content/cinematic-image and unknown reliable-message warnings appeared in smoke logs. No fatal error was observed in passing runs; warnings were not treated as proof of a warning-free engine.
+
+Not yet covered: all HUD notifications and interactive states, PDA/menu image comparisons, split-screen/VR, wide FOV transitions, full motion/ghosting matrix, invalid temporal-resource injection tests, GPU timing thresholds, Vulkan builds, actual 5120x1440 capture, live resize, native display HDR, and NR bridge gameplay on this revision. New HUD controls stay opt-in. No new geometry, lighting, or HDR-output effect is claimed by this batch.
+
+Final source audit and diff review are recorded with the checkpoint; see `UNATTENDED_WORKFLOW.md` for commands and screenshot-location changes.
+
 ## 2026-09-03 / ND3-520 / guided local assembly
 
 - Guided setup dry-run: PASS. PowerShell 5 executed the updated setup noninteractively against the established Steam BFG installation; Robocopy found 384/6.932 GB source files and copied zero because the local install was current.

@@ -4,6 +4,20 @@ Statuses: `BLOCKED`, `READY`, `IN PROGRESS`, `VERIFY`, `DONE`, `DEFERRED`.
 
 ## Current focus
 
+### Modernization implementation / 2026-09-06
+
+| ID | Status | Task | Exit evidence |
+|---|---|---|---|
+| ND3-600 | DONE | Exact CMake artifact identity and build manifests | Both build variants pass; missing/stale/wrong-config fixture tests pass |
+| ND3-610 | DONE | Initial bounded gameplay smoke runner | Native/null/DLAA runs, reset epochs, frame progress, isolated PNGs and structured JSON; wider scenarios remain follow-up |
+| ND3-620 | VERIFY | Shared temporal contract validation | Both builds and null/DLAA runtime pass; negative-case injection coverage remains |
+| ND3-660A | VERIFY | HUD maximum aspect and uniform scaling | 16:9/21:9/32:9 automated runs and selected captures inspected; broader HUD interaction/layout checks pending |
+| ND3-660B | READY | Native HDR presentation capability audit | Named DX12 swapchain/tonemap/UI boundaries in modernization plan; no HDR output implemented yet |
+
+See `UNATTENDED_WORKFLOW.md` for the implemented controls and test commands, and the 2026-09-06 entry in `TEST_RESULTS.md` for exact evidence and failures.
+
+Planning checkpoint: development branch is `codex/modernization-foundation`, based on `76ff35b5`. See [MODERNIZATION_PLAN.md](MODERNIZATION_PLAN.md) for the initial reviewed state, AFK validation policy, and ordered ND3-600 through ND3-680 backlog. The modernization table above supersedes its initial READY status; older DONE entries below retain their historical evidence.
+
 | ID | Status | Task | Exit evidence |
 |---|---|---|---|
 | ND3-000 | DONE | Clone, branch, and install starter files | Feature branch and `UPSTREAM_BASE.txt` at `ea29c006` |

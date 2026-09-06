@@ -133,45 +133,31 @@ function Invoke-NativeChecked {
 function Find-NeuralDoomExecutable {
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
-        [string]$Configuration = 'RelWithDebInfo'
+        [ValidateSet('Debug', 'Release', 'RelWithDebInfo', 'MinSizeRel')]
+        [string]$Configuration = 'RelWithDebInfo',
+        [string]$BuildDirectory
     )
-
-    $preferred = @(
-        (Join-Path $RepoRoot "build\$Configuration\neuralDoom.exe"),
-        (Join-Path $RepoRoot "build\Release\neuralDoom.exe"),
-        (Join-Path $RepoRoot 'neuralDoom.exe'),
-        (Join-Path $RepoRoot "build\$Configuration\RBDoom3BFG.exe"),
-        (Join-Path $RepoRoot "build\Release\RBDoom3BFG.exe"),
-        (Join-Path $RepoRoot 'RBDoom3BFG.exe')
-    )
-
-    foreach ($candidate in $preferred) {
-        if (Test-Path $candidate) {
-            return (Resolve-Path $candidate).Path
-        }
+    if ([string]::IsNullOrWhiteSpace($BuildDirectory)) {
+        $BuildDirectory = Join-Path $RepoRoot 'build'
     }
-
-    $buildRoot = Join-Path $RepoRoot 'build'
-    if (Test-Path $buildRoot) {
-        $found = Get-ChildItem $buildRoot -File -Recurse -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -in @('neuralDoom.exe', 'RBDoom3BFG.exe') } |
-            Sort-Object LastWriteTimeUtc -Descending |
-            Select-Object -First 1
-        if ($found) {
-            return $found.FullName
-        }
+    $artifactFile = Join-Path $BuildDirectory "neuraldoom-artifact-$Configuration.txt"
+    if (-not (Test-Path -LiteralPath $artifactFile -PathType Leaf)) {
+        throw "Missing CMake artifact identity: $artifactFile. Reconfigure this build tree first."
     }
-
+    $candidate = (Get-Content -LiteralPath $artifactFile -Raw).Trim()
+    if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+        return (Resolve-Path -LiteralPath $candidate).Path
+    }
     return $null
 }
 
 function Find-RBDoomExecutable {
     param(
         [Parameter(Mandatory)][string]$RepoRoot,
-        [string]$Configuration = 'RelWithDebInfo'
+        [string]$Configuration = 'RelWithDebInfo',
+        [string]$BuildDirectory
     )
-
-    return Find-NeuralDoomExecutable -RepoRoot $RepoRoot -Configuration $Configuration
+    return Find-NeuralDoomExecutable -RepoRoot $RepoRoot -Configuration $Configuration -BuildDirectory $BuildDirectory
 }
 
 Enable-NeuralBuildToolPaths
