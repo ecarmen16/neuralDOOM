@@ -422,6 +422,13 @@ if ($engine) {
     Write-Host '[missing] Build neuralDoom with the scripts in tools\neural-rendering.' -ForegroundColor Yellow
 }
 
+$lighting = & (Join-Path $PSScriptRoot 'Get-NeuralLightingData.ps1') -RepoRoot $RepoRoot
+if ($lighting.hasCandidates) {
+    Write-Host "[lighting] $($lighting.detail)" -ForegroundColor DarkGray
+} else {
+    Write-Warning $lighting.detail
+}
+
 $runtimeFiles = @(
     'sl.interposer.dll',
     'sl.common.dll',

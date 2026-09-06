@@ -88,6 +88,9 @@ if ($retailCandidates.Count -gt 0) {
     Add-Check 'Doom 3 BFG data' 'MISSING' 'No retail resource files detected. Run 03-COPY-GAME-DATA.cmd before launching.' ($RequireGameData.IsPresent)
 }
 
+$lighting = & (Join-Path $PSScriptRoot 'Get-NeuralLightingData.ps1') -RepoRoot $RepoRoot
+Add-Check 'Map lighting data' $(if ($lighting.hasCandidates) { 'INFO' } else { 'WARN' }) $lighting.detail $false
+
 $missingSubmodules = [System.Collections.Generic.List[string]]::new()
 $submoduleCount = 0
 $gitModuleFiles = @(Get-ChildItem -LiteralPath $RepoRoot -Filter '.gitmodules' -File -Recurse -Force -ErrorAction SilentlyContinue)

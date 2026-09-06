@@ -597,3 +597,98 @@ startup/resource/content warnings. Probe-lighting quality is therefore not a
 validated baseline. Bridge/NR appearance, HDR calibration, motion artifacts and
 other maps remain outside this timing task. Next: audit missing probe loading and
 fallbacks, then add two representative fixed-camera lighting scenarios.
+
+## 2026-09-06 - Probe lighting repair and native ray-tracing readiness
+
+Checkpoint: `codex/probe-lighting`, based on `5ca342cf`; next working branch
+`codex/rt-foundation`. This implements diagnostics and an empty-grid loading fix,
+not a ray-tracing pass. See `PROBE_LIGHTING.md` and `RAY_TRACING_PLAN.md`.
+
+### Changes and content provenance
+
+- `RenderWorld_envprobes.cpp::probeLightingStatus`: on-demand world/probe/grid
+  counts and current view selection, including defaulted images and positive-weight
+  fallback slots. No textures are allocated or reloaded by the command.
+- `RenderWorld_lightgrid.cpp::LoadLightGridImages`: use the baker's existing
+  `CountValidGridPoints() == 0` condition to skip nonexistent atlases for empty
+  areas. Leave their image pointers null for the existing frontend probe fallback.
+  Missing images in populated areas still take the normal warning/fallback path.
+- `RenderSystem_init.cpp::R_RayTracingStatus_f/R_InitCommands`: read-only NVRHI
+  acceleration-structure, pipeline and inline-query capability report, explicitly
+  separate from `sceneImplemented=0`.
+- `Test-NeuralDoom-Smoke.ps1`: record these diagnostics, assert the expected loaded
+  map and optional Local/Fallback probe state. `Get-NeuralLightingData.ps1`, setup
+  and prerequisites report absent lighting candidates without claiming that a
+  filename inventory proves map coverage.
+- No shader, texture format, coordinate convention, default lighting cvar or SDK
+  dependency changed. Loaded bake formats remain the existing HDR probe/BC6 path.
+- The official v1.6.0 lighting pack was extracted alone and installed locally.
+  All 12,244 ZIP entries passed CRC checks and path/type inspection. Its 12,150
+  images include all 196 exact missing Mars City 2 probe names, plus light grids.
+  Archive/pack SHA-256 fingerprints are recorded in `PROBE_LIGHTING.md`. Nothing
+  from the release's executables/shaders or retail/runtime payloads was staged in Git.
+
+### Builds and runtime
+
+Configured both existing DX12 build trees with `Configure-RBDOOM-DX12.ps1`, then
+built `RelWithDebInfo` using `Build-RBDOOM.ps1 -BuildDirectory build` and
+`-BuildDirectory build-streamline`: PASS. SDK remains OFF in the default build.
+Final tested executable SHA-256:
+
+- SDK-OFF: `17C1A71291521C04AC4E05422EBF66262B734605DDA7006A3BC4085FBB82687E`.
+- SDK-ON: `18AA22E824ECE548174C4885B73A99023E7AE52DDCD8CC74E602AA27A9BD3A0F`.
+
+Runtime manifests retain the parent commit and dirty=true while these changes
+were under validation. Final synchronization refreshes manifests and checks that
+committing did not substitute a different executable. The root launcher executable
+was not replaced.
+
+All artifact directories below are under the game checkout's ignored
+`captures/neural`. Runs use `game/mars_city2`, SDR, bridge disabled, isolated configs,
+600 warmup frames and existing fixed-tick GPU profiling. No user playtest was needed.
+
+| Artifact | Scenario | Evidence |
+|---|---|---|
+| `smoke-20260906-135818-d546a429` | Initial diagnostic, Native 2560x720, missing pack | PASS; 98 probes, zero ready pairs, 196 defaulted textures; loaded placeholders are not real bakes |
+| `smoke-20260906-140042-e1fb87ec` | Added grid diagnostic, Native 2560x720, missing pack | PASS Fallback assertion; no grid images; 392 repeated probe-image warning lines represent 196 unique images |
+| `smoke-20260906-140416-c551e2de` | Pack restored, before empty-grid loader fix, Native 2560x720 | PASS Local assertion; 98 pairs and 93 grids load; 22 repeated warning lines for 11 empty grids identify the loader mismatch |
+| `smoke-20260906-140826-6b790263` | Final SDK-OFF Native 2560x720, 64 GPU samples | PASS; 98 pairs, 93 grids, 11 empty areas, zero defaulted/populated-missing images and zero lighting-image warnings |
+| `smoke-20260906-140851-72659aec` | Final SDK-OFF Native 4800x1350, 300 GPU samples | PASS; same lighting coverage; median GPU 1.569296 ms, p95 1.588288 ms |
+| `smoke-20260906-140922-522c1817` | Final SDK-ON DLAA 4800x1350, 300 GPU samples | PASS; same lighting coverage; evaluated/presented with zero rejection; median GPU 2.021728 ms, p95 2.044736 ms |
+
+Every completed scenario passed primary-view progress, history reset, expected
+backend state and screenshot dimensions. Startup `probeLightingStatus` safely
+reported `world=0`. The final selected view has local diffuse and two local
+specular slots; its remaining default slot has zero blend weight. The script
+checks active fallback contribution rather than mistaking an unused slot for a
+missing bake.
+
+All six final PNGs passed chunk CRC, full pixel-stream decompression, dimensions
+and scanline-filter validation. The 2560x720 missing-pack, restored-pack and final
+captures were visually inspected: recognizable geometry, lighting, weapon and HUD,
+with changed ambient/reflection shading after pack restoration. This is one still
+view, not motion/ghosting acceptance or a claim about every map's appearance.
+The 4800x1350 captures received structural validation; no full-size perceptual
+DLAA comparison is claimed. Timing is one scene, not FPS or a broad performance
+gain. The smaller missing-pack run has the previously observed clock-sensitive
+GPU timing behavior and is not suitable for a before/after speedup claim.
+
+### RTX readiness and focused review
+
+The actual DX12 device reports acceleration structures, ray-tracing pipelines and
+inline ray queries supported on RTX 5090 / NVIDIA 610.47. Windows SDK 10.0.26100.0
+DXC compiled an isolated `RayQuery` compute shader using `-T cs_6_5 -E main -WX
+-Zpr` (3,532-byte DXIL, local ignored artifact). This is capability/compiler proof
+only; no acceleration structure or ray dispatch was implemented or tested.
+
+Focused review covered game-thread synchronization, null/no-world diagnostics,
+loaded-versus-defaulted reporting, zero-weight specular fallback, zero-point and
+invalid-only grids, preserved missing-valid-grid warnings, no per-frame scanning,
+and unchanged SDK-OFF/backend paths. The parser was exercised against actual
+missing and restored data; inventory reported both absence and presence correctly.
+PowerShell syntax/build-identity checks and whitespace/source audits pass.
+
+Next: RT-001's OFF-by-default synthetic-triangle hit/miss readback and static-map
+scene audit. Broader map/mod compatibility, moving lighting, denoiser selection and
+real HDR display calibration remain separate work. No path-tracing image-quality
+or frame-rate claim is established by this checkpoint.

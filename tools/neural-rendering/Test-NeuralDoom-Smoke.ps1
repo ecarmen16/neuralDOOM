@@ -20,6 +20,7 @@ param(
     [switch]$GpuProfile,
     [ValidateSet('Baseline', 'NoSSAO', 'NoSSR', 'Shadow4')][string]$LightingVariant = 'Baseline',
     [ValidateRange(180, 3600)][int]$WarmupFrames = 180,
+    [ValidateSet('Any', 'Local', 'Fallback')][string]$ExpectedProbeLighting = 'Any',
     [switch]$PassThru
 )
 
@@ -56,6 +57,10 @@ $result.lightingVariant = $LightingVariant
 $result.warmupFrames = $WarmupFrames
 $result.gpuProfile = $null
 $result.fixedTicProfiling = [bool]$GpuProfile
+$result.expectedProbeLighting = $ExpectedProbeLighting
+$result.probeLighting = $null
+$result.lightGrid = $null
+$result.rayTracingCapabilities = $null
 if (-not $GpuProfile -and $LightingVariant -ne 'Baseline') { throw 'Lighting variants require -GpuProfile.' }
 $process = $null
 try {
@@ -101,14 +106,14 @@ try {
             "set r_useSSR $([int]($LightingVariant -ne 'NoSSR'))",
             "set r_shadowMapSamples $(if ($LightingVariant -eq 'Shadow4') { 4 } else { 16 })")
     }
-    $scriptLines += @('devmap game/mars_city2', "wait $WarmupFrames", 'hdrStatus', 'neuralHistoryStatus', 'neuralBackendStatus', 'screenshot screenshots/before.png')
+    $scriptLines += @('rayTracingStatus', 'probeLightingStatus', 'devmap game/mars_city2', "wait $WarmupFrames", 'hdrStatus', 'neuralHistoryStatus', 'neuralBackendStatus', 'probeLightingStatus', 'screenshot screenshots/before.png')
     if ($GpuProfile) {
         # Let the screenshot stall and its queued frames drain before requesting samples.
         $scriptLines += @('wait 30', "set r_gpuProfileFrames $Frames", "wait $($Frames + 60)")
     } else {
         $scriptLines += "wait $Frames"
     }
-    $scriptLines += @('neuralHistoryStatus', 'neuralBackendStatus',
+    $scriptLines += @('neuralHistoryStatus', 'neuralBackendStatus', 'probeLightingStatus',
         'neuralHistoryReset', 'wait 30', 'neuralHistoryStatus',
         'hdrStatus', 'screenshot screenshots/after.png'
     )
@@ -142,6 +147,45 @@ try {
     $log = Get-Content -LiteralPath (Join-Path $saveBase.FullName 'smoke.log') -Raw
     if ($log -notmatch 'NEURAL_SMOKE_COMPLETE') { throw 'Gameplay script did not complete.' }
     if ($log -match '(?im)FATAL ERROR|D3D12 device removed|Unknown command') { throw 'Engine log contains fatal/device/command errors.' }
+    $probes = [regex]::Matches($log, 'PROBE_LIGHTING world=1 map=(\S+) probes=(\d+) irradianceReady=(\d+) radianceReady=(\d+) complete=(\d+) defaulted=(\d+) unloaded=(\d+)')
+    $selections = [regex]::Matches($log, 'PROBE_SELECTION valid=1 area=(-?\d+) diffuseFallback=(\d) specularFallbacks=(\d) activeSpecularFallbacks=(\d)')
+    if ($probes.Count -lt 2 -or $selections.Count -lt 2) { throw 'Missing gameplay probe-lighting diagnostics.' }
+    $probeStates = @()
+    # The startup diagnostic may report a menu world; validate the two gameplay samples.
+    for ($i = 2; $i -ge 1; $i--) {
+        $sample = $probes[$probes.Count - $i]; $selection = $selections[$selections.Count - $i]
+        $state = [pscustomobject]@{
+            map = $sample.Groups[1].Value; probes = [int]$sample.Groups[2].Value
+            irradianceReady = [int]$sample.Groups[3].Value; radianceReady = [int]$sample.Groups[4].Value
+            complete = [int]$sample.Groups[5].Value; defaulted = [int]$sample.Groups[6].Value; unloaded = [int]$sample.Groups[7].Value
+            area = [int]$selection.Groups[1].Value; diffuseFallback = [int]$selection.Groups[2].Value
+            specularFallbacks = [int]$selection.Groups[3].Value; activeSpecularFallbacks = [int]$selection.Groups[4].Value
+        }
+        $probeStates += $state
+        $result.probeLighting = $probeStates
+        if ($state.map -notmatch '^maps/game/mars_city2(?:\.map)?$' -or $state.probes -le 0 -or $state.area -lt 0) { throw 'Probe diagnostics did not describe the expected gameplay world.' }
+        if ($ExpectedProbeLighting -eq 'Local' -and ($state.complete -ne $state.probes -or $state.defaulted -ne 0 -or $state.unloaded -ne 0 -or $state.diffuseFallback -ne 0 -or $state.activeSpecularFallbacks -ne 0)) {
+            throw 'Expected complete map lighting bakes and a local probe selection.'
+        }
+        if ($ExpectedProbeLighting -eq 'Fallback' -and ($state.irradianceReady -ne 0 -or $state.radianceReady -ne 0 -or $state.diffuseFallback -ne 1 -or $state.specularFallbacks -ne 3 -or $state.activeSpecularFallbacks -lt 1)) {
+            throw 'Expected missing map lighting bakes and the built-in lighting fallback.'
+        }
+    }
+    $grid = [regex]::Matches($log, 'LIGHT_GRID enabled=([01]) areas=(\d+) ready=(\d+) defaulted=(\d+) unloaded=(\d+) empty=(\d+)')
+    if ($grid.Count -lt 2) { throw 'Missing light-grid diagnostic.' }
+    $lastGrid = $grid[$grid.Count - 1]
+    $result.lightGrid = [pscustomobject]@{
+        enabled = $lastGrid.Groups[1].Value -eq '1'; areas = [int]$lastGrid.Groups[2].Value
+        ready = [int]$lastGrid.Groups[3].Value; defaulted = [int]$lastGrid.Groups[4].Value; unloaded = [int]$lastGrid.Groups[5].Value
+        emptyAreas = [int]$lastGrid.Groups[6].Value
+    }
+    $rt = [regex]::Match($log, 'RAY_TRACING_STATUS device=1 api=(\w+) accelStruct=([01]) pipeline=([01]) rayQuery=([01]) sceneImplemented=([01])')
+    if (-not $rt.Success) { throw 'Missing ray-tracing capability diagnostic.' }
+    $result.rayTracingCapabilities = [pscustomobject]@{
+        api = $rt.Groups[1].Value; accelerationStructures = $rt.Groups[2].Value -eq '1'
+        pipelines = $rt.Groups[3].Value -eq '1'; inlineRayQueries = $rt.Groups[4].Value -eq '1'
+        sceneImplemented = $rt.Groups[5].Value -eq '1'
+    }
     if ($GpuProfile) {
         if ($log -notmatch "GPU_PROFILE_COMPLETE samples=$Frames file=gpu_profile.csv") { throw 'GPU profile did not complete.' }
         $result.gpuProfile = & (Join-Path $PSScriptRoot 'Measure-NeuralGpuProfile.ps1') -Path (Join-Path $saveBase.FullName 'gpu_profile.csv') -ExpectedSamples $Frames -Width $Width -Height $Height

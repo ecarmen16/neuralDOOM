@@ -46,6 +46,8 @@ DUDE is valuable as a comparative reference for temporal-input design, but using
 
 ## 3. Scope boundaries
 
+2026-09-06 scope extension: the user requested RTX/path-tracing investigation after the baseline, temporal, SDK and modernization work. [RAY_TRACING_PLAN.md](RAY_TRACING_PLAN.md) defines the next staged native-rendering track. The initial exclusions below remain the historical starting scope; the existing validation and dependency gates still apply.
+
 ### In scope
 
 - Reproducible Windows build and launch workflow.

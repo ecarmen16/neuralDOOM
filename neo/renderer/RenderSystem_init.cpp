@@ -1593,6 +1593,27 @@ void R_SetColorMappings()
 
 /*
 ================
+R_RayTracingStatus_f
+================
+*/
+static void R_RayTracingStatus_f( const idCmdArgs& args )
+{
+	nvrhi::IDevice* device = deviceManager ? deviceManager->GetDevice() : nullptr;
+	if( !device )
+	{
+		common->Printf( "RAY_TRACING_STATUS device=0 sceneImplemented=0\n" );
+		return;
+	}
+	common->Printf( "RAY_TRACING_STATUS device=1 api=%s accelStruct=%d pipeline=%d rayQuery=%d sceneImplemented=0\n",
+		device->getGraphicsAPI() == nvrhi::GraphicsAPI::D3D12 ? "dx12" : "vulkan",
+		device->queryFeatureSupport( nvrhi::Feature::RayTracingAccelStruct ),
+		device->queryFeatureSupport( nvrhi::Feature::RayTracingPipeline ),
+		device->queryFeatureSupport( nvrhi::Feature::RayQuery ) );
+	common->Printf( "Hardware/API capabilities only; no scene ray-tracing pass is implemented.\n" );
+}
+
+/*
+================
 GfxInfo_f
 ================
 */
@@ -1783,6 +1804,7 @@ void R_InitCommands()
 	cmdSystem->AddCommand( "envToSky", R_TransformEnvToSkybox_f, CMD_FL_RENDERER | CMD_FL_CHEAT, "transforms environment textures to sky box textures" );
 	cmdSystem->AddCommand( "skyToEnv", R_TransformSkyboxToEnv_f, CMD_FL_RENDERER | CMD_FL_CHEAT, "transforms sky box textures to environment textures" );
 	cmdSystem->AddCommand( "gfxInfo", GfxInfo_f, CMD_FL_RENDERER, "show graphics info" );
+	cmdSystem->AddCommand( "rayTracingStatus", R_RayTracingStatus_f, CMD_FL_RENDERER, "report ray-tracing API capabilities separately from implementation status" );
 	cmdSystem->AddCommand( "modulateLights", R_ModulateLights_f, CMD_FL_RENDERER | CMD_FL_CHEAT, "modifies shader parms on all lights" );
 	cmdSystem->AddCommand( "testImage", R_TestImage_f, CMD_FL_RENDERER | CMD_FL_CHEAT, "displays the given image centered on screen", idCmdSystem::ArgCompletion_ImageName );
 	cmdSystem->AddCommand( "testVideo", R_TestVideo_f, CMD_FL_RENDERER | CMD_FL_CHEAT, "displays the given cinematic", idCmdSystem::ArgCompletion_VideoName );

@@ -6,7 +6,7 @@ Statuses: `BLOCKED`, `READY`, `IN PROGRESS`, `VERIFY`, `DONE`, `DEFERRED`.
 
 ### Modernization implementation / 2026-09-06
 
-Current branch: `codex/lighting-diagnostics`. See [LIGHTING_BASELINE.md](LIGHTING_BASELINE.md) for unattended GPU measurements and the next probe-lighting audit; [NATIVE_HDR.md](NATIVE_HDR.md) retains the HDR implementation and validation boundary.
+Working branch: `codex/rt-foundation`, prepared from the completed `codex/probe-lighting` checkpoint. See [PROBE_LIGHTING.md](PROBE_LIGHTING.md) for the lighting-pack investigation and empty-grid fix, and [RAY_TRACING_PLAN.md](RAY_TRACING_PLAN.md) for the next implementation gates. [LIGHTING_BASELINE.md](LIGHTING_BASELINE.md) retains the earlier missing-pack GPU measurements; [NATIVE_HDR.md](NATIVE_HDR.md) retains the HDR implementation and validation boundary.
 
 | ID | Status | Task | Exit evidence |
 |---|---|---|---|
@@ -16,6 +16,9 @@ Current branch: `codex/lighting-diagnostics`. See [LIGHTING_BASELINE.md](LIGHTIN
 | ND3-660A | VERIFY | HUD layout, size and menu controls | Menu changes, archive persistence, relaunch and resolution changes tested; broader notification/combat HUD states remain |
 | ND3-660B | VERIFY | Native scRGB presentation, HDR tone mapping and calibration controls | SDK-OFF/ON builds; GPU composition/presentation diagnostics and resize checks; Windows HDR is off so actual HDR display review remains |
 | ND3-660C | DONE | Opt-in GPU timing export and unattended lighting baseline | Eight Native ultrawide variant runs, two DLAA baseline runs, disabled/lifecycle/CSV validation; missing probes and further scene coverage remain follow-up |
+| ND3-660D | DONE | Restore local lighting data and audit probe/grid readiness | SDK-OFF/ON builds and Native/DLAA ultrawide checks pass; 98 complete probe pairs, 93 populated grids, 11 empty areas, zero lighting-image warnings; broader map/art review remains |
+| ND3-700 | DONE | Native RT/path-tracing reconnaissance and staged plan | Actual NVRHI capabilities queried on RTX 5090; isolated shader-model-6.5 compile passes; exact scene/material/compiler gaps documented |
+| RT-001 | READY | OFF-by-default ray intersection prototype and static-scene audit | Next: known-ray readbacks, behind-camera geometry, AS ownership/synchronization, unsupported and disabled fallback |
 
 See `UNATTENDED_WORKFLOW.md` for the implemented controls and test commands, and the 2026-09-06 entry in `TEST_RESULTS.md` for exact evidence and failures.
 

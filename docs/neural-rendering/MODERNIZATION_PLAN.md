@@ -4,6 +4,8 @@ Reviewed 2026-09-06. This is the next implementation backlog, not a claim that t
 
 Implementation began later on 2026-09-06. See `UNATTENDED_WORKFLOW.md` and the dated implementation/test notes for delivered code and current evidence; the initial review below remains a historical snapshot.
 
+Later scope extension: the user requested native RTX/path tracing. [RAY_TRACING_PLAN.md](RAY_TRACING_PLAN.md) records actual GPU/compiler readiness and the staged scene, shadows, reflections, indirect-lighting and full-integrator work. [PROBE_LIGHTING.md](PROBE_LIGHTING.md) records the missing lighting-pack repair that establishes the reference for this work.
+
 ## Branch and baseline
 
 - Working branch: `codex/modernization-foundation`, created from `76ff35b5`.

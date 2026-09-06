@@ -424,6 +424,13 @@ void idRenderWorldLocal::LoadLightGridImages()
 	for( int i = 0; i < numPortalAreas; i++ )
 	{
 		portalArea_t* area = &portalAreas[i];
+		// The baker emits no atlas for areas without valid samples. Keep these
+		// areas on the existing probe fallback instead of loading a missing image.
+		if( area->lightGrid.CountValidGridPoints() == 0 )
+		{
+			area->lightGrid.irradianceImage = NULL;
+			continue;
+		}
 
 		if( !area->lightGrid.irradianceImage )
 		{

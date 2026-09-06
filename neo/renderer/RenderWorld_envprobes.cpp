@@ -921,6 +921,93 @@ void R_MakeAmbientMap( const char* baseName, byte* buffers[6], const char* suffi
 	}
 }
 
+CONSOLE_COMMAND_SHIP( probeLightingStatus, "Report loaded map probes and the selected lighting fallback", NULL )
+{
+	commonLocal.WaitGameThread();
+	if( !tr.primaryWorld )
+	{
+		common->Printf( "PROBE_LIGHTING world=0\n" );
+		return;
+	}
+
+	int probes = 0;
+	int irradianceReady = 0;
+	int radianceReady = 0;
+	int complete = 0;
+	int defaulted = 0;
+	int unloaded = 0;
+	for( int i = 0; i < tr.primaryWorld->envprobeDefs.Num(); i++ )
+	{
+		const RenderEnvprobeLocal* probe = tr.primaryWorld->envprobeDefs[i];
+		if( !probe )
+		{
+			continue;
+		}
+		probes++;
+		const idImage* images[2] = { probe->irradianceImage, probe->radianceImage };
+		bool ready[2] = { false, false };
+		for( int j = 0; j < 2; j++ )
+		{
+			// A successfully allocated default texture is not a loaded lighting bake.
+			const bool loaded = images[j] && images[j]->IsLoaded();
+			const bool fallback = images[j] && images[j]->IsDefaulted();
+			unloaded += !loaded;
+			defaulted += fallback;
+			ready[j] = loaded && !fallback;
+		}
+		irradianceReady += ready[0];
+		radianceReady += ready[1];
+		complete += ready[0] && ready[1];
+	}
+	common->Printf( "PROBE_LIGHTING world=1 map=%s probes=%d irradianceReady=%d radianceReady=%d complete=%d defaulted=%d unloaded=%d\n",
+		tr.primaryWorld->mapName.c_str(), probes, irradianceReady, radianceReady, complete, defaulted, unloaded );
+	int gridReady = 0;
+	int gridDefaulted = 0;
+	int gridUnloaded = 0;
+	int gridEmpty = 0;
+	for( int i = 0; i < tr.primaryWorld->numPortalAreas; i++ )
+	{
+		const LightGrid& grid = tr.primaryWorld->portalAreas[i].lightGrid;
+		if( grid.CountValidGridPoints() == 0 )
+		{
+			gridEmpty++;
+			continue;
+		}
+		const idImage* image = grid.GetIrradianceImage();
+		const bool loaded = image && image->IsLoaded();
+		const bool fallback = image && image->IsDefaulted();
+		gridReady += loaded && !fallback;
+		gridDefaulted += fallback;
+		gridUnloaded += !loaded;
+	}
+	// Per-surface light grids can supply diffuse lighting independently of the view probe.
+	common->Printf( "LIGHT_GRID enabled=%d areas=%d ready=%d defaulted=%d unloaded=%d empty=%d\n",
+		r_useLightGrid.GetBool(), tr.primaryWorld->numPortalAreas, gridReady, gridDefaulted, gridUnloaded, gridEmpty );
+
+	const viewDef_t* view = tr.primaryView;
+	if( !view || view->renderWorld != tr.primaryWorld || view->isSubview || !view->irradianceImage )
+	{
+		common->Printf( "PROBE_SELECTION valid=0\n" );
+		return;
+	}
+	int specularFallbacks = 0;
+	int activeSpecularFallbacks = 0;
+	for( int i = 0; i < 3; i++ )
+	{
+		const bool fallback = view->radianceImages[i] == globalImages->defaultUACRadianceCube;
+		specularFallbacks += fallback;
+		activeSpecularFallbacks += fallback && view->radianceImageBlends[i] > 0.0f;
+	}
+	common->Printf( "PROBE_SELECTION valid=1 area=%d diffuseFallback=%d specularFallbacks=%d activeSpecularFallbacks=%d\n",
+		view->areaNum, view->irradianceImage == globalImages->defaultUACIrradianceCube, specularFallbacks, activeSpecularFallbacks );
+	common->Printf( "Probe irradiance: %s\n", view->irradianceImage->GetName() );
+	for( int i = 0; i < 3; i++ )
+	{
+		common->Printf( "Probe radiance[%d]: weight=%.6f image=%s\n", i, view->radianceImageBlends[i],
+			view->radianceImages[i] ? view->radianceImages[i]->GetName() : "<none>" );
+	}
+}
+
 CONSOLE_COMMAND_SHIP( bakeEnvironmentProbes, "Bake environment probes", NULL )
 {
 	idStr			fullname;
