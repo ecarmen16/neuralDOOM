@@ -23,6 +23,7 @@ param(
     [ValidateSet('Any', 'Local', 'Fallback')][string]$ExpectedProbeLighting = 'Any',
     [ValidateSet('None', 'BuildDisabled', 'Synthetic', 'Scene', 'MissingShader')][string]$RayTracingDiagnostics = 'None',
     [ValidateRange(0, 2)][int]$ValidationLayers = 1,
+    [switch]$RayTracedAO,
     [switch]$PassThru
 )
 
@@ -65,6 +66,9 @@ $result.lightGrid = $null
 $result.rayTracingCapabilities = $null
 $result.rayTracingDiagnostics = $RayTracingDiagnostics
 $result.validationLayers = $ValidationLayers
+$result.rayTracedAO = [bool]$RayTracedAO
+$result.rayTracedAOStatus = @()
+if ($RayTracedAO -and ($manifest.features.rayTracing -ne 'ON' -or $LightingVariant -eq 'NoSSAO')) { throw 'RTAO requires a ray-tracing build with SSAO enabled.' }
 if (-not $GpuProfile -and $LightingVariant -ne 'Baseline') { throw 'Lighting variants require -GpuProfile.' }
 $process = $null
 try {
@@ -97,10 +101,11 @@ try {
     $culture = [Globalization.CultureInfo]::InvariantCulture
     $scriptLines = @(
         "set r_neuralBackend $backend", "set r_hdrDiagnostic $([int][bool]$HDRDiagnostic)", 'set r_screenFraction 100', "set r_renderMode $LegacyRenderMode",
-        'set r_useTemporalAA 1', 'set r_antiAliasing 2',
+        'set r_useTemporalAA 1', 'set r_antiAliasing 2', "set r_rayTracedAO $([int][bool]$RayTracedAO)",
         ('set swf_hudScale ' + $HudScale.ToString($culture)),
         ('set swf_hudMaxAspect ' + $HudMaxAspect.ToString($culture))
     )
+    if ($RayTracedAO) { $scriptLines += @('set r_useSSAO 1', 'set r_useNewSSAOPass 1') }
     if ($GpuProfile) {
         # Bypass the background 15-Hz sleep using the engine's existing debug mode.
         # One simulation tick per render frame is a throughput workload, not normal play.
@@ -125,7 +130,7 @@ try {
     $scriptLines += @('devmap game/mars_city2', "wait $WarmupFrames")
     if ($RayTracingDiagnostics -in @('Synthetic', 'Scene')) { $scriptLines += 'rayTracingTest' }
     if ($RayTracingDiagnostics -eq 'Scene') { $scriptLines += @('rayTracingScene', 'rayTracingTest') }
-    $scriptLines += @('hdrStatus', 'neuralHistoryStatus', 'neuralBackendStatus', 'probeLightingStatus', 'screenshot screenshots/before.png')
+    $scriptLines += @('rayTracingAOStatus', 'hdrStatus', 'neuralHistoryStatus', 'neuralBackendStatus', 'probeLightingStatus', 'screenshot screenshots/before.png')
     if ($GpuProfile) {
         # Let the screenshot stall and its queued frames drain before requesting samples.
         $scriptLines += @('wait 30', "set r_gpuProfileFrames $Frames", "wait $($Frames + 60)")
@@ -136,10 +141,15 @@ try {
         'neuralHistoryReset', 'wait 30', 'neuralHistoryStatus',
         'hdrStatus', 'screenshot screenshots/after.png'
     )
+    # Capture live rollback before resizing, retaining comparable image dimensions.
+    if ($RayTracedAO) {
+        $scriptLines += @('rayTracingAOStatus', 'set r_rayTracedAO 0', 'wait 30', 'rayTracingAOStatus',
+            'screenshot screenshots/rt_off.png', 'set r_rayTracedAO 1', 'wait 30')
+    }
     if ($ResizeWidth -gt 0) {
         $scriptLines += @("set r_windowWidth $ResizeWidth", "set r_windowHeight $ResizeHeight", 'vid_restart', 'wait 90', 'hdrStatus', 'neuralHistoryStatus', 'screenshot screenshots/resized.png')
     }
-    $scriptLines += @('echo NEURAL_SMOKE_COMPLETE', 'quit')
+    $scriptLines += @('rayTracingAOStatus', 'echo NEURAL_SMOKE_COMPLETE', 'quit')
     $scriptLines | Set-Content -LiteralPath (Join-Path $saveBase.FullName 'neural_smoke.cfg') -Encoding ASCII
     # Values are scalar/validated; quote filesystem paths explicitly for Windows argv.
     # Win32 stores the command line in MAX_STRING_CHARS (1024 bytes).
@@ -167,6 +177,22 @@ try {
     $log = Get-Content -LiteralPath (Join-Path $saveBase.FullName 'smoke.log') -Raw
     if ($log -notmatch 'NEURAL_SMOKE_COMPLETE') { throw 'Gameplay script did not complete.' }
     if ($log -match '(?im)FATAL ERROR|D3D12 device removed|Unknown command') { throw 'Engine log contains fatal/device/command errors.' }
+    $aoSamples = [regex]::Matches($log, 'RTAO_STATUS active=([01]) frames=(\d+) samples=(\d+) matched=(\d+) occluded=(\d+)')
+    $result.rayTracedAOStatus = @($aoSamples | ForEach-Object {
+        [pscustomobject]@{ active = $_.Groups[1].Value -eq '1'; frames = [int]$_.Groups[2].Value;
+            samples = [int]$_.Groups[3].Value; matched = [int]$_.Groups[4].Value; occluded = [int]$_.Groups[5].Value }
+    })
+    $ao = $result.rayTracedAOStatus
+    if ($RayTracedAO) {
+        if ($ao.Count -ne 4 -or -not $ao[0].active -or -not $ao[1].active -or $ao[2].active -or -not $ao[3].active -or
+            $ao[1].frames -le $ao[0].frames -or $ao[3].frames -le $ao[2].frames -or
+            $ao[2].frames -gt $ao[1].frames + 3 -or $ao[1].matched -le 0 -or $ao[1].occluded -le 0 -or
+            $ao[3].matched -le 0 -or $ao[3].occluded -le 0) {
+            throw 'Ray-traced AO did not shade static receivers, stop on disable, or resume after enable/resize.'
+        }
+    } elseif ($ao.Count -ne 2 -or ($ao | Where-Object { $_.active -or $_.frames -ne 0 }).Count -gt 0) {
+        throw 'Disabled AO unexpectedly allocated or dispatched gameplay rays.'
+    }
     if ($RayTracingDiagnostics -eq 'BuildDisabled') {
         if ($log -notmatch 'RT_TEST status=SKIP reason=build-disabled' -or $log -notmatch 'RT_SCENE status=SKIP reason=build-disabled' -or $log -match 'RT_BUILD|RT_TRACE') { throw 'Disabled RT build did not preserve the no-work path.' }
     } elseif ($RayTracingDiagnostics -eq 'MissingShader') {
@@ -256,6 +282,7 @@ try {
     if ($DisplayOutput -eq 'AutoHDR' -and $log -match 'transport=scRGB-FP16' -and $presented.Count -lt 2) { throw 'Missing scRGB presentation readback.' }
     if ($ResizeWidth -gt 0 -and ($history.Count -lt 4 -or [long]$history[3].Groups[1].Value -le [long]$history[2].Groups[1].Value)) { throw 'Resize did not advance history epoch.' }
     $names = @('before', 'after')
+    if ($RayTracedAO) { $names += 'rt_off' }
     if ($ResizeWidth -gt 0) { $names += 'resized' }
     foreach ($name in $names) {
         $capture = Join-Path $saveBase.FullName "screenshots/$name.png"

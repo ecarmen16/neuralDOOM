@@ -1610,11 +1610,11 @@ static void R_RayTracingStatus_f( const idCmdArgs& args )
 		device->queryFeatureSupport( nvrhi::Feature::RayTracingPipeline ),
 		device->queryFeatureSupport( nvrhi::Feature::RayQuery ) );
 #if defined( USE_RAYTRACING )
-	common->Printf( "Native RT diagnostics: compiled=1; explicit console commands only.\n" );
+	common->Printf( "Native RT: compiled=1; optional static-world AO via r_rayTracedAO 1.\n" );
 #else
 	common->Printf( "Native RT diagnostics: compiled=0.\n" );
 #endif
-	common->Printf( "No gameplay ray-traced lighting pass is implemented.\n" );
+	common->Printf( "Full dynamic ray scene, direct-light shadows and path tracing are not implemented.\n" );
 }
 
 /*
@@ -2449,6 +2449,7 @@ idRenderSystemLocal::Shutdown
 void idRenderSystemLocal::Shutdown()
 {
 	common->Printf( "idRenderSystem::Shutdown()\n" );
+	R_ClearRayTracedAO();
 
 	fonts.DeleteContents();
 
@@ -2522,6 +2523,7 @@ idRenderSystemLocal::BeginLevelLoad
 */
 void idRenderSystemLocal::BeginLevelLoad()
 {
+	R_ClearRayTracedAO();
 	RequestTemporalHistoryReset( NTRR_LEVEL_LOAD );
 
 	// clear binding sets for previous level images and light data #676

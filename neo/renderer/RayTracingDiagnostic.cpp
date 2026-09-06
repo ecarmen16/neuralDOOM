@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// On-demand native ray-intersection diagnostics. Gameplay rendering is unchanged.
+// Native ray-intersection diagnostics and opt-in static-world ambient occlusion.
 #include "precompiled.h"
 #pragma hdrstop
 
@@ -10,6 +10,9 @@
 #include <vector>
 
 extern DeviceManager* deviceManager;
+
+idCVar r_rayTracedAO( "r_rayTracedAO", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Experimental native ray-traced AO for static opaque world surfaces; requires USE_RAYTRACING and new SSAO" );
+static idCVar r_rayTracedAORadius( "r_rayTracedAORadius", "64", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Ray-traced AO radius in Doom world units", 1, 256 );
 
 #if defined( USE_RAYTRACING )
 
@@ -62,8 +65,8 @@ static nvrhi::IDevice* DiagnosticDevice( const char* command )
 	return device;
 }
 
-// All resources belong to this diagnostic invocation, including immutable copies
-// of map vertices. The graphics queue completes before readback or destruction.
+// Own immutable geometry copies and acceleration structures. Diagnostics use
+// this per invocation; gameplay AO retains it until the world is unloaded.
 // Automatic NVRHI barriers order upload, BLAS, TLAS, tracing and readback.
 class RayQueryDiagnostic
 {
@@ -90,12 +93,14 @@ public:
 		nvrhi::BufferDesc vertexDesc;
 		vertexDesc.byteSize = positions.size() * sizeof( idVec3 );
 		vertexDesc.isAccelStructBuildInput = true;
+		vertexDesc.structStride = sizeof( idVec3 );
 		vertexDesc.initialState = nvrhi::ResourceStates::CopyDest;
 		vertexDesc.keepInitialState = true;
 		vertexDesc.debugName = "RT diagnostic positions";
 		vertices = device->createBuffer( vertexDesc );
 		nvrhi::BufferDesc indexDesc = vertexDesc;
 		indexDesc.byteSize = indices.size() * sizeof( uint32 );
+		indexDesc.structStride = sizeof( uint32 );
 		indexDesc.debugName = "RT diagnostic indices";
 		indexBuffer = device->createBuffer( indexDesc );
 		if( !vertices || !indexBuffer ) { return false; }
@@ -136,7 +141,10 @@ public:
 		pipeline = device->createComputePipeline( pipelineDesc );
 		if( !pipeline ) { return false; }
 
-		nvrhi::CommandListHandle list = device->createCommandList();
+		// This scene can initialize while the renderer's immediate list is open.
+		nvrhi::CommandListParameters listParams;
+		listParams.enableImmediateExecution = false;
+		nvrhi::CommandListHandle list = device->createCommandList( listParams );
 		nvrhi::TimerQueryHandle timer = device->createTimerQuery();
 		if( !list || !timer ) { return false; }
 		list->open();
@@ -228,6 +236,11 @@ public:
 			device->getTimerQueryTime( timer ) * 1000.0 );
 		return true;
 	}
+
+public:
+	nvrhi::rt::IAccelStruct* Scene() const { return tlas; }
+	nvrhi::IBuffer* Positions() const { return vertices; }
+	nvrhi::IBuffer* Indices() const { return indexBuffer; }
 
 private:
 	nvrhi::IDevice* device;
@@ -335,21 +348,11 @@ static float ReferenceDistance( const rtRay_t& ray, const std::vector<idVec3>& p
 	return hit ? closest : -1;
 }
 
-static void TestStaticWorld()
+static bool GatherStaticWorld( const idRenderWorldLocal* world, std::vector<idVec3>& positions, std::vector<uint32>& indices, int& models, int& surfaces, int& excluded )
 {
-	nvrhi::IDevice* device = DiagnosticDevice( "RT_SCENE" );
-	if( !device ) { return; }
-	if( !tr.primaryWorld || !tr.primaryView || tr.primaryView->renderWorld != tr.primaryWorld )
+	for( int m = 0; m < world->localModels.Num(); m++ )
 	{
-		common->Printf( "RT_SCENE status=SKIP reason=no-world\n" );
-		return;
-	}
-	std::vector<idVec3> positions;
-	std::vector<uint32> indices;
-	int models = 0, surfaces = 0, excluded = 0;
-	for( int m = 0; m < tr.primaryWorld->localModels.Num(); m++ )
-	{
-		const idRenderModel* model = tr.primaryWorld->localModels[m];
+		const idRenderModel* model = world->localModels[m];
 		if( !model || !model->IsStaticWorldModel() ) { continue; }
 		models++;
 		for( int s = 0; s < model->NumSurfaces(); s++ )
@@ -368,7 +371,7 @@ static void TestStaticWorld()
 				positions.size() + tri->numVerts > 2000000 || indices.size() + tri->numIndexes > 6000000 )
 			{
 				common->Printf( "RT_SCENE status=FAIL reason=invalid-or-oversized-geometry\n" );
-				return;
+				return false;
 			}
 			uint32 offset = static_cast<uint32>( positions.size() );
 			for( int v = 0; v < tri->numVerts; v++ )
@@ -377,7 +380,7 @@ static void TestStaticWorld()
 				if( !std::isfinite( point.x ) || !std::isfinite( point.y ) || !std::isfinite( point.z ) )
 				{
 					common->Printf( "RT_SCENE status=FAIL reason=nonfinite-geometry\n" );
-					return;
+					return false;
 				}
 				positions.push_back( point );
 			}
@@ -386,7 +389,7 @@ static void TestStaticWorld()
 				if( static_cast<uint32>( tri->indexes[j] ) >= static_cast<uint32>( tri->numVerts ) )
 				{
 					common->Printf( "RT_SCENE status=FAIL reason=invalid-index\n" );
-					return;
+					return false;
 				}
 				indices.push_back( offset + tri->indexes[j] );
 			}
@@ -396,8 +399,24 @@ static void TestStaticWorld()
 	if( indices.empty() )
 	{
 		common->Printf( "RT_SCENE status=SKIP reason=no-static-opaque-geometry\n" );
+		return false;
+	}
+	return true;
+}
+
+static void TestStaticWorld()
+{
+	nvrhi::IDevice* device = DiagnosticDevice( "RT_SCENE" );
+	if( !device ) { return; }
+	if( !tr.primaryWorld || !tr.primaryView || tr.primaryView->renderWorld != tr.primaryWorld )
+	{
+		common->Printf( "RT_SCENE status=SKIP reason=no-world\n" );
 		return;
 	}
+	std::vector<idVec3> positions;
+	std::vector<uint32> indices;
+	int models = 0, surfaces = 0, excluded = 0;
+	if( !GatherStaticWorld( tr.primaryWorld, positions, indices, models, surfaces, excluded ) ) { return; }
 	const int width = 512, height = 256;
 	const renderView_t view = tr.primaryView->renderView;
 	std::vector<rtRay_t> rays;
@@ -455,8 +474,183 @@ static void TestStaticWorld()
 		static_cast<uint32>( indices.size() / 3 ), static_cast<uint32>( rays.size() ), hitCount, behindHits, mismatches, invalid );
 	common->Printf( "RT scene capture: screenshots/rt_static_world.png (static opaque world only; no gameplay lighting)\n" );
 }
+struct rtAOConstants_t
+{
+	idRenderMatrix clipToWorld;
+	idVec4 cameraRadius;
+	idVec4 viewport;
+};
+static_assert( sizeof( rtAOConstants_t ) == 96, "RT AO constants must match HLSL" );
+
+class RayTracedAO
+{
+public:
+	explicit RayTracedAO( nvrhi::IDevice* device ) : scene( device ), device( device ) {}
+	bool Initialize( const idRenderWorldLocal* world )
+	{
+		std::vector<idVec3> positions;
+		std::vector<uint32> indices;
+		int models = 0, surfaces = 0, excluded = 0;
+		if( !GatherStaticWorld( world, positions, indices, models, surfaces, excluded ) ) { return false; }
+		std::vector<nvrhi::rt::InstanceDesc> instances( 1 );
+		instances[0].setInstanceID( 7 ).setInstanceMask( 255 ).setFlags( nvrhi::rt::InstanceFlags::TriangleCullDisable );
+		if( !scene.Initialize( positions, indices, instances ) ) { return false; }
+		void* bytes = nullptr;
+		int size = fileSystem->ReadFile( "renderprogs2/dxil/rt/ambient_occlusion.cs.dxil", &bytes );
+		if( size <= 0 || !bytes )
+		{
+			if( bytes ) { fileSystem->FreeFile( bytes ); }
+			return false;
+		}
+		nvrhi::ShaderHandle shader = device->createShader( nvrhi::ShaderDesc( nvrhi::ShaderType::Compute ), bytes, size );
+		fileSystem->FreeFile( bytes );
+		if( !shader ) { return false; }
+		nvrhi::BindingLayoutDesc desc;
+		desc.visibility = nvrhi::ShaderType::Compute;
+		desc.bindings = { nvrhi::BindingLayoutItem::VolatileConstantBuffer( 0 ),
+			nvrhi::BindingLayoutItem::RayTracingAccelStruct( 0 ), nvrhi::BindingLayoutItem::Texture_SRV( 1 ),
+			nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 2 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 3 ),
+			nvrhi::BindingLayoutItem::Texture_UAV( 0 ), nvrhi::BindingLayoutItem::StructuredBuffer_UAV( 1 ) };
+		layout = device->createBindingLayout( desc );
+		if( !layout ) { return false; }
+		nvrhi::ComputePipelineDesc pipelineDesc;
+		pipelineDesc.CS = shader;
+		pipelineDesc.bindingLayouts = { layout };
+		pipeline = device->createComputePipeline( pipelineDesc );
+		nvrhi::BufferDesc cb;
+		cb.byteSize = sizeof( rtAOConstants_t );
+		cb.isConstantBuffer = true;
+		cb.isVolatile = true;
+		cb.maxVersions = 16;
+		cb.debugName = "Ray-traced AO constants";
+		constants = device->createBuffer( cb );
+		nvrhi::BufferDesc counters;
+		counters.byteSize = 16;
+		counters.structStride = 4;
+		counters.canHaveUAVs = true;
+		counters.initialState = nvrhi::ResourceStates::UnorderedAccess;
+		counters.keepInitialState = true;
+		counters.debugName = "Ray-traced AO sampled counters";
+		stats = device->createBuffer( counters );
+		return pipeline && constants && stats;
+	}
+
+	bool Render( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* output )
+	{
+		if( !bindingSet || boundDepth != depth || boundOutput != output )
+		{
+			nvrhi::BindingSetDesc desc;
+			desc.bindings = { nvrhi::BindingSetItem::ConstantBuffer( 0, constants ),
+				nvrhi::BindingSetItem::RayTracingAccelStruct( 0, scene.Scene() ), nvrhi::BindingSetItem::Texture_SRV( 1, depth ),
+				nvrhi::BindingSetItem::StructuredBuffer_SRV( 2, scene.Positions() ), nvrhi::BindingSetItem::StructuredBuffer_SRV( 3, scene.Indices() ),
+				nvrhi::BindingSetItem::Texture_UAV( 0, output ), nvrhi::BindingSetItem::StructuredBuffer_UAV( 1, stats ) };
+			bindingSet = device->createBindingSet( desc, layout );
+			if( !bindingSet ) { return false; }
+			boundDepth = depth;
+			boundOutput = output;
+		}
+		rtAOConstants_t data;
+		data.clipToWorld = view->unprojectionToWorldRenderMatrix;
+		data.cameraRadius = idVec4( view->renderView.vieworg.x, view->renderView.vieworg.y, view->renderView.vieworg.z, r_rayTracedAORadius.GetFloat() );
+		data.viewport = idVec4( view->viewport.x1, view->viewport.y1, view->viewport.GetWidth(), view->viewport.GetHeight() );
+		list->writeBuffer( constants, &data, sizeof( data ) );
+		list->clearBufferUInt( stats, 0 );
+		nvrhi::ComputeState state;
+		state.pipeline = pipeline;
+		state.bindings = { bindingSet };
+		list->beginMarker( "Ray-traced ambient occlusion" );
+		list->setComputeState( state );
+		list->dispatch( ( view->viewport.GetWidth() + 7 ) / 8, ( view->viewport.GetHeight() + 7 ) / 8, 1 );
+		list->endMarker();
+		frames++;
+		return true;
+	}
+
+	void PrintStatus()
+	{
+		nvrhi::BufferDesc desc;
+		desc.byteSize = 16;
+		desc.cpuAccess = nvrhi::CpuAccessMode::Read;
+		desc.initialState = nvrhi::ResourceStates::CopyDest;
+		desc.keepInitialState = true;
+		nvrhi::BufferHandle readback = device->createBuffer( desc );
+		// Keep explicit status readback independent of the renderer's list.
+		nvrhi::CommandListParameters listParams;
+		listParams.enableImmediateExecution = false;
+		nvrhi::CommandListHandle list = device->createCommandList( listParams );
+		if( !readback || !list ) { return; }
+		list->open();
+		list->copyBuffer( readback, 0, stats, 0, 16 );
+		list->close();
+		device->executeCommandList( list );
+		device->waitForIdle();
+		const uint32* counts = static_cast<const uint32*>( device->mapBuffer( readback, nvrhi::CpuAccessMode::Read ) );
+		if( !counts ) { return; }
+		common->Printf( "RTAO_STATUS active=%d frames=%u samples=%u matched=%u occluded=%u\n", r_rayTracedAO.GetBool(), frames, counts[0], counts[1], counts[2] );
+		device->unmapBuffer( readback );
+	}
+
+	uint32 frames = 0;
+private:
+	RayQueryDiagnostic scene;
+	nvrhi::IDevice* device;
+	nvrhi::BindingLayoutHandle layout;
+	nvrhi::ComputePipelineHandle pipeline;
+	nvrhi::BufferHandle constants, stats;
+	nvrhi::BindingSetHandle bindingSet;
+	nvrhi::TextureHandle boundDepth, boundOutput;
+};
+
+static RayTracedAO* rayTracedAO = nullptr;
+static const idRenderWorldLocal* aoWorld = nullptr;
+static bool aoFailed = false;
 } // namespace
 #endif
+
+void R_ClearRayTracedAO()
+{
+#if defined( USE_RAYTRACING )
+	delete rayTracedAO;
+	rayTracedAO = nullptr;
+	aoWorld = nullptr;
+	aoFailed = false;
+#endif
+}
+
+void R_RenderRayTracedAO( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* output )
+{
+#if defined( USE_RAYTRACING )
+	if( !r_rayTracedAO.GetBool() || !view->renderWorld ) { return; }
+	nvrhi::IDevice* device = deviceManager->GetDevice();
+	if( device->getGraphicsAPI() != nvrhi::GraphicsAPI::D3D12 || !device->queryFeatureSupport( nvrhi::Feature::RayQuery ) ||
+		!device->queryFeatureSupport( nvrhi::Feature::RayTracingAccelStruct ) ) { return; }
+	if( aoWorld != view->renderWorld ) { R_ClearRayTracedAO(); aoWorld = view->renderWorld; }
+	if( aoFailed ) { return; }
+	if( !rayTracedAO )
+	{
+		rayTracedAO = new RayTracedAO( device );
+		if( !rayTracedAO->Initialize( aoWorld ) )
+		{
+			delete rayTracedAO;
+			rayTracedAO = nullptr;
+			aoFailed = true;
+			common->Warning( "Ray-traced AO unavailable; retaining SSAO for this map" );
+			return;
+		}
+		common->Printf( "RTAO_READY staticWorld=1 raysPerPixel=8 radius=%.1f\n", r_rayTracedAORadius.GetFloat() );
+	}
+	rayTracedAO->Render( list, view, depth, output );
+#endif
+}
+
+CONSOLE_COMMAND_SHIP( rayTracingAOStatus, "Report active ray-traced AO and sampled GPU coverage", NULL )
+{
+#if defined( USE_RAYTRACING )
+	commonLocal.WaitGameThread();
+	if( rayTracedAO && rayTracedAO->frames ) { rayTracedAO->PrintStatus(); return; }
+#endif
+	common->Printf( "RTAO_STATUS active=0 frames=0 samples=0 matched=0 occluded=0\n" );
+}
 
 CONSOLE_COMMAND_SHIP( rayTracingTest, "Run bounded native ray hit/miss and instance-update diagnostics", NULL )
 {

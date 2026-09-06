@@ -5,7 +5,9 @@ param(
     [string]$BuildDirectory,
     [ValidateSet('Debug', 'Release', 'RelWithDebInfo', 'MinSizeRel')]
     [string]$Configuration = 'RelWithDebInfo',
-    [switch]$ValidateOnly
+    [switch]$ValidateOnly,
+    [switch]$RayTracedAO,
+    [ValidateSet('Saved', 'SDR', 'AutoHDR')][string]$DisplayOutput = 'Saved'
 )
 
 . (Join-Path $PSScriptRoot 'Common.ps1')
@@ -61,18 +63,26 @@ $launchArgs = @(
     '+set', 'logFileName', "dogfood-$Profile.log", '+set', 'logFile', '2',
     '+exec', 'neural_dogfood.cfg'
 )
+if ($RayTracedAO) {
+    $launchArgs += @('+set', 'r_rayTracedAO', '1', '+set', 'r_useSSAO', '1', '+set', 'r_useNewSSAOPass', '1')
+}
 # Seed display settings once. Later HUD, resolution and HDR edits must survive relaunch.
 if ($firstRun) {
     $launchArgs += @('+set', 'r_fullscreen', '0', '+set', 'r_windowWidth', '2560',
-        '+set', 'r_windowHeight', '720', '+set', 'r_hdrOutput', '0')
+        '+set', 'r_windowHeight', '720')
+}
+if ($firstRun -or $DisplayOutput -ne 'Saved') {
+    $launchArgs += @('+set', 'r_hdrOutput', $(if ($DisplayOutput -eq 'AutoHDR') { 1 } else { 0 }))
 }
 if ([Text.Encoding]::UTF8.GetByteCount(($launchArgs -join ' ')) -ge 1024) {
     throw 'Launch arguments exceed the engine limit; use a shorter checkout path.'
 }
 Write-Host "Profile:    $Profile"
+if ($RayTracedAO) { Write-Host 'RTX AO:     Enabled (static world). Toggle live with r_rayTracedAO 0 / 1.' }
 Write-Host "Executable: $exe"
 Write-Host "Commit:     $($manifest.commit) (dirty=$($manifest.dirty))"
 Write-Host "Settings:   $saveRoot"
+Write-Host "Display:    $DisplayOutput"
 Write-Host 'Checklist:  docs/neural-rendering/DOGFOOD_CHECKLIST.md'
 if ($ValidateOnly) {
     Write-Host 'PASS: exact executable, manifest, feature flags, runtime files and local map data. No game started.'

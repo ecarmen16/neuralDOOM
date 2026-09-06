@@ -1,5 +1,11 @@
 # Native ray tracing and path tracing
 
+Current addition: [RAY_TRACED_AO.md](RAY_TRACED_AO.md) implements opt-in static-world
+ambient occlusion with a persistent AS, reusing the validated intersection path.
+This supplies an early gameplay effect while the full scene/material/motion
+gates below remain open. `sceneImplemented=0` still describes the incomplete full
+scene; `rayTracingAOStatus` reports the actual AO dispatch and shaded receivers.
+
 Source review and capability check: 2026-09-06, starting at `5ca342cf` on `codex/probe-lighting`. The user expanded the modernization scope to investigate RTX/path tracing while AFK. This extends the initial project's scope; it does not claim a ray-traced renderer is implemented.
 
 The next implementation branch is `codex/rt-foundation`, prepared from the validated probe-lighting checkpoint. Build one reusable ray scene, prove intersections, then introduce shadows, reflections, diffuse bounce lighting, and finally an optional full path-tracing mode. Indirect lighting is the largest anticipated change to Doom 3's atmosphere; a single light's shadow visibility is a smaller first correctness test. These are engineering priorities, not measured visual-quality gains.

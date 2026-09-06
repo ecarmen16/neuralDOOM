@@ -1,5 +1,36 @@
 # Test results
 
+## 2026-09-06 — First gameplay ray-traced ambient occlusion
+
+`RayTracingDiagnostic.cpp` now shares the validated static BSP extraction with a
+persistent opt-in AO pass. `RenderBackend.cpp` applies it before ambient lighting;
+`RenderSystem_init.cpp` clears map/device ownership. The new SM 6.5 AO shader,
+resource formats, depth/normal conventions, fallbacks and controls are documented
+in [RAY_TRACED_AO.md](RAY_TRACED_AO.md). The RTX launcher requests native HDR (Auto)
+and supports both Native and DLAA. No new binary dependency is tracked.
+
+Initial Native `RelWithDebInfo` configure/build passed. The first runtime attempt
+exposed NVRHI's prohibition on two simultaneously open immediate command lists.
+Scene upload/build now uses an independent deferred list. A subsequent strict
+coverage check sampled the closed, excluded elevator door; final checks require
+shaded receivers after opening and after resize. A 600-frame warmup also provides
+useful open-door comparison captures.
+
+`smoke-20260906-180746-ddaea461` passes on RTX 5090 with full DX12 validation:
+Native, 2560x720 -> 1920x1080, 600 warmup frames, 64 GPU samples, local probe
+lighting, AO ON/OFF/ON. Sampled shaded/occluded receivers are 356/221 initially,
+356/223 before disable and 748/487 after resize. Dispatch count holds at 781
+while disabled and reaches 900 after resuming. Static AS: 82,833 triangles,
+5,242,880 bytes; one build per map. Gameplay, captures, history reset and exit
+pass. Initial captures were inspected; final HDR monitor appearance and moving
+camera quality still require the user's short visual check.
+
+Focused review covers shader binding ABI, depth agreement, immutable AS lifetime,
+deferred initialization, resize rebinding, baseline SSAO retention and live
+rollback. Final clean-build Native/DLAA/HDR and compiled-OFF evidence follows
+after the implementation commit. Full material registration, dynamic/cutout
+occluders and authored-light ray shadows remain the next tasks.
+
 ## 2026-09-06 / modernization foundation working tree
 
 Base `76ff35b5`, branch `codex/modernization-foundation`. Automated checks used disposable `game/mars_city2` runs and local owned BFG data. The experimental ReShade/NR compatibility layer was disabled. Results prove the checks listed here, not an NR aesthetic comparison or monitor HDR capability.

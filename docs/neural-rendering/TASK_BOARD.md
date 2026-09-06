@@ -21,12 +21,14 @@ Working branch: `codex/rt-foundation`, prepared from the completed `codex/probe-
 | RT-001A | DONE | OFF-by-default GPU intersection tests and static-world audit | 24 known rays including TLAS update; 82,833 map triangles, 131,072 panorama rays, 32 CPU reference matches; Native/DLAA and disabled/missing-shader checks with native DX12 validation |
 | ND3-661 | DONE | Synchronize DX12 presentation before releasing resized backbuffers | Reproduced debug-runtime failure with RT compiled out; post-Present fence fixes Native, DLAA/scRGB and default-build resize/shutdown checks |
 | RT-001B | READY | Persistent scene registration and material mapping | Next: stable mesh/instance IDs, owned persistent AS resources, map cleanup/rebuild; then rigid/skinned/cutout coverage and selected-light ray shadows |
+| RT-AO | VERIFY | Opt-in static-world ray-traced ambient occlusion | Native DX12 gameplay, sampled occlusion, live rollback/resume and resize pass; final clean-build Native/DLAA/HDR and compiled-OFF checks pending |
 
 The implemented diagnostics and exact resource contract are in
 [RAY_TRACING_DIAGNOSTICS.md](RAY_TRACING_DIAGNOSTICS.md). The user's short manual
 pass is [DOGFOOD_CHECKLIST.md](DOGFOOD_CHECKLIST.md), launched with
-`Launch-NeuralDoom-Dogfood.cmd` in the game checkout. The full RT-001 persistent
-scene gate remains open; no gameplay ray-traced lighting is claimed.
+`Launch-NeuralDoom-RTX.cmd` in the game checkout. The first gameplay effect is
+documented in [RAY_TRACED_AO.md](RAY_TRACED_AO.md). Full instance/material scene
+registration, moving occluders and path tracing remain open.
 
 See `UNATTENDED_WORKFLOW.md` for the implemented controls and test commands, and the 2026-09-06 entry in `TEST_RESULTS.md` for exact evidence and failures.
 

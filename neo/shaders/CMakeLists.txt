@@ -50,7 +50,7 @@ else()
 endif()
 
 # Keep the existing SM 6.0 shader set and unsupported-hardware startup unchanged.
-# This raw DXIL shader is loaded only by explicit diagnostic console commands.
+# Raw SM 6.5 shaders are loaded only by explicitly enabled RT features.
 if(USE_RAYTRACING)
     if(NOT DXC_PATH)
         message(FATAL_ERROR "USE_RAYTRACING requires DXC with shader model 6.5 support")
@@ -60,12 +60,16 @@ if(USE_RAYTRACING)
     else()
         set(rt_output_root "${CMAKE_CURRENT_SOURCE_DIR}/../../base/renderprogs2")
     endif()
-    set(rt_shader "${rt_output_root}/dxil/rt/ray_query.cs.dxil")
-    add_custom_command(OUTPUT "${rt_shader}"
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${rt_output_root}/dxil/rt"
-        COMMAND "${DXC_PATH}" -T cs_6_5 -E main -WX -O3 -Zpr
-            -Fo "${rt_shader}" "${CMAKE_CURRENT_SOURCE_DIR}/rt/ray_query.cs.hlsl"
-        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/rt/ray_query.cs.hlsl"
-        VERBATIM)
-    add_custom_target(RayTracingShaders DEPENDS "${rt_shader}")
+    set(rt_shaders)
+    foreach(rt_name ray_query ambient_occlusion)
+        set(rt_shader "${rt_output_root}/dxil/rt/${rt_name}.cs.dxil")
+        add_custom_command(OUTPUT "${rt_shader}"
+            COMMAND ${CMAKE_COMMAND} -E make_directory "${rt_output_root}/dxil/rt"
+            COMMAND "${DXC_PATH}" -T cs_6_5 -E main -WX -O3 -Zpr
+                -Fo "${rt_shader}" "${CMAKE_CURRENT_SOURCE_DIR}/rt/${rt_name}.cs.hlsl"
+            DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/rt/${rt_name}.cs.hlsl"
+            VERBATIM)
+        list(APPEND rt_shaders "${rt_shader}")
+    endforeach()
+    add_custom_target(RayTracingShaders DEPENDS ${rt_shaders})
 endif()

@@ -1,15 +1,22 @@
-# neuralDoom playtest: about 10 minutes
+# neuralDoom RTX playtest: about 5 minutes
 
 In the game installation's `RBDOOM-3-BFG` folder, double-click
-`Launch-NeuralDoom-Dogfood.cmd`. Choose **Native** first, then quit and relaunch
+`Launch-NeuralDoom-RTX.cmd`. Choose **Native** first, then quit and relaunch
 with **DLAA** for comparison. The launcher verifies the exact build and opens the
 main menu. Start a game, or press **~** and enter `devmap game/mars_city2` to visit
 the automated test map quickly.
 
 Both profiles share persistent test settings and saves in `captures/dogfood`.
-The first launch starts in a 2560x720 SDR window. Later resolution, HUD and HDR
-choices persist. This playtest uses the native renderer with the bridge disabled.
+The first launch starts in a 2560x720 window. Resolution and HUD choices persist.
+The RTX launcher requests native HDR (Auto), using Windows HDR when enabled and
+SDR fallback otherwise. The ordinary dogfood launcher preserves saved HDR
+settings. This playtest uses the native renderer with the bridge disabled.
 
+- [ ] **RTX AO comparison:** In a room with corners and nearby surfaces, enter
+  `r_rayTracedAO 0`, then `r_rayTracedAO 1`. Look for changes in ambient contact
+  shading. Walk, turn and watch a door/character. Report flicker, seams, excessive
+  darkness or stutter. This first pass traces static opaque map geometry;
+  moving objects retain raster shading and do not yet cast ray occlusion.
 - [ ] **Ultrawide HUD:** Settings > System > System Options: choose **HUD Layout =
   Auto (16:9)** and a comfortable **HUD Size**. Resize the window and switch to
   your usual fullscreen resolution. Health/ammo should stay centered and readable;
@@ -23,19 +30,17 @@ choices persist. This playtest uses the native renderer with the bridge disabled
   Note which profile looks better and whether either stutters.
 - [ ] **Persistence:** Change HUD Size, leave the menu, quit and relaunch. Confirm
   the size/layout and chosen resolution remain set and still adapt to resizing.
-- [ ] **Optional HDR:** Enable Windows HDR, select **HDR Output = HDR (Auto)** in
-  System Options and fully restart the game through this launcher. Check bright
+- [ ] **HDR:** With Windows HDR enabled, the RTX launcher requests HDR output on
+  startup. Check bright
   lamps, dark corners and menu brightness; adjust HDR Scene White, Peak and UI
   White. `hdrStatus` should report `windowsHDR=1` and `active=1`. Ordinary PNGs
   cannot show the monitor's actual HDR appearance.
 
-Optional RTX sanity check: in a loaded map, enter `rayTracingTest` and
-`rayTracingScene`. Expect `RT_TEST status=PASS` and `RT_SCENE status=PASS`. The
-second command briefly pauses to create
-`captures/dogfood/base/screenshots/rt_static_world.png`, a 360-degree depth image.
-This milestone proves GPU ray intersections; gameplay ray-traced lighting and
-full path tracing are still upcoming. Moving props, characters and cutout
-materials are outside this static-world diagnostic.
+No manual diagnostics are required. `rayTracingAOStatus` is available if needed;
+an enabled pass in a populated room should show nonzero `matched` and `occluded`.
+Ray-traced AO is a first gameplay effect; ray shadows from authored lights,
+reflections and full path tracing remain upcoming. The ordinary dogfood launcher
+uses your saved AO setting; `r_rayTracedAO 0` returns to raster SSAO immediately.
 
 For feedback, send **Native/DLAA, map/location, what you did, and what looked
 wrong**. `screenshot screenshots/dogfood.png` captures an SDR preview. Logs are

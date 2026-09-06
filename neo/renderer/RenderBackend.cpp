@@ -5802,6 +5802,7 @@ void idRenderBackend::DrawScreenSpaceAmbientOcclusion2( const viewDef_t* _viewDe
 	commandList->clearTextureFloat( globalImages->ambientOcclusionImage[0]->GetTextureHandle(), nvrhi::AllSubresources, nvrhi::Color( 1.f ) );
 
 	ssaoPass->Render( commandList, _viewDef, 0 );
+	R_RenderRayTracedAO( commandList, _viewDef, globalImages->currentDepthImage->GetTextureHandle(), globalImages->ambientOcclusionImage[0]->GetTextureHandle() );
 
 	renderLog.CloseBlock();
 	renderLog.CloseMainBlock();

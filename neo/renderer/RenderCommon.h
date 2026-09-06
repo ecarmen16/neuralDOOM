@@ -1854,6 +1854,8 @@ void RB_ClearDebugPolygons( int time );
 void RB_DrawBounds( const idBounds& bounds );
 
 void RB_ShutdownDebugTools();
+void R_ClearRayTracedAO();
+void R_RenderRayTracedAO( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* output );
 void RB_SetVertexColorParms( stageVertexColor_t svc );
 
 
