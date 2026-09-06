@@ -21,6 +21,12 @@ settings. This playtest uses the native renderer with the bridge disabled.
   Auto (16:9)** and a comfortable **HUD Size**. Resize the window and switch to
   your usual fullscreen resolution. Health/ammo should stay centered and readable;
   the crosshair should stay centered. Try Full width and Centered 21:9 too.
+- [ ] **Field of view:** Settings > Game Options > Field of View now spans
+  **60–100** in five-degree steps. It is a 16:9 reference value: at 5120x1440,
+  80 gives about 118 degrees horizontally; 70 gives about 109. Try **70** if
+  objects at the edges look stretched. Back out to apply/save; no restart needed.
+  Lower settings show less of the scene. Multiplayer retains its existing
+  minimum of 80. Borderless mode uses the current monitor's desktop resolution.
 - [ ] **Motion and lighting:** Walk through a dark room and a doorway, turn quickly,
   fire, and watch an animated character. Check for flashes, lighting pops, trails,
   unusually crushed shadows or distracting reflections. Open the PDA and inspect
@@ -41,6 +47,8 @@ an enabled pass in a populated room should show nonzero `matched` and `occluded`
 Ray-traced AO is a first gameplay effect; ray shadows from authored lights,
 reflections and full path tracing remain upcoming. The ordinary dogfood launcher
 uses your saved AO setting; `r_rayTracedAO 0` returns to raster SSAO immediately.
+AO replaces SSAO on matching static surfaces. Less occlusion can look brighter;
+this is a change in ambient shading, not an additional light or AA technique.
 
 For feedback, send **Native/DLAA, map/location, what you did, and what looked
 wrong**. `screenshot screenshots/dogfood.png` captures an SDR preview. Logs are

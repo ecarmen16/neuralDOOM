@@ -31,7 +31,8 @@ If you have questions concerning this license or the applicable additional terms
 
 const static int NUM_GAME_OPTIONS_OPTIONS = 8;
 
-const float MIN_FOV = 80.0f;
+// Base horizontal FOV at 16:9; ultrawide expands the actual horizontal view.
+const float MIN_FOV = 60.0f;
 const float MAX_FOV = 100.0f;
 
 const float MIN_FOV_GUN = 3.0f;
@@ -342,7 +343,9 @@ void idMenuScreen_Shell_GameOptions::idMenuDataSource_GameSettings::CommitData()
 {
 
 	g_fov.SetFloat( fields[ GAME_FIELD_FOV ].ToFloat() );
-	g_gun_x.SetFloat( Lerp( MIN_FOV_GUN, MAX_FOV_GUN, ( fields[ GAME_FIELD_FOV ].ToFloat() - MIN_FOV ) / ( MAX_FOV - MIN_FOV ) ) );
+	// Preserve the original 80-100 weapon placement when extending camera FOV.
+	const float gunOffsetFraction = idMath::ClampFloat( 0.0f, 1.0f, ( fields[ GAME_FIELD_FOV ].ToFloat() - 80.0f ) / 20.0f );
+	g_gun_x.SetFloat( Lerp( MIN_FOV_GUN, MAX_FOV_GUN, gunOffsetFraction ) );
 
 	g_checkpoints.SetBool( fields[ GAME_FIELD_CHECKPOINTS ].ToBool() );
 	ui_autoSwitch.SetBool( fields[ GAME_FIELD_AUTO_SWITCH ].ToBool() );

@@ -1,5 +1,29 @@
 # Test results
 
+## 2026-09-06 — Ultrawide feedback and narrower FOV control
+
+User dogfood feedback: brighter/smoother appearance with AO enabled, ultrawide
+HUD working well, and edge discomfort at 5120x1440 borderless. The local DLAA log
+confirms a 5120x1440 render/output viewport and active native HDR. Saved settings
+use `r_fullscreen -2`, `g_fov 80` and the centered 16:9 HUD. The brightness report
+is consistent with replacement of SSAO by a different occlusion estimate; no
+new anti-aliasing or direct lighting is inferred from that observation.
+
+Source review found an existing FOV control in Settings > Game Options, limited
+to 80–100. `MenuScreen_Shell_GameOptions.cpp` now permits 60–100 with the original
+five-degree step. `idGameLocal::CalcFov` already derives projection from actual
+viewport dimensions every frame: at 32:9, base 80 gives approximately 118 degrees
+horizontal and base 70 gives 109. No resolution-specific projection change is
+needed. Edge stretching is a plausible explanation; other edge artifacts remain
+unidentified. Narrowing FOV trades peripheral visibility for less stretching.
+
+The weapon-position interpolation remains anchored to 80–100 and clamps below
+80, preserving existing placement. Values apply/save when leaving Game Options;
+the multiplayer minimum of 80 is unchanged. There are no resource-format,
+shader, AO-strength or HDR changes. `Test-NeuralDoom-Smoke.ps1` adds explicit
+borderless and base-FOV inputs to cover the actual desktop mode. Build/runtime
+results follow below. Next manual check: compare 70 and 80 in the same room.
+
 ## 2026-09-06 — First gameplay ray-traced ambient occlusion
 
 `RayTracingDiagnostic.cpp` now shares the validated static BSP extraction with a

@@ -7,6 +7,8 @@ param(
     [ValidateSet('Native', 'Validate', 'DLAA')][string]$Profile = 'Native',
     [ValidateRange(640, 7680)][int]$Width = 1280,
     [ValidateRange(360, 4320)][int]$Height = 720,
+    [switch]$Borderless,
+    [ValidateRange(60, 100)][int]$FieldOfView = 80,
     [ValidateRange(0.5, 1.5)][float]$HudScale = 1,
     [ValidateRange(0, 4)][float]$HudMaxAspect = 0,
     [ValidateSet('SDR', 'AutoHDR')][string]$DisplayOutput = 'SDR',
@@ -46,10 +48,12 @@ $resultPath = Join-Path $runRoot 'result.json'
 $result = [ordered]@{
     schemaVersion = 1; status = 'FAIL'; profile = $Profile; build = $manifest
     width = $Width; height = $Height; hudScale = $HudScale; hudMaxAspect = $HudMaxAspect
+    borderless = [bool]$Borderless; baseFieldOfView = $FieldOfView
     requestedFrames = $Frames; frameProgress = 0; exitCode = $null; reason = ''
     visualReview = 'PENDING'; artifacts = $runRoot
 }
 if (($ResizeWidth -eq 0) -ne ($ResizeHeight -eq 0) -or ($ResizeWidth -gt 0 -and ($ResizeWidth -lt 640 -or $ResizeHeight -lt 360))) { throw 'Resize requires both valid dimensions.' }
+if ($Borderless -and $ResizeWidth -gt 0) { throw 'Borderless uses desktop dimensions; use a windowed run for the resize scenario.' }
 $result.displayOutput = $DisplayOutput
 $result.expectedHDR = $ExpectedHDR
 $result.hdrDiagnostic = [bool]$HDRDiagnostic
@@ -101,7 +105,7 @@ try {
     $culture = [Globalization.CultureInfo]::InvariantCulture
     $scriptLines = @(
         "set r_neuralBackend $backend", "set r_hdrDiagnostic $([int][bool]$HDRDiagnostic)", 'set r_screenFraction 100', "set r_renderMode $LegacyRenderMode",
-        'set r_useTemporalAA 1', 'set r_antiAliasing 2', "set r_rayTracedAO $([int][bool]$RayTracedAO)",
+        'set r_useTemporalAA 1', 'set r_antiAliasing 2', "set r_rayTracedAO $([int][bool]$RayTracedAO)", "set g_fov $FieldOfView",
         ('set swf_hudScale ' + $HudScale.ToString($culture)),
         ('set swf_hudMaxAspect ' + $HudMaxAspect.ToString($culture))
     )
@@ -156,7 +160,7 @@ try {
     # Keep only initialization settings here; use the cfg for the scenario.
     $launchArgs = @(
         '+set', 'fs_basepath', ('"' + $RepoRoot + '"'), '+set', 'fs_savepath', ('"' + $runRoot + '"'),
-        '+set', 'r_graphicsAPI', 'dx12', '+set', 'r_fullscreen', '0',
+        '+set', 'r_graphicsAPI', 'dx12', '+set', 'r_fullscreen', $(if ($Borderless) { -2 } else { 0 }),
         '+set', 'r_useValidationLayers', $ValidationLayers,
         '+set', 'r_windowWidth', $Width, '+set', 'r_windowHeight', $Height,
         '+set', 'r_neuralCompatibilityEnable', '0', '+set', 'r_streamlineEnable', $sdk,
