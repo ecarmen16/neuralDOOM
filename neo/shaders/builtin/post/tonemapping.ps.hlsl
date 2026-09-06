@@ -113,6 +113,17 @@ void main(
 #else
 	float4 HdrColor = t_Source[pos.xy];
 #endif
+	if( g_ToneMapping.hdrOutput.x > 0 )
+	{
+		float adapted = max( asfloat( t_Exposure[0] ), g_ToneMapping.minAdaptedLuminance );
+		float3 exposed = max( HdrColor.rgb, 0 ) * g_ToneMapping.exposureScale / adapted;
+		float range = g_ToneMapping.hdrOutput.z / g_ToneMapping.hdrOutput.y;
+		// Expand the display shoulder from scene-linear values, before the SDR curve/LUT clips them.
+		float3 nits = ACESFilm( exposed / range ) * g_ToneMapping.hdrOutput.z;
+		o_rgba = float4( pow( nits / g_ToneMapping.hdrOutput.w, 1.0 / 2.2 ), HdrColor.a );
+		return;
+	}
+
 	o_rgba.rgb = ConvertToLDR( HdrColor.rgb );
 	o_rgba.a = HdrColor.a;
 

@@ -477,3 +477,47 @@ Use one section per tested commit/configuration. Include failures; do not rewrit
 - Focused diff review covered enum ordering, live cvar reads, archive/change detection, restart behavior, upstream attributes and branding compatibility. Interactive menu navigation, save/relaunch persistence and live window-resize visual tests remain pending; runtime smoke checks use explicit HUD values and do not exercise those UI flows.
 - Git setup uses origin ecarmen16/neuralDoom and upstream RobertBeckebans/RBDOOM-3-BFG. Remote provisioning/push remains pending repository availability and authenticated GitHub CLI. No proprietary payloads are included in the source checkpoint.
 - Next: validate menu interaction and resize persistence, then implement the first native HDR capability/output negotiation slice described in MODERNIZATION_PLAN.md.
+
+
+## 2026-09-06: native HDR prototype and HUD verification
+
+Implementation on `codex/native-hdr` starts from `9174f4ca`. The task's source checkout is now populated; implementation is synchronized to the established local game/build checkout without moving game data or reusing its CMake cache in a different directory.
+
+### HUD and menu checks
+
+A bounded local window-message helper targeted only the game process it launched, with disposable saves/configuration under `captures/neural/hud-ui-check`. Inspected pause/settings/System Options captures. Changed HUD Layout to centered 21:9 and HUD Size to 115%, left the menu, and observed archived values `2.333333` and `1.15`. Changed resolution through `vid_restart` at 1680x720, 2560x720 and 1280x720; inspected the 32:9 screenshot for the adjusted HUD region. A fresh launch read back both saved values. Original user configuration was not used. Broader combat/notification/PDA states remain outside this check.
+
+A second isolated run under `captures/neural/hud-hdr-ui-check` exercised the new HDR brightness menu fields. Inspected `screenshots/hdr_controls.png`: all four labels and values fit the menu. Two menu sessions increased scene/UI white to 220 nits and peak to 1100; the config and console reported those values after leaving the menu. The HDR output restart prompt is wired through the existing IsRestartRequired path and reviewed in source; accepting that prompt was not part of this UI test.
+
+### Build and GPU checks
+
+- Configured DX12 RelWithDebInfo and built SDK OFF (`build`) and SDK ON (`build-streamline`). Changed tone-mapping/blit shader permutations compiled to DXIL. Final build logs: `captures/neural/native-hdr-build-off.log` and `native-hdr-build-on.log`.
+- Exact artifact/missing/stale/wrong-config fixtures and all PowerShell syntax checks passed. The source audit and whitespace checks passed before the final commit hook.
+- Windows output discovery reported scRGB transport support, Windows HDR inactive, 8-bit desktop output and reported peak 1499 nits. That is current desktop state and reported metadata, not monitor calibration or proof of active HDR.
+- Native and DLAA HDR diagnostics preserved finite composition values above 1 before the SDR preview conversion. The readback retains row pitch and the specific rendered swapchain texture, rather than reading the next DXGI buffer. Final SDR scRGB presentation stayed at or below 1, with zero nonfinite or negative values. DLAA continued evaluating/presenting without rejection through resize.
+- Default SDR gameplay, 32:9-to-16:9 resize, automatic SDR fallback and selected retro mode all passed. All recorded smoke runs below advanced 64 primary frames; resize cases advanced the temporal-history epoch and produced the requested PNG dimensions.
+
+| Run directory under captures/neural | Scenario | Result |
+|---|---|---|
+| smoke-20260906-123753-246dfaf3 | SDK-OFF native HDR shader diagnostic, 1680x720 to 2560x720 | PASS; initial composition readback implementation |
+| smoke-20260906-124054-a019aeba | SDK-ON DLAA HDR diagnostic, 1680x720 to 2560x720 | PASS; both composition and scRGB readbacks |
+| smoke-20260906-124934-27eff540 | SDK-OFF SDR, 2560x720 to 1280x720 | PASS; inspected gameplay capture |
+| smoke-20260906-124958-e259a1f6 | SDK-OFF AutoHDR on SDR desktop, 1280x720 | PASS; inspected gameplay capture and bounded presentation |
+| smoke-20260906-125020-6e73c139 | SDK-OFF AutoHDR with retro render mode 1 | PASS; SDR content/presentation preserved |
+| smoke-20260906-125209-c8014c01 | SDK-ON DLAA HDR diagnostic, 2560x720 to 1680x720 | PASS; reverse resize |
+
+### Failures addressed and validation limits
+
+- Initial AutoHDR fallback run `smoke-20260906-123440-10db4c8f` failed a check that conflated negative legacy composition values with nonfinite values. FP16 exposes negatives/overshoot previously clamped by UNORM targets. Diagnostics now report them separately, reject nonfinite composition and verify that final presentation clamps to the supported range with no negative/nonfinite pixels. This retains the existing SDR effect processing while enforcing the presentation contract.
+- Two launch attempts exited before creating logs because the menu test already owned Doom 3's single-instance mutex. The runner now checks that mutex before launching, and gameplay checks run sequentially. Those attempts are not counted as passes.
+- The temporary UI helper initially consumed a stale ready marker on relaunch; its log is now cleared before process creation. An unquoted hyphen in a screenshot filename triggered the engine console's argument parser; a subsequent capture with a simple filename succeeded. These were test-harness issues, with disposable output only.
+- An attempted SPIR-V shader check was unavailable: the installed Windows SDK DXC reports that SPIR-V CodeGen was not compiled in. Vulkan build/runtime validation remains pending; the shared interface provides SDR defaults and no Vulkan backend implementation was removed.
+- Actual Windows-HDR-enabled gameplay, monitor movement/HDR-toggle transitions, unavailable color-space failure injection, perceptual calibration, motion/ghosting comparisons and comprehensive performance measurements remain pending. The implementation preserves legacy gamma-space HUD blending; it does not yet provide physically linear UI composition or HDR-aware legacy filmic effects. The embedded NR bridge stays on its SDR transport.
+- Focused review covered format/color-space pairing, startup/resize failure handling, default-SDR polling cost, scene/UI brightness separation, constant-buffer agreement, exact presentation conversion placement, retained swapchain readback, menu enum ordering/change tracking, and isolated smoke artifacts. No new dependency was introduced.
+
+Next: validate HDR-enabled display behavior/calibration, then measure existing lighting/shadow/reflection passes before choosing the first lighting refinement. Keep geometry experiments on a later focused branch.
+
+Final revision verification after limiting display polling to scRGB mode:
+
+- `smoke-20260906-125537-f75e6bee`: Native, SDR, diagnostic=False, 64 primary frames, PASS. Executable SHA-256: `6593A16BDB1F0633BBC26C0FBBF18E9BFED44A6A90EB5B043968863E34E1E59A`.
+- `smoke-20260906-125601-2d6d8ba1`: DLAA, AutoHDR, diagnostic=True, 64 primary frames, PASS. Executable SHA-256: `2B5850976E667C03A3348D7E90BF0651864676B08F9C0448F3FD751428FD380A`.

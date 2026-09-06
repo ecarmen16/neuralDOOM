@@ -2,9 +2,11 @@
 
 neuralDoom is an experimental open-source Doom 3 BFG renderer project built on RBDOOM-3-BFG. It adds a reversible temporal-input interface, native DX12 Streamline/DLSS integration, and a local validation path for future neural-rendering technology.
 
-Development uses `codex/modernization-foundation`. The downstream remote is intended to be `ecarmen16/neuralDoom`; upstream history and licensing remain intact. See [CONTRIBUTING.md](CONTRIBUTING.md) for commit checks and [the unattended workflow](docs/neural-rendering/UNATTENDED_WORKFLOW.md) for repeatable builds and gameplay validation.
+The modernization checkpoint is on `codex/modernization-foundation`; native HDR development uses `codex/native-hdr`. The downstream remote is intended to be `ecarmen16/neuralDoom`; upstream history and licensing remain intact. See [CONTRIBUTING.md](CONTRIBUTING.md) for commit checks and [the unattended workflow](docs/neural-rendering/UNATTENDED_WORKFLOW.md) for repeatable builds and gameplay validation.
 
 **Settings > System Options** now includes **HUD Layout** and **HUD Size**. New configurations default to Auto (16:9), keeping the HUD centered on ultrawide displays. Layout responds to the current viewport on every frame, including after resolution changes; preferences are archived when leaving the menu. Existing saved layout choices remain respected.
+
+An opt-in [native HDR prototype](docs/neural-rendering/NATIVE_HDR.md) adds DX12 scRGB output and separate scene/UI brightness controls. SDR remains the default; actual HDR monitor appearance is still awaiting visual validation.
 
 Run `Setup-NeuralDoom.cmd` after cloning to assemble a local installation. The guided setup lets you browse to a legally owned Doom 3 BFG Edition folder, downloads and verifies D3HDP BFG Lite from ModDB (or accepts an existing archive), and lets you either browse to `nvngx_dlssnr.dll` or enter an HTTPS URL. The selected runtime is copied into the neuralDoom install directory. Downloads, retail game data, community assets, ReShade/RenoDX files, NVIDIA SDK/runtime binaries, and captures remain ignored and are never committed to this repository.
 

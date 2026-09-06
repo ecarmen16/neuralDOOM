@@ -31,7 +31,7 @@
 #include <sys/DeviceManager.h>
 
 #include <Windows.h>
-#include <dxgi1_5.h>
+#include <dxgi1_6.h>
 #include <dxgidebug.h>
 
 #include <nvrhi/d3d12.h>
@@ -51,6 +51,8 @@ idCVar r_graphicsAdapter( "r_graphicsAdapter", "", CVAR_RENDERER | CVAR_INIT | C
 idCVar r_dxMaxFrameLatency( "r_dxMaxFrameLatency", "2", CVAR_RENDERER | CVAR_INIT | CVAR_ARCHIVE | CVAR_INTEGER | CVAR_NEW, "Maximum frame latency for DXGI swap chains (DX12 only)", 0, NUM_FRAME_DATA );
 idCVar r_dxUsePushConstants( "r_dxUsePushConstants", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_INIT | CVAR_NEW, "Use D3D12 root constants / push constants for DX12 renderer" );
 
+extern idCVar r_hdrOutput;
+
 class DeviceManager_DX12 : public DeviceManager
 {
 	RefCountPtr<ID3D12Device>                   m_Device12;
@@ -63,6 +65,12 @@ class DeviceManager_DX12 : public DeviceManager
 	RefCountPtr<IDXGIAdapter3>                  m_DxgiAdapter;
 	HANDLE										m_frameLatencyWaitableObject = NULL;
 	bool                                        m_TearingSupported = false;
+	bool m_ScRGB = false;
+	bool m_HDRDisplay = false;
+	float m_DisplayPeakNits = 0.0f;
+	UINT m_DisplayBits = 0;
+	unsigned int m_DisplayPoll = 0;
+
 
 	std::vector<RefCountPtr<ID3D12Resource>>    m_SwapChainBuffers;
 	std::vector<nvrhi::TextureHandle>           m_RhiSwapChainBuffers;
@@ -84,6 +92,10 @@ public:
 	}
 
 	void ReportLiveObjects() override;
+	bool IsScRGBSwapChain() const override { return m_ScRGB; }
+	bool IsHDRDisplayActive() const override { return m_HDRDisplay; }
+	void PrintDisplayStatus() const override;
+
 
 	nvrhi::GraphicsAPI GetGraphicsAPI() const override
 	{
@@ -103,6 +115,7 @@ protected:
 	void Present() override;
 
 private:
+	void RefreshDisplayStatus();
 	bool CreateRenderTargets();
 	void ReleaseRenderTargets();
 };
@@ -232,6 +245,9 @@ std::wstring StrToWS( const idStr& str )
 
 bool DeviceManager_DX12::CreateDeviceAndSwapChain()
 {
+	m_ScRGB = false;
+	m_HDRDisplay = false;
+	m_DisplayPoll = 0;
 	RefCountPtr<IDXGIAdapter> targetAdapter;
 
 	if( m_DeviceParams.adapter )
@@ -311,6 +327,11 @@ bool DeviceManager_DX12::CreateDeviceAndSwapChain()
 	m_SwapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	m_SwapChainDesc.Flags = ( m_DeviceParams.allowModeSwitch ? DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH : 0 ) |
 							( r_dxMaxFrameLatency.GetInteger() > 0 ? DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT : 0 );
+
+	if( r_hdrOutput.GetInteger() == 1 && !cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) )
+	{
+		m_DeviceParams.swapChainFormat = nvrhi::Format::RGBA16_FLOAT;
+	}
 
 	// Special processing for sRGB swap chain formats.
 	// DXGI will not create a swap chain with an sRGB format, but its contents will be interpreted as sRGB.
@@ -448,10 +469,38 @@ bool DeviceManager_DX12::CreateDeviceAndSwapChain()
 
 	RefCountPtr<IDXGISwapChain1> pSwapChain1;
 	hr = pDxgiFactory->CreateSwapChainForHwnd( m_GraphicsQueue, ( HWND )windowHandle, &m_SwapChainDesc, &m_FullScreenDesc, nullptr, &pSwapChain1 );
+	if( FAILED( hr ) && m_SwapChainDesc.Format == DXGI_FORMAT_R16G16B16A16_FLOAT )
+	{
+		common->Warning( "scRGB swapchain creation failed (0x%08x); falling back to SDR", unsigned( hr ) );
+		m_SwapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		m_DeviceParams.swapChainFormat = nvrhi::Format::RGBA8_UNORM;
+		hr = pDxgiFactory->CreateSwapChainForHwnd( m_GraphicsQueue, ( HWND )windowHandle, &m_SwapChainDesc, &m_FullScreenDesc, nullptr, &pSwapChain1 );
+	}
 	HR_RETURN( hr );
 
 	hr = pSwapChain1->QueryInterface( IID_PPV_ARGS( &m_SwapChain ) );
 	HR_RETURN( hr );
+
+	if( m_SwapChainDesc.Format == DXGI_FORMAT_R16G16B16A16_FLOAT )
+	{
+		UINT support = 0;
+		const DXGI_COLOR_SPACE_TYPE space = DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709;
+		m_ScRGB = SUCCEEDED( m_SwapChain->CheckColorSpaceSupport( space, &support ) ) &&
+			( support & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT ) != 0 &&
+			SUCCEEDED( m_SwapChain->SetColorSpace1( space ) );
+		if( !m_ScRGB )
+		{
+			common->Warning( "scRGB color space unavailable; falling back to SDR" );
+			m_SwapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+			m_DeviceParams.swapChainFormat = nvrhi::Format::RGBA8_UNORM;
+			hr = m_SwapChain->ResizeBuffers( m_SwapChainDesc.BufferCount, m_SwapChainDesc.Width, m_SwapChainDesc.Height, m_SwapChainDesc.Format, m_SwapChainDesc.Flags );
+			HR_RETURN( hr );
+			hr = m_SwapChain->SetColorSpace1( DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709 );
+			HR_RETURN( hr );
+		}
+	}
+	RefreshDisplayStatus();
+	PrintDisplayStatus();
 
 	if( r_dxMaxFrameLatency.GetInteger() > 0 )
 	{
@@ -601,6 +650,19 @@ void DeviceManager_DX12::ResizeSwapChain()
 		common->FatalError( "ResizeBuffers failed" );
 	}
 
+	if( m_ScRGB && FAILED( m_SwapChain->SetColorSpace1( DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709 ) ) )
+	{
+		common->Warning( "Unable to restore scRGB after resize; falling back to SDR" );
+		m_ScRGB = false;
+		m_SwapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		m_DeviceParams.swapChainFormat = nvrhi::Format::RGBA8_UNORM;
+		if( FAILED( m_SwapChain->ResizeBuffers( m_SwapChainDesc.BufferCount, m_DeviceParams.backBufferWidth, m_DeviceParams.backBufferHeight, m_SwapChainDesc.Format, m_SwapChainDesc.Flags ) ) ||
+			FAILED( m_SwapChain->SetColorSpace1( DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709 ) ) )
+		{
+			common->FatalError( "Unable to restore either HDR or SDR swapchain" );
+		}
+	}
+	RefreshDisplayStatus();
 	bool ret = CreateRenderTargets();
 	if( !ret )
 	{
@@ -608,9 +670,56 @@ void DeviceManager_DX12::ResizeSwapChain()
 	}
 }
 
+// Use a fresh DXGI factory so OS HDR toggles and monitor moves do not retain stale output metadata.
+void DeviceManager_DX12::RefreshDisplayStatus()
+{
+	m_HDRDisplay = false;
+	m_DisplayPeakNits = 0.0f;
+	m_DisplayBits = 0;
+	const HMONITOR monitor = MonitorFromWindow( ( HWND )windowHandle, MONITOR_DEFAULTTONEAREST );
+	RefCountPtr<IDXGIFactory1> factory;
+	if( FAILED( CreateDXGIFactory1( IID_PPV_ARGS( &factory ) ) ) ) { return; }
+	for( UINT a = 0; ; a++ )
+	{
+		RefCountPtr<IDXGIAdapter1> adapter;
+		if( FAILED( factory->EnumAdapters1( a, &adapter ) ) ) { break; }
+		for( UINT o = 0; ; o++ )
+		{
+			RefCountPtr<IDXGIOutput> output;
+			if( FAILED( adapter->EnumOutputs( o, &output ) ) ) { break; }
+			DXGI_OUTPUT_DESC desc = {};
+			if( FAILED( output->GetDesc( &desc ) ) || desc.Monitor != monitor ) { continue; }
+			RefCountPtr<IDXGIOutput6> output6;
+			DXGI_OUTPUT_DESC1 desc1 = {};
+			if( SUCCEEDED( output->QueryInterface( IID_PPV_ARGS( &output6 ) ) ) && SUCCEEDED( output6->GetDesc1( &desc1 ) ) )
+			{
+				m_HDRDisplay = desc1.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020;
+				m_DisplayPeakNits = desc1.MaxLuminance;
+				m_DisplayBits = desc1.BitsPerColor;
+			}
+			return;
+		}
+	}
+}
+
+void DeviceManager_DX12::PrintDisplayStatus() const
+{
+	common->Printf( "HDR display: requested=%d transport=%s windowsHDR=%d bits=%u reportedPeakNits=%.1f\n",
+		r_hdrOutput.GetInteger(), m_ScRGB ? "scRGB-FP16" : "SDR-8bit", m_HDRDisplay ? 1 : 0, m_DisplayBits, m_DisplayPeakNits );
+}
+
 void DeviceManager_DX12::BeginFrame()
 {
 	OPTICK_CATEGORY( "DX12_BeginFrame", Optick::Category::Wait );
+	if( m_ScRGB && m_DisplayPoll++ % 120 == 0 )
+	{
+		const bool wasHDR = m_HDRDisplay;
+		RefreshDisplayStatus();
+		if( wasHDR != m_HDRDisplay )
+		{
+			PrintDisplayStatus();
+		}
+	}
 
 	// SRS - get DXGI GPU memory usage for display in statistics overlay HUD
 	DXGI_QUERY_VIDEO_MEMORY_INFO memoryInfoLocal = {}, memoryInfoNonLocal = {};

@@ -1387,6 +1387,12 @@ INITIALIZATION
 bool R_UsePixelatedLook();
 
 bool R_UseTemporalAA();
+bool R_UseNativeHDR();
+bool R_UseHDRToneMapping();
+extern idCVar r_hdrOutput;
+extern idCVar r_hdrPaperWhiteNits;
+extern idCVar r_hdrPeakNits;
+extern idCVar r_hdrUIWhiteNits;
 
 bool R_UseHiZ();
 

@@ -9,6 +9,12 @@ param(
     [ValidateRange(360, 4320)][int]$Height = 720,
     [ValidateRange(0.5, 1.5)][float]$HudScale = 1,
     [ValidateRange(0, 4)][float]$HudMaxAspect = 0,
+    [ValidateSet('SDR', 'AutoHDR')][string]$DisplayOutput = 'SDR',
+    [ValidateSet('Either', 'Active', 'SDR')][string]$ExpectedHDR = 'Either',
+    [switch]$HDRDiagnostic,
+    [ValidateRange(0, 7680)][int]$ResizeWidth = 0,
+    [ValidateRange(0, 4320)][int]$ResizeHeight = 0,
+    [ValidateRange(0, 1)][int]$LegacyRenderMode = 0,
     [ValidateRange(60, 3600)][int]$Frames = 120,
     [ValidateRange(30, 600)][int]$TimeoutSeconds = 120
 )
@@ -35,6 +41,13 @@ $result = [ordered]@{
     requestedFrames = $Frames; frameProgress = 0; exitCode = $null; reason = ''
     visualReview = 'PENDING'; artifacts = $runRoot
 }
+if (($ResizeWidth -eq 0) -ne ($ResizeHeight -eq 0) -or ($ResizeWidth -gt 0 -and ($ResizeWidth -lt 640 -or $ResizeHeight -lt 360))) { throw 'Resize requires both valid dimensions.' }
+$result.displayOutput = $DisplayOutput
+$result.expectedHDR = $ExpectedHDR
+$result.hdrDiagnostic = [bool]$HDRDiagnostic
+$result.resizeWidth = $ResizeWidth
+$result.resizeHeight = $ResizeHeight
+$result.hdrActive = $false
 $process = $null
 try {
     if ($Profile -eq 'DLAA' -and $manifest.features.streamline -ne 'ON') {
@@ -53,19 +66,31 @@ try {
         $result.status = 'SKIP'; $result.reason = 'Required local BFG map data is unavailable.'
         return
     }
+    # The engine exits successfully before opening its log if another instance owns this mutex.
+    $existingGame = $null
+    try { $existingGame = [Threading.Mutex]::OpenExisting('DOOM3') }
+    catch [Threading.WaitHandleCannotBeOpenedException] { }
+    if ($null -ne $existingGame) {
+        $existingGame.Dispose()
+        throw 'Another Doom 3 instance is running. Close it before starting a smoke check.'
+    }
     $backend = @{ Native = 0; Validate = 1; DLAA = 2 }[$Profile]
     $sdk = if ($Profile -eq 'DLAA') { 1 } else { 0 }
     $culture = [Globalization.CultureInfo]::InvariantCulture
     $scriptLines = @(
-        "set r_neuralBackend $backend", 'set r_screenFraction 100', 'set r_renderMode 0',
+        "set r_neuralBackend $backend", "set r_hdrDiagnostic $([int][bool]$HDRDiagnostic)", 'set r_screenFraction 100', "set r_renderMode $LegacyRenderMode",
         'set r_useTemporalAA 1', 'set r_antiAliasing 2',
         ('set swf_hudScale ' + $HudScale.ToString($culture)),
         ('set swf_hudMaxAspect ' + $HudMaxAspect.ToString($culture)),
-        'devmap game/mars_city2', 'wait 180', 'neuralHistoryStatus', 'neuralBackendStatus',
+        'devmap game/mars_city2', 'wait 180', 'hdrStatus', 'neuralHistoryStatus', 'neuralBackendStatus',
         'screenshot screenshots/before.png', "wait $Frames", 'neuralHistoryStatus', 'neuralBackendStatus',
         'neuralHistoryReset', 'wait 30', 'neuralHistoryStatus',
-        'screenshot screenshots/after.png', 'echo NEURAL_SMOKE_COMPLETE', 'quit'
+        'hdrStatus', 'screenshot screenshots/after.png'
     )
+    if ($ResizeWidth -gt 0) {
+        $scriptLines += @("set r_windowWidth $ResizeWidth", "set r_windowHeight $ResizeHeight", 'vid_restart', 'wait 90', 'hdrStatus', 'neuralHistoryStatus', 'screenshot screenshots/resized.png')
+    }
+    $scriptLines += @('echo NEURAL_SMOKE_COMPLETE', 'quit')
     $scriptLines | Set-Content -LiteralPath (Join-Path $saveBase.FullName 'neural_smoke.cfg') -Encoding ASCII
     # Values are scalar/validated; quote filesystem paths explicitly for Windows argv.
     # Win32 stores the command line in MAX_STRING_CHARS (1024 bytes).
@@ -77,7 +102,7 @@ try {
         '+set', 'r_neuralCompatibilityEnable', '0', '+set', 'r_streamlineEnable', $sdk,
         '+set', 'r_streamlineApplicationId', '0', '+set', 'r_neuralBackend', $backend,
         '+set', 'logFileName', 'smoke.log', '+set', 'logFile', '2',
-        '+set', 's_noSound', '1',
+        '+set', 's_noSound', '1', '+set', 'r_hdrOutput', $(if ($DisplayOutput -eq 'AutoHDR') { 1 } else { 0 }),
         '+exec', 'neural_smoke.cfg'
     )
     if ([Text.Encoding]::UTF8.GetByteCount(($launchArgs -join ' ')) -ge 1024) { throw 'Launch arguments exceed the engine command-line limit; use a shorter checkout path.' }
@@ -104,14 +129,34 @@ try {
         if ([long]$last.Groups[1].Value -lt $Frames -or [long]$last.Groups[3].Value -ne 0) { throw 'Backend did not evaluate enough frames without rejection.' }
         if ($Profile -eq 'DLAA' -and [long]$last.Groups[2].Value -lt $Frames) { throw 'DLAA did not present enough evaluated frames.' }
     }
-    foreach ($name in @('before', 'after')) {
+    $hdr = [regex]::Matches($log, 'HDR content: active=(\d)')
+    if ($hdr.Count -lt 2) { throw 'Missing HDR content status.' }
+    $result.hdrActive = $hdr[$hdr.Count - 1].Groups[1].Value -eq '1'
+    if ($ExpectedHDR -eq 'Active' -and -not $result.hdrActive) { throw 'HDR was requested for validation but remained inactive.' }
+    if (($ExpectedHDR -eq 'SDR' -or $DisplayOutput -eq 'SDR') -and $result.hdrActive) { throw 'Expected SDR fallback, but HDR content is active.' }
+    $readbacks = [regex]::Matches($log, 'HDR readback: stage=composition format=RGBA16F width=(\d+) height=(\d+) maximum=([0-9.]+) aboveOne=(\d+) invalid=(\d+) active=(\d)')
+    foreach ($readback in $readbacks) {
+        if ([long]$readback.Groups[5].Value -ne 0) { throw 'HDR composition contains invalid values.' }
+    }
+    if (($result.hdrActive -or $HDRDiagnostic) -and ($readbacks.Count -lt 2 -or [long]$readbacks[0].Groups[4].Value -eq 0)) { throw 'No readback evidence of HDR values above the SDR ceiling.' }
+    $presented = [regex]::Matches($log, 'HDR readback: stage=scRGB format=RGBA16F width=(\d+) height=(\d+) maximum=([0-9.]+) aboveOne=(\d+) invalid=(\d+) active=(\d+) negative=(\d+)')
+    foreach ($sample in $presented) {
+        if ([long]$sample.Groups[5].Value -ne 0 -or [long]$sample.Groups[7].Value -ne 0) { throw 'Invalid scRGB presentation values.' }
+        if ($log -match 'transport=scRGB-FP16 windowsHDR=0' -and [double]::Parse($sample.Groups[3].Value, [Globalization.CultureInfo]::InvariantCulture) -gt 1.001) { throw 'SDR presentation exceeded normalized white.' }
+    }
+    if ($DisplayOutput -eq 'AutoHDR' -and $log -match 'transport=scRGB-FP16' -and $presented.Count -lt 2) { throw 'Missing scRGB presentation readback.' }
+    if ($ResizeWidth -gt 0 -and ($history.Count -lt 4 -or [long]$history[3].Groups[1].Value -le [long]$history[2].Groups[1].Value)) { throw 'Resize did not advance history epoch.' }
+    $names = @('before', 'after')
+    if ($ResizeWidth -gt 0) { $names += 'resized' }
+    foreach ($name in $names) {
         $capture = Join-Path $saveBase.FullName "screenshots/$name.png"
         if (-not (Test-Path -LiteralPath $capture)) { throw "Missing screenshot: $name" }
         $png = [IO.File]::ReadAllBytes($capture)
         if ($png.Length -lt 33 -or [BitConverter]::ToString($png, 0, 8) -ne '89-50-4E-47-0D-0A-1A-0A') { throw "Invalid PNG: $name" }
         $captureWidth = $png[16] * 16777216 + $png[17] * 65536 + $png[18] * 256 + $png[19]
         $captureHeight = $png[20] * 16777216 + $png[21] * 65536 + $png[22] * 256 + $png[23]
-        if ($captureWidth -ne $Width -or $captureHeight -ne $Height) { throw "Capture dimensions differ from requested output: ${captureWidth}x$captureHeight" }
+        $expectedWidth = if ($name -eq 'resized') { $ResizeWidth } else { $Width }; $expectedHeight = if ($name -eq 'resized') { $ResizeHeight } else { $Height }
+        if ($captureWidth -ne $expectedWidth -or $captureHeight -ne $expectedHeight) { throw "Capture dimensions differ from requested output: ${captureWidth}x$captureHeight" }
     }
     $result.status = 'PASS'
     $result.reason = 'Gameplay completed with primary-view progress, reset epoch, captures, and requested backend evidence.'

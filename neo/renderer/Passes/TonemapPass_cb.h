@@ -44,4 +44,5 @@ struct ToneMappingConstants
 
 	idVec2 colorLUTTextureSize;
 	idVec2 colorLUTTextureSizeInv;
+	idVec4 hdrOutput; // active, paper white, peak, UI white (nits)
 };

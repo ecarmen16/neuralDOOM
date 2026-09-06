@@ -198,6 +198,12 @@ public:
 	}
 	virtual void ReportLiveObjects() {}
 
+	// scRGB transport may remain active on an SDR desktop; content is bounded there.
+	virtual bool IsScRGBSwapChain() const { return false; }
+	virtual bool IsHDRDisplayActive() const { return false; }
+	virtual void PrintDisplayStatus() const { common->Printf( "HDR display: backend=SDR\n" ); }
+
+
 	[[nodiscard]] uint32_t GetFrameIndex() const
 	{
 		return m_FrameIndex;

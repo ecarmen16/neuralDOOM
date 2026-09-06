@@ -6955,7 +6955,7 @@ void idRenderBackend::PostProcess( const void* data )
 	}
 #endif
 
-	if( r_useFilmicPostFX.GetBool() || r_renderMode.GetInteger() > 0 )
+	if( !R_UseHDRToneMapping() && ( r_useFilmicPostFX.GetBool() || r_renderMode.GetInteger() > 0 ) )
 	{
 		OPTICK_GPU_EVENT( "Render_FilmicPostFX" );
 

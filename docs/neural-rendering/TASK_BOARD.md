@@ -6,13 +6,15 @@ Statuses: `BLOCKED`, `READY`, `IN PROGRESS`, `VERIFY`, `DONE`, `DEFERRED`.
 
 ### Modernization implementation / 2026-09-06
 
+Current branch: `codex/native-hdr`. See [NATIVE_HDR.md](NATIVE_HDR.md) for the opt-in implementation and validation boundary.
+
 | ID | Status | Task | Exit evidence |
 |---|---|---|---|
 | ND3-600 | DONE | Exact CMake artifact identity and build manifests | Both build variants pass; missing/stale/wrong-config fixture tests pass |
 | ND3-610 | DONE | Initial bounded gameplay smoke runner | Native/null/DLAA runs, reset epochs, frame progress, isolated PNGs and structured JSON; wider scenarios remain follow-up |
 | ND3-620 | VERIFY | Shared temporal contract validation | Both builds and null/DLAA runtime pass; negative-case injection coverage remains |
-| ND3-660A | VERIFY | HUD maximum aspect and uniform scaling | 16:9/21:9/32:9 automated runs and selected captures inspected; broader HUD interaction/layout checks pending |
-| ND3-660B | READY | Native HDR presentation capability audit | Named DX12 swapchain/tonemap/UI boundaries in modernization plan; no HDR output implemented yet |
+| ND3-660A | VERIFY | HUD layout, size and menu controls | Menu changes, archive persistence, relaunch and resolution changes tested; broader notification/combat HUD states remain |
+| ND3-660B | VERIFY | Native scRGB presentation, HDR tone mapping and calibration controls | SDK-OFF/ON builds; GPU composition/presentation diagnostics and resize checks; Windows HDR is off so actual HDR display review remains |
 
 See `UNATTENDED_WORKFLOW.md` for the implemented controls and test commands, and the 2026-09-06 entry in `TEST_RESULTS.md` for exact evidence and failures.
 

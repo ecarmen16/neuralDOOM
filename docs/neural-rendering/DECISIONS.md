@@ -117,3 +117,12 @@ Resolve these only after `RECON_REPORT.md` and targeted captures provide evidenc
 **Reasoning:** Public RHI source shows that it installs a ReShade graphics proxy and launches the target normally. Public ReShade supports loading under a non-proxy filename and exposes the add-on API requested dynamically by the local DLSS5 add-on. Loading that runtime from NeuralDoom before D3D12 creation removes the manual proxy installation step while preserving the complete device, swapchain, overlay, configuration, and add-on lifecycle that the closed experimental bridge expects. Reimplementing that private add-on or calling an undocumented NR runtime interface would be less supportable and would cross the project's legal/API boundary.
 
 **Consequence:** `r_neuralCompatibilityEnable` defaults OFF and only loads an ignored, user-supplied `neuraldoom-reshade64.dll`. ReShade still performs D3D12 hooks internally; this is not described as a native Neural Rendering backend. The engine's neutral temporal contract and official Streamline backend remain independent. A later public, documented DLSSNR API replaces this bridge rather than inheriting its ReShade assumptions.
+
+
+## D-015 - Use optional native scRGB with explicit SDR fallback
+
+**Status:** Accepted for a prototype; actual HDR display review pending.
+
+**Reasoning:** The renderer already has linear HDR scene inputs. Native Windows scRGB allows those highlights to survive into presentation without the temporary NR bridge. SDR LUTs, filmic scratch targets and retro modes require explicit handling to avoid silently clipping the new path.
+
+**Consequence:** `r_hdrOutput 1` requests FP16 scRGB on DX12, while SDR remains the default. Scene reference white, peak and nominal UI white are separate saved controls. The prototype retains extended gamma-coded HUD composition, converts only the presentation blit to linear scRGB, and bounds SDR fallback. Legacy retro/CRT/SMAA content remains SDR; the embedded bridge retains 8-bit transport. A non-archived diagnostic tests HDR tone mapping without changing Windows display settings. See NATIVE_HDR.md for the exact formats and limitations.

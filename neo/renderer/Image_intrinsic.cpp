@@ -34,6 +34,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "imgui.h"
 
 #include "RenderCommon.h"
+#include "sys/DeviceManager.h"
+extern DeviceManager* deviceManager;
 #include "SMAA/AreaTex.h"
 #include "SMAA/SearchTex.h"
 #include "Image_brdfLut.h"
@@ -257,7 +259,7 @@ static void R_RGBA8LinearImage( idImage* image, nvrhi::ICommandList* commandList
 
 static void R_LdrNativeImage( idImage* image, nvrhi::ICommandList* commandList )
 {
-	image->GenerateImage( NULL, renderSystem->GetWidth(), renderSystem->GetHeight(), TF_NEAREST, TR_CLAMP, TD_LOOKUP_TABLE_RGBA, nullptr, true, false, 1 );
+	image->GenerateImage( NULL, renderSystem->GetWidth(), renderSystem->GetHeight(), TF_NEAREST, TR_CLAMP, deviceManager && deviceManager->IsScRGBSwapChain() ? TD_RGBA16F : TD_LOOKUP_TABLE_RGBA, nullptr, true, false, 1 );
 }
 
 static void R_DepthImage( idImage* image, nvrhi::ICommandList* commandList )

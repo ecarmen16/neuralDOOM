@@ -312,6 +312,7 @@ void TonemapPass::Render(
 		toneMappingConstants.minAdaptedLuminance = r_hdrMinLuminance.GetFloat();
 		toneMappingConstants.maxAdaptedLuminance = r_hdrMaxLuminance.GetFloat();
 		toneMappingConstants.sourceSlice = 0;
+		toneMappingConstants.hdrOutput = idVec4( R_UseHDRToneMapping() ? 1.0f : 0.0f, r_hdrPaperWhiteNits.GetFloat(), r_hdrPeakNits.GetFloat(), r_hdrUIWhiteNits.GetFloat() );
 		toneMappingConstants.colorLUTTextureSize = enableColorLUT ? idVec2( colorLutSize * colorLutSize, colorLutSize ) : idVec2( 0.f, 0.f );
 		toneMappingConstants.colorLUTTextureSizeInv = enableColorLUT ? 1.f / toneMappingConstants.colorLUTTextureSize : idVec2( 0.f, 0.f );
 

@@ -45,6 +45,7 @@ struct ToneMappingConstants
 
 	float2 colorLUTTextureSize;
 	float2 colorLUTTextureSizeInv;
+	float4 hdrOutput; // active, paper white, peak, UI white (nits)
 };
 
 #endif // DEPTH_CB_H

@@ -30,6 +30,8 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "renderer/RenderCommon.h"
 #include "CommonPasses.h"
+#include "sys/DeviceManager.h"
+extern DeviceManager* deviceManager;
 
 
 CommonRenderPasses::CommonRenderPasses()
@@ -338,6 +340,11 @@ void CommonRenderPasses::BlitTexture( nvrhi::ICommandList* commandList, const Bl
 	blitConstants.sourceSize = idVec2( params.sourceBox.z, params.sourceBox.w );
 	blitConstants.targetOrigin = idVec2( params.targetBox.x, params.targetBox.y );
 	blitConstants.targetSize = idVec2( params.targetBox.z, params.targetBox.w );
+	if( deviceManager->IsScRGBSwapChain() && params.targetFramebuffer == deviceManager->GetCurrentFramebuffer() )
+	{
+		blitConstants.scRGBScale = deviceManager->IsHDRDisplayActive() ? r_hdrUIWhiteNits.GetFloat() / 80.0f : 1.0f;
+		blitConstants.scRGBMax = R_UseNativeHDR() ? r_hdrPeakNits.GetFloat() / 80.0f : blitConstants.scRGBScale;
+	}
 
 	commandList->setGraphicsState( state );
 

@@ -20,6 +20,13 @@
 * DEALINGS IN THE SOFTWARE.
 */
 
+#include <blit.cb.h>
+#ifdef SPIRV
+[[vk::push_constant]] ConstantBuffer<BlitConstants> g_Blit;
+#else
+cbuffer g_Blit : register( b0 ) { BlitConstants g_Blit; }
+#endif
+
 // *INDENT-OFF*
 #if TEXTURE_ARRAY
 Texture2DArray tex : register( t0 );
@@ -44,4 +51,9 @@ void main(
 #else
 	o_rgba = tex.Sample( samp, fragment.uv );
 #endif
+	if( g_Blit.scRGBScale > 0 )
+	{
+		// scRGB uses linear BT.709 primaries, with 1.0 representing 80 nits on HDR Windows.
+		o_rgba.rgb = min( pow( max( o_rgba.rgb, 0 ), 2.2 ) * g_Blit.scRGBScale, g_Blit.scRGBMax );
+	}
 }

@@ -1368,6 +1368,10 @@ public:
 			SYSTEM_FIELD_FULLSCREEN,
 			SYSTEM_FIELD_HUD_LAYOUT,
 			SYSTEM_FIELD_HUD_SCALE,
+			SYSTEM_FIELD_HDR_OUTPUT,
+			SYSTEM_FIELD_HDR_PAPER_WHITE,
+			SYSTEM_FIELD_HDR_PEAK,
+			SYSTEM_FIELD_HDR_UI_WHITE,
 			SYSTEM_FIELD_FRAMERATE,
 			SYSTEM_FIELD_VSYNC,
 			SYSTEM_FIELD_ANTIALIASING,
@@ -1412,6 +1416,10 @@ public:
 		float originalVolume;
 		float originalHudLayout;
 		float originalHudScale;
+		int originalHDROutput;
+		float originalHDRPaperWhite;
+		float originalHDRPeak;
+		float originalHDRUIWhite;
 		// RB begin
 		//int originalShadowMapping; // TODO use for quality of shadowmaps?
 		int originalRenderMode;

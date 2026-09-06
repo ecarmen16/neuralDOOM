@@ -72,6 +72,8 @@ struct BlitConstants
 	idVec2  targetSize;
 
 	float   sharpenFactor;
+	float   scRGBScale;
+	float   scRGBMax;
 };
 
 class CommonRenderPasses

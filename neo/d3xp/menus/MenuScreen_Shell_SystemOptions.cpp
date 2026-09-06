@@ -42,6 +42,10 @@ extern idCVar r_lightScale;
 extern idCVar r_useSSR;
 extern idCVar swf_hudMaxAspect;
 extern idCVar swf_hudScale;
+extern idCVar r_hdrOutput;
+extern idCVar r_hdrPaperWhiteNits;
+extern idCVar r_hdrPeakNits;
+extern idCVar r_hdrUIWhiteNits;
 
 /*
 ========================
@@ -111,6 +115,42 @@ void idMenuScreen_Shell_SystemOptions::Initialize( idMenuHandler* data )
 	control->SetDataSource( &systemData, idMenuDataSource_SystemSettings::SYSTEM_FIELD_HUD_SCALE );
 	control->SetupEvents( DEFAULT_REPEAT_TIME, options->GetChildren().Num() );
 	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, idMenuDataSource_SystemSettings::SYSTEM_FIELD_HUD_SCALE );
+	options->AddChild( control );
+
+	control = new( TAG_SWF ) idMenuWidget_ControlButton();
+	control->SetOptionType( OPTION_SLIDER_TEXT );
+	control->SetLabel( "HDR Output" );
+	control->SetDescription( "Uses native HDR with DirectX 12 and Windows HDR enabled. SDR fallback is automatic. Requires restarting the game." );
+	control->SetDataSource( &systemData, idMenuDataSource_SystemSettings::SYSTEM_FIELD_HDR_OUTPUT );
+	control->SetupEvents( DEFAULT_REPEAT_TIME, options->GetChildren().Num() );
+	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, idMenuDataSource_SystemSettings::SYSTEM_FIELD_HDR_OUTPUT );
+	options->AddChild( control );
+
+	control = new( TAG_SWF ) idMenuWidget_ControlButton();
+	control->SetOptionType( OPTION_SLIDER_TEXT );
+	control->SetLabel( "HDR Scene White" );
+	control->SetDescription( "Reference brightness of the HDR scene in nits. Does not change HUD brightness." );
+	control->SetDataSource( &systemData, idMenuDataSource_SystemSettings::SYSTEM_FIELD_HDR_PAPER_WHITE );
+	control->SetupEvents( DEFAULT_REPEAT_TIME, options->GetChildren().Num() );
+	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, idMenuDataSource_SystemSettings::SYSTEM_FIELD_HDR_PAPER_WHITE );
+	options->AddChild( control );
+
+	control = new( TAG_SWF ) idMenuWidget_ControlButton();
+	control->SetOptionType( OPTION_SLIDER_TEXT );
+	control->SetLabel( "HDR Peak" );
+	control->SetDescription( "Highlight ceiling in nits. Match this to your display using visual calibration." );
+	control->SetDataSource( &systemData, idMenuDataSource_SystemSettings::SYSTEM_FIELD_HDR_PEAK );
+	control->SetupEvents( DEFAULT_REPEAT_TIME, options->GetChildren().Num() );
+	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, idMenuDataSource_SystemSettings::SYSTEM_FIELD_HDR_PEAK );
+	options->AddChild( control );
+
+	control = new( TAG_SWF ) idMenuWidget_ControlButton();
+	control->SetOptionType( OPTION_SLIDER_TEXT );
+	control->SetLabel( "HDR UI White" );
+	control->SetDescription( "Brightness of HUD and menus in nits, independent of scene exposure." );
+	control->SetDataSource( &systemData, idMenuDataSource_SystemSettings::SYSTEM_FIELD_HDR_UI_WHITE );
+	control->SetupEvents( DEFAULT_REPEAT_TIME, options->GetChildren().Num() );
+	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, idMenuDataSource_SystemSettings::SYSTEM_FIELD_HDR_UI_WHITE );
 	options->AddChild( control );
 
 	control = new( TAG_SWF ) idMenuWidget_ControlButton();
@@ -464,6 +504,10 @@ void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::LoadData
 	originalVolume = s_volume_dB.GetFloat();
 	originalHudLayout = swf_hudMaxAspect.GetFloat();
 	originalHudScale = swf_hudScale.GetFloat();
+	originalHDROutput = r_hdrOutput.GetInteger();
+	originalHDRPaperWhite = r_hdrPaperWhiteNits.GetFloat();
+	originalHDRPeak = r_hdrPeakNits.GetFloat();
+	originalHDRUIWhite = r_hdrUIWhiteNits.GetFloat();
 	// RB begin
 	originalRenderMode = r_renderMode.GetInteger();
 	originalAmbientBrightness = r_forceAmbient.GetFloat();
@@ -491,6 +535,7 @@ idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsRestartRequ
 */
 bool idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsRestartRequired() const
 {
+	if( originalHDROutput != r_hdrOutput.GetInteger() ) { return true; }
 	/*
 	if( originalAntialias != r_antiAliasing.GetInteger() )
 	{
@@ -604,6 +649,18 @@ void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustFi
 			com_engineHz.SetInteger( AdjustOption( com_engineHz.GetInteger(), values, numValues, adjustAmount ) );
 			break;
 		}
+		case SYSTEM_FIELD_HDR_OUTPUT:
+			r_hdrOutput.SetInteger( r_hdrOutput.GetInteger() == 0 ? 1 : 0 );
+			break;
+		case SYSTEM_FIELD_HDR_PAPER_WHITE:
+			r_hdrPaperWhiteNits.SetFloat( idMath::ClampFloat( 80, 400, r_hdrPaperWhiteNits.GetFloat() + 10 * adjustAmount ) );
+			break;
+		case SYSTEM_FIELD_HDR_PEAK:
+			r_hdrPeakNits.SetFloat( idMath::ClampFloat( 400, 4000, r_hdrPeakNits.GetFloat() + 50 * adjustAmount ) );
+			break;
+		case SYSTEM_FIELD_HDR_UI_WHITE:
+			r_hdrUIWhiteNits.SetFloat( idMath::ClampFloat( 80, 400, r_hdrUIWhiteNits.GetFloat() + 10 * adjustAmount ) );
+			break;
 		case SYSTEM_FIELD_HUD_LAYOUT:
 		{
 			const float values[] = { 0.0f, 16.0f / 9.0f, 21.0f / 9.0f };
@@ -808,6 +865,14 @@ idSWFScriptVar idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings
 				return "#str_swf_disabled";
 			}
 
+		case SYSTEM_FIELD_HDR_OUTPUT:
+			return r_hdrOutput.GetInteger() == 1 ? "HDR (Auto)" : "SDR";
+		case SYSTEM_FIELD_HDR_PAPER_WHITE:
+			return va( "%d nits", idMath::Ftoi( r_hdrPaperWhiteNits.GetFloat() ) );
+		case SYSTEM_FIELD_HDR_PEAK:
+			return va( "%d nits", idMath::Ftoi( r_hdrPeakNits.GetFloat() ) );
+		case SYSTEM_FIELD_HDR_UI_WHITE:
+			return va( "%d nits", idMath::Ftoi( r_hdrUIWhiteNits.GetFloat() ) );
 		case SYSTEM_FIELD_HUD_LAYOUT:
 			if( swf_hudMaxAspect.GetFloat() <= 0.0f )
 			{
@@ -998,6 +1063,12 @@ bool idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsDataCh
 	}
 
 	if( originalBrightness != r_exposure.GetFloat() )
+	{
+		return true;
+	}
+
+	if( originalHDROutput != r_hdrOutput.GetInteger() || originalHDRPaperWhite != r_hdrPaperWhiteNits.GetFloat() ||
+		originalHDRPeak != r_hdrPeakNits.GetFloat() || originalHDRUIWhite != r_hdrUIWhiteNits.GetFloat() )
 	{
 		return true;
 	}

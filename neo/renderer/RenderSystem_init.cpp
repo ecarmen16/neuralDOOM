@@ -31,6 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "precompiled.h"
 #pragma hdrstop
+#include <cmath>
 
 #include "imgui.h"
 
@@ -338,6 +339,39 @@ DeviceManager* deviceManager = NULL;
 bool R_UsePixelatedLook()
 {
 	return ( r_renderMode.GetInteger() == RENDERMODE_PSX ) || image_pixelLook.GetBool();
+}
+
+idCVar r_hdrOutput( "r_hdrOutput", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER | CVAR_NEW, "native display output: 0 SDR, 1 scRGB with automatic SDR fallback; restart game after changing", 0, 1 );
+idCVar r_hdrPaperWhiteNits( "r_hdrPaperWhiteNits", "200", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT | CVAR_NEW, "HDR scene reference white in nits", 80.0f, 400.0f );
+idCVar r_hdrPeakNits( "r_hdrPeakNits", "1000", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT | CVAR_NEW, "HDR scene highlight ceiling in nits; calibrate for the display", 400.0f, 4000.0f );
+idCVar r_hdrUIWhiteNits( "r_hdrUIWhiteNits", "200", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT | CVAR_NEW, "HDR HUD and menu white in nits, independent of scene exposure", 80.0f, 400.0f );
+
+idCVar r_hdrDiagnostic( "r_hdrDiagnostic", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "exercise HDR tone mapping in an SDR-clipped preview; requires scRGB transport, does not enable Windows HDR" );
+
+bool R_UseHDRToneMapping()
+{
+	// Legacy retro/CRT/SMAA targets clamp to SDR. Preserve their selected appearance.
+	return deviceManager && deviceManager->IsScRGBSwapChain() && ( deviceManager->IsHDRDisplayActive() || r_hdrDiagnostic.GetBool() ) &&
+		r_renderMode.GetInteger() == RENDERMODE_DOOM && r_useCRTPostFX.GetInteger() == 0 &&
+		r_antiAliasing.GetInteger() != ANTI_ALIASING_SMAA_1X &&
+		!cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" );
+}
+
+bool R_UseNativeHDR()
+{
+	return R_UseHDRToneMapping() && deviceManager->IsHDRDisplayActive();
+}
+
+static void R_HDRStatus_f( const idCmdArgs& args )
+{
+	if( deviceManager ) { deviceManager->PrintDisplayStatus(); }
+	const char* reason = R_UseNativeHDR() ? "none" :
+		!deviceManager || !deviceManager->IsScRGBSwapChain() ? "SDR-mode-or-transport-unavailable" :
+		!deviceManager->IsHDRDisplayActive() ? "Windows-HDR-inactive" : "legacy-render-mode-AA-CRT-or-bridge";
+	common->Printf( "HDR fallback: %s\n", reason );
+	common->Printf( "HDR content: active=%d paperWhiteNits=%.1f peakNits=%.1f uiWhiteNits=%.1f legacyFilmicBypassed=%d diagnostic=%d\n",
+		R_UseNativeHDR() ? 1 : 0, r_hdrPaperWhiteNits.GetFloat(), r_hdrPeakNits.GetFloat(), r_hdrUIWhiteNits.GetFloat(),
+		R_UseHDRToneMapping() && r_useFilmicPostFX.GetBool() ? 1 : 0, r_hdrDiagnostic.GetBool() ? 1 : 0 );
 }
 
 bool R_UseTemporalAA()
@@ -808,9 +842,47 @@ void R_ReportSurfaceAreas_f( const idCmdArgs& args )
 ==============================================================================
 */
 
+static void R_MeasureHDRComposition( nvrhi::IDevice* device, nvrhi::ITexture* texture, bool presentation = false )
+{
+	const nvrhi::TextureDesc& desc = texture->getDesc();
+	nvrhi::StagingTextureHandle staging = device->createStagingTexture( desc, nvrhi::CpuAccessMode::Read );
+	nvrhi::CommandListHandle list = device->createCommandList();
+	list->open();
+	list->copyTexture( staging, nvrhi::TextureSlice(), texture, nvrhi::TextureSlice() );
+	list->close();
+	device->executeCommandList( list );
+	size_t pitch = 0;
+	const byte* data = static_cast<const byte*>( device->mapStagingTexture( staging, nvrhi::TextureSlice(), nvrhi::CpuAccessMode::Read, &pitch ) );
+	if( !data ) { common->Warning( "HDR readback failed" ); return; }
+	float maximum = 0.0f;
+	uint64 aboveOne = 0, invalid = 0, negative = 0;
+	for( uint32_t y = 0; y < desc.height; y++ )
+	{
+		const uint16_t* row = reinterpret_cast<const uint16_t*>( data + y * pitch );
+		for( uint32_t x = 0; x < desc.width; x++ )
+		{
+			for( int c = 0; c < 3; c++ )
+			{
+				const float value = F16toF32( row[x * 4 + c] );
+				if( !std::isfinite( value ) ) { invalid++; continue; }
+				if( value < 0.0f ) { negative++; }
+				maximum = Max( maximum, value );
+				if( value > 1.0f ) { aboveOne++; }
+			}
+		}
+	}
+	device->unmapStagingTexture( staging );
+	common->Printf( "HDR readback: stage=%s format=RGBA16F width=%u height=%u maximum=%.6f aboveOne=%llu invalid=%llu active=%d negative=%llu diagnostic=%d\n",
+		presentation ? "scRGB" : "composition", desc.width, desc.height, maximum, ( unsigned long long )aboveOne, ( unsigned long long )invalid, R_UseNativeHDR() ? 1 : 0, ( unsigned long long )negative, r_hdrDiagnostic.GetBool() ? 1 : 0 );
+}
+
 bool R_ReadPixelsRGB8( nvrhi::IDevice* device, CommonRenderPasses* pPasses, nvrhi::ITexture* texture, nvrhi::ResourceStates textureState, const char* fullname )
 {
 	nvrhi::TextureDesc desc = texture->getDesc();
+	if( desc.format == nvrhi::Format::RGBA16_FLOAT && texture == globalImages->ldrImage->GetTextureHandle() )
+	{
+		R_MeasureHDRComposition( device, texture );
+	}
 	nvrhi::TextureHandle tempTexture;
 	nvrhi::FramebufferHandle tempFramebuffer;
 
@@ -829,7 +901,7 @@ bool R_ReadPixelsRGB8( nvrhi::IDevice* device, CommonRenderPasses* pPasses, nvrh
 			tempTexture = texture;
 			break;
 		default:
-			desc.format = nvrhi::Format::SRGBA8_UNORM;
+			desc.format = texture == globalImages->ldrImage->GetTextureHandle() ? nvrhi::Format::RGBA8_UNORM : nvrhi::Format::SRGBA8_UNORM;
 			desc.isRenderTarget = true;
 			desc.initialState = nvrhi::ResourceStates::RenderTarget;
 			desc.keepInitialState = true;
@@ -1093,11 +1165,16 @@ void idRenderSystemLocal::TakeScreenshot( int widthIgnored, int heightIgnored, c
 
 	// get the GPU busy with new commands
 	tr.RenderCommandBuffers( cmd );
+	nvrhi::TextureHandle presentedTexture = deviceManager->IsScRGBSwapChain() ? deviceManager->GetCurrentBackBuffer() : nullptr;
 
 	// discard anything currently on the list (this triggers SwapBuffers)
 	tr.SwapCommandBuffers( NULL, NULL, NULL, NULL, NULL, NULL );
 
 	R_ReadPixelsRGB8( deviceManager->GetDevice(), &backEnd.GetCommonPasses(), globalImages->ldrImage->GetTextureHandle() , nvrhi::ResourceStates::RenderTarget, fileName );
+	if( presentedTexture )
+	{
+		R_MeasureHDRComposition( deviceManager->GetDevice(), presentedTexture, true );
+	}
 
 	// discard anything currently on the list
 	tr.SwapCommandBuffers( NULL, NULL, NULL, NULL, NULL, NULL );
@@ -1711,6 +1788,7 @@ void R_InitCommands()
 	cmdSystem->AddCommand( "testVideo", R_TestVideo_f, CMD_FL_RENDERER | CMD_FL_CHEAT, "displays the given cinematic", idCmdSystem::ArgCompletion_VideoName );
 	cmdSystem->AddCommand( "reportSurfaceAreas", R_ReportSurfaceAreas_f, CMD_FL_RENDERER, "lists all used materials sorted by surface area" );
 	cmdSystem->AddCommand( "showInteractionMemory", R_ShowInteractionMemory_f, CMD_FL_RENDERER, "shows memory used by interactions" );
+	cmdSystem->AddCommand( "hdrStatus", R_HDRStatus_f, CMD_FL_RENDERER, "reports native HDR transport, Windows output and content state" );
 	cmdSystem->AddCommand( "vid_restart", R_VidRestart_f, CMD_FL_RENDERER, "restarts renderSystem" );
 	cmdSystem->AddCommand( "neuralHistoryReset", R_NeuralHistoryReset_f, CMD_FL_RENDERER, "invalidate all temporal history on the next primary view" );
 	cmdSystem->AddCommand( "neuralHistoryStatus", R_NeuralHistoryStatus_f, CMD_FL_RENDERER, "print the temporal history epoch and pending reset reasons" );
