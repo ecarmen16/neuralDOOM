@@ -33,6 +33,7 @@ If you have questions concerning this license or the applicable additional terms
 extern DeviceManager* deviceManager;
 
 idCVar r_logLevel( "r_logLevel", "0", CVAR_BOOL, "1 = Named render events in RenderDoc but is slower if enabled" );
+idCVar r_gpuProfileFrames( "r_gpuProfileFrames", "0", CVAR_RENDERER | CVAR_INTEGER, "capture 1..3600 GPU timing samples to gpu_profile.csv in fs_savepath; 0 cancels; resets after completion", 0, 3600 );
 
 static const int LOG_LEVEL_BLOCKS_ONLY	= 1;
 static const int LOG_LEVEL_EVERYTHING	= 2;
@@ -118,6 +119,12 @@ idRenderLog::idRenderLog()
 {
 	frameCounter = 0;
 	frameParity = 0;
+	profileTarget = 0;
+	profileCount = 0;
+	profileWarmup = 0;
+	memset( queryFrames, 0, sizeof( queryFrames ) );
+	memset( queryWidths, 0, sizeof( queryWidths ) );
+	memset( queryHeights, 0, sizeof( queryHeights ) );
 }
 
 void idRenderLog::Init()
@@ -132,6 +139,9 @@ void idRenderLog::Init()
 void idRenderLog::Shutdown()
 {
 	commandList = nullptr;
+	profileSamples.Clear();
+	profileTarget = 0;
+	r_gpuProfileFrames.SetInteger( 0 );
 
 	for( int i = 0; i < MRB_TOTAL * NUM_FRAME_DATA; i++ )
 	{
@@ -142,6 +152,9 @@ void idRenderLog::Shutdown()
 void idRenderLog::StartFrame( nvrhi::ICommandList* _commandList )
 {
 	commandList = _commandList;
+	queryFrames[frameParity] = frameCounter;
+	queryWidths[frameParity] = renderSystem->GetWidth();
+	queryHeights[frameParity] = renderSystem->GetHeight();
 }
 
 void idRenderLog::EndFrame()
@@ -211,6 +224,43 @@ void idRenderLog::FetchGPUTimers( backEndCounters_t& pc )
 	frameCounter++;
 	frameParity = ( frameParity + 1 ) % NUM_FRAME_DATA;
 
+	const int requested = r_gpuProfileFrames.GetInteger();
+	if( requested != profileTarget )
+	{
+		profileSamples.Clear();
+		profileCount = 0;
+		profileTarget = requested;
+		// Discard queries submitted before the request, including in-flight frames.
+		profileWarmup = NUM_FRAME_DATA + 1;
+		if( requested > 0 && !glConfig.timerQueryAvailable )
+		{
+			common->Warning( "GPU profile requires GPU timer queries" );
+			profileTarget = 0;
+			r_gpuProfileFrames.SetInteger( 0 );
+		}
+		profileSamples.SetNum( profileTarget );
+	}
+
+	gpuProfileSample_t* sample = NULL;
+	if( profileTarget > 0 )
+	{
+		if( profileWarmup > 0 )
+		{
+			profileWarmup--;
+		}
+		else if( timerUsed[MRB_GPU_TIME + frameParity * MRB_TOTAL] )
+		{
+			sample = &profileSamples[profileCount];
+			sample->frame = queryFrames[frameParity];
+			sample->width = queryWidths[frameParity];
+			sample->height = queryHeights[frameParity];
+			for( int i = 0; i < MRB_TOTAL; i++ )
+			{
+				sample->microseconds[i] = -1.0;
+			}
+		}
+	}
+
 	for( int i = 0; i < MRB_TOTAL; i++ )
 	{
 		int timerIndex = i + frameParity * MRB_TOTAL;
@@ -219,6 +269,10 @@ void idRenderLog::FetchGPUTimers( backEndCounters_t& pc )
 		{
 			double time = deviceManager->GetDevice()->getTimerQueryTime( timerQueries[ timerIndex ] );
 			time *= 1000000.0; // seconds -> microseconds
+			if( sample != NULL )
+			{
+				sample->microseconds[i] = time;
+			}
 
 			switch( i )
 			{
@@ -306,6 +360,51 @@ void idRenderLog::FetchGPUTimers( backEndCounters_t& pc )
 		// reset timer
 		timerUsed[timerIndex] = false;
 	}
+
+	if( sample != NULL && ++profileCount == profileTarget )
+	{
+		// File I/O happens only after the last measured frame has finished.
+		WriteGPUProfile();
+		profileSamples.Clear();
+		profileTarget = 0;
+		r_gpuProfileFrames.SetInteger( 0 );
+	}
+}
+
+void idRenderLog::WriteGPUProfile()
+{
+	idFile* file = fileSystem->OpenFileWrite( "gpu_profile.csv" );
+	if( file == NULL )
+	{
+		common->Warning( "Could not write GPU profile" );
+		return;
+	}
+	file->Printf( "query_frame,width,height" );
+	for( int i = 0; i < MRB_TOTAL; i++ )
+	{
+		file->Printf( ",%s_us", renderLogMainBlockLabels[i] );
+	}
+	file->Printf( "\n" );
+	for( int row = 0; row < profileCount; row++ )
+	{
+		const gpuProfileSample_t& sample = profileSamples[row];
+		file->Printf( "%llu,%d,%d", ( unsigned long long )sample.frame, sample.width, sample.height );
+		for( int i = 0; i < MRB_TOTAL; i++ )
+		{
+			// Missing passes stay blank, rather than masquerading as zero-cost work.
+			if( sample.microseconds[i] != -1.0 )
+			{
+				file->Printf( ",%.3f", sample.microseconds[i] );
+			}
+			else
+			{
+				file->Printf( "," );
+			}
+		}
+		file->Printf( "\n" );
+	}
+	fileSystem->CloseFile( file );
+	common->Printf( "GPU_PROFILE_COMPLETE samples=%d file=gpu_profile.csv\n", profileCount );
 }
 
 

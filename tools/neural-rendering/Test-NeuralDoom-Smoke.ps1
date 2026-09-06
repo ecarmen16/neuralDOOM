@@ -16,7 +16,11 @@ param(
     [ValidateRange(0, 4320)][int]$ResizeHeight = 0,
     [ValidateRange(0, 1)][int]$LegacyRenderMode = 0,
     [ValidateRange(60, 3600)][int]$Frames = 120,
-    [ValidateRange(30, 600)][int]$TimeoutSeconds = 120
+    [ValidateRange(30, 600)][int]$TimeoutSeconds = 120,
+    [switch]$GpuProfile,
+    [ValidateSet('Baseline', 'NoSSAO', 'NoSSR', 'Shadow4')][string]$LightingVariant = 'Baseline',
+    [ValidateRange(180, 3600)][int]$WarmupFrames = 180,
+    [switch]$PassThru
 )
 
 . (Join-Path $PSScriptRoot 'Common.ps1')
@@ -48,6 +52,11 @@ $result.hdrDiagnostic = [bool]$HDRDiagnostic
 $result.resizeWidth = $ResizeWidth
 $result.resizeHeight = $ResizeHeight
 $result.hdrActive = $false
+$result.lightingVariant = $LightingVariant
+$result.warmupFrames = $WarmupFrames
+$result.gpuProfile = $null
+$result.fixedTicProfiling = [bool]$GpuProfile
+if (-not $GpuProfile -and $LightingVariant -ne 'Baseline') { throw 'Lighting variants require -GpuProfile.' }
 $process = $null
 try {
     if ($Profile -eq 'DLAA' -and $manifest.features.streamline -ne 'ON') {
@@ -81,9 +90,25 @@ try {
         "set r_neuralBackend $backend", "set r_hdrDiagnostic $([int][bool]$HDRDiagnostic)", 'set r_screenFraction 100', "set r_renderMode $LegacyRenderMode",
         'set r_useTemporalAA 1', 'set r_antiAliasing 2',
         ('set swf_hudScale ' + $HudScale.ToString($culture)),
-        ('set swf_hudMaxAspect ' + $HudMaxAspect.ToString($culture)),
-        'devmap game/mars_city2', 'wait 180', 'hdrStatus', 'neuralHistoryStatus', 'neuralBackendStatus',
-        'screenshot screenshots/before.png', "wait $Frames", 'neuralHistoryStatus', 'neuralBackendStatus',
+        ('set swf_hudMaxAspect ' + $HudMaxAspect.ToString($culture))
+    )
+    if ($GpuProfile) {
+        # Bypass the background 15-Hz sleep using the engine's existing debug mode.
+        # One simulation tick per render frame is a throughput workload, not normal play.
+        $scriptLines += @('set r_swapInterval 0', 'set com_engineHz 60', 'set com_fixedTic 1',
+            'set r_useShadowAtlas 1', 'set r_skipShadows 0', 'set r_lightScale 3', 'set r_useNewSSAOPass 1',
+            "set r_useSSAO $([int]($LightingVariant -ne 'NoSSAO'))",
+            "set r_useSSR $([int]($LightingVariant -ne 'NoSSR'))",
+            "set r_shadowMapSamples $(if ($LightingVariant -eq 'Shadow4') { 4 } else { 16 })")
+    }
+    $scriptLines += @('devmap game/mars_city2', "wait $WarmupFrames", 'hdrStatus', 'neuralHistoryStatus', 'neuralBackendStatus', 'screenshot screenshots/before.png')
+    if ($GpuProfile) {
+        # Let the screenshot stall and its queued frames drain before requesting samples.
+        $scriptLines += @('wait 30', "set r_gpuProfileFrames $Frames", "wait $($Frames + 60)")
+    } else {
+        $scriptLines += "wait $Frames"
+    }
+    $scriptLines += @('neuralHistoryStatus', 'neuralBackendStatus',
         'neuralHistoryReset', 'wait 30', 'neuralHistoryStatus',
         'hdrStatus', 'screenshot screenshots/after.png'
     )
@@ -117,6 +142,10 @@ try {
     $log = Get-Content -LiteralPath (Join-Path $saveBase.FullName 'smoke.log') -Raw
     if ($log -notmatch 'NEURAL_SMOKE_COMPLETE') { throw 'Gameplay script did not complete.' }
     if ($log -match '(?im)FATAL ERROR|D3D12 device removed|Unknown command') { throw 'Engine log contains fatal/device/command errors.' }
+    if ($GpuProfile) {
+        if ($log -notmatch "GPU_PROFILE_COMPLETE samples=$Frames file=gpu_profile.csv") { throw 'GPU profile did not complete.' }
+        $result.gpuProfile = & (Join-Path $PSScriptRoot 'Measure-NeuralGpuProfile.ps1') -Path (Join-Path $saveBase.FullName 'gpu_profile.csv') -ExpectedSamples $Frames -Width $Width -Height $Height
+    }
     $history = [regex]::Matches($log, 'Neural temporal history: epoch (\d+),[^\r\n]+trackedView valid at frame (\d+)')
     if ($history.Count -lt 3) { throw 'Missing primary-view history evidence.' }
     $result.frameProgress = [int]$history[1].Groups[2].Value - [int]$history[0].Groups[2].Value
@@ -170,5 +199,6 @@ try {
     $result | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $resultPath -Encoding UTF8
     Write-Host "$($result.status): $($result.reason)"
     Write-Host "Results: $resultPath"
+    if ($PassThru) { Write-Output ([pscustomobject]$result) }
 }
 if ($result.status -eq 'FAIL') { throw $result.reason }

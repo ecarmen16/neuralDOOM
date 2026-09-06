@@ -6,7 +6,7 @@ Statuses: `BLOCKED`, `READY`, `IN PROGRESS`, `VERIFY`, `DONE`, `DEFERRED`.
 
 ### Modernization implementation / 2026-09-06
 
-Current branch: `codex/native-hdr`. See [NATIVE_HDR.md](NATIVE_HDR.md) for the opt-in implementation and validation boundary.
+Current branch: `codex/lighting-diagnostics`. See [LIGHTING_BASELINE.md](LIGHTING_BASELINE.md) for unattended GPU measurements and the next probe-lighting audit; [NATIVE_HDR.md](NATIVE_HDR.md) retains the HDR implementation and validation boundary.
 
 | ID | Status | Task | Exit evidence |
 |---|---|---|---|
@@ -15,6 +15,7 @@ Current branch: `codex/native-hdr`. See [NATIVE_HDR.md](NATIVE_HDR.md) for the o
 | ND3-620 | VERIFY | Shared temporal contract validation | Both builds and null/DLAA runtime pass; negative-case injection coverage remains |
 | ND3-660A | VERIFY | HUD layout, size and menu controls | Menu changes, archive persistence, relaunch and resolution changes tested; broader notification/combat HUD states remain |
 | ND3-660B | VERIFY | Native scRGB presentation, HDR tone mapping and calibration controls | SDK-OFF/ON builds; GPU composition/presentation diagnostics and resize checks; Windows HDR is off so actual HDR display review remains |
+| ND3-660C | DONE | Opt-in GPU timing export and unattended lighting baseline | Eight Native ultrawide variant runs, two DLAA baseline runs, disabled/lifecycle/CSV validation; missing probes and further scene coverage remain follow-up |
 
 See `UNATTENDED_WORKFLOW.md` for the implemented controls and test commands, and the 2026-09-06 entry in `TEST_RESULTS.md` for exact evidence and failures.
 

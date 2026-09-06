@@ -88,6 +88,22 @@ private:
 	idStaticList<nvrhi::TimerQueryHandle, MRB_TOTAL* NUM_FRAME_DATA> timerQueries;
 	idStaticList<bool, MRB_TOTAL* NUM_FRAME_DATA> timerUsed;
 
+	struct gpuProfileSample_t
+	{
+		uint64 frame;
+		int width;
+		int height;
+		double microseconds[MRB_TOTAL]; // -1 means this block was not issued
+	};
+	uint64 queryFrames[NUM_FRAME_DATA];
+	int queryWidths[NUM_FRAME_DATA];
+	int queryHeights[NUM_FRAME_DATA];
+	idList<gpuProfileSample_t> profileSamples;
+	int profileTarget;
+	int profileCount;
+	int profileWarmup;
+	void WriteGPUProfile();
+
 public:
 	idRenderLog();
 

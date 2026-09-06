@@ -521,3 +521,79 @@ Final revision verification after limiting display polling to scRGB mode:
 
 - `smoke-20260906-125537-f75e6bee`: Native, SDR, diagnostic=False, 64 primary frames, PASS. Executable SHA-256: `6593A16BDB1F0633BBC26C0FBBF18E9BFED44A6A90EB5B043968863E34E1E59A`.
 - `smoke-20260906-125601-2d6d8ba1`: DLAA, AutoHDR, diagnostic=True, 64 primary frames, PASS. Executable SHA-256: `2B5850976E667C03A3348D7E90BF0651864676B08F9C0448F3FD751428FD380A`.
+
+## 2026-09-06: unattended lighting diagnostics
+
+Branch `codex/lighting-diagnostics`, based on `953d6904`. No shader, image format,
+coordinate convention, lighting default or vendor dependency changed. Added
+`r_gpuProfileFrames` in `neo/renderer/RenderLog.{h,cpp}` and the GPU CSV reader,
+lighting comparison runner, reader fixtures and optional smoke-run profiling under
+`tools/neural-rendering`. See `LIGHTING_BASELINE.md` for the contract and numbers.
+
+### Build and validation
+
+- `Configure-RBDOOM-DX12.ps1 -BuildDirectory build` followed by
+  `Build-RBDOOM.ps1 -BuildDirectory build -Configuration RelWithDebInfo -Parallel 16`:
+  PASS. Repeated with `-BuildDirectory build-streamline`: PASS, existing official
+  SDK enabled. Existing Windows SDK string-macro warnings remain. DXIL shaders
+  were unchanged/up to date; Vulkan was not built or run in this task.
+- SDK-OFF tested executable SHA-256:
+  `3CFD13CCA81F3AAAEB5EB54FD4099DE76433ABBCCC22E581337EDE75DCADA373`.
+- SDK-ON tested executable SHA-256:
+  `71F4681A8F9742F0ACD26197A28D5A6E8327883B77275991BB30885E20DCF180`.
+- Test manifests record base commit `953d6904` with the diagnostics patch dirty;
+  exact hashes bind the results to the executables. Final source synchronization
+  and commit do not substitute a different executable for these measurements.
+- `Test-NeuralGpuProfile.ps1`: PASS for units, median/p95, missing versus zero,
+  invalid/negative/nonfinite/zero total timing, incomplete CSV, duplicate frames
+  and wrong dimensions. `Test-NeuralBuildIdentity.ps1`: PASS, including all helper
+  PowerShell syntax and exact/missing/stale/configuration artifact checks.
+- Focused review covered query-ring attribution and warmup, bounded allocation,
+  cancellation/restart/completion, absent query export, post-capture file I/O,
+  existing query synchronization, isolated cvars, statistical scope, backend
+  gating, and preservation of the default smoke scenario. Whitespace/source
+  audits passed; staged new files are checked again by the commit hook.
+
+### Runtime evidence
+
+All paths below are under the build checkout's ignored `captures/neural` directory.
+
+| Artifact | Scenario | Result |
+| --- | --- | --- |
+| `smoke-20260906-131738-b52894cd` | Initial Native 2560x720, 64 GPU samples | PASS; inspected gameplay PNG |
+| `lighting-20260906-131917-fc736ea1/lighting.json` | Eight 2560x720 pilot runs, 300 samples each | Functional PASS; timing noise makes this unsuitable for marginal-cost claims |
+| `lighting-20260906-132418-8c1128b8/lighting.json` and `smoke-20260906-132418-9041577e` | Requested 5120x1440 window | FAIL: Windows clamped the client to 5104x1401; reader correctly rejected the mismatch |
+| `lighting-20260906-132554-7a6c8356/lighting.json` | Eight Native 4800x1350 runs, 600 warmup/300 samples each | PASS; fixed-tick mode, reversed order, all temporal/PNG/GPU checks |
+| `smoke-20260906-133042-3af9999d`, `smoke-20260906-133102-d7b6671c` | Two DLAA Baseline 4800x1350 runs, same warmup/samples | PASS; evaluated/presented with zero rejection; bypassed TAA absent in all samples |
+| `smoke-20260906-133122-36fe6903` | SDK-OFF Native 1280x720, profiling disabled | PASS; no GPU CSV created |
+| `smoke-20260906-133145-19f47621` | 1-sample completion, 3600-to-3500 request restart, cancel, then new 64-sample request | PASS; exactly two completion markers (1 and 64), final CSV contains 64 valid samples |
+
+The lifecycle scenario used an ignored copy of the smoke runner with only its cfg
+sequence extended. It did not drive the user's active game or configuration.
+All 20 PNGs from the ten final comparison runs passed CRC, full pixel-stream
+decompression, dimensions and scanline-filter checks at 4800x1350. Full-size preview
+tooling returned base64 transport errors. A first verification attempt lacked
+Pillow; the check was completed with Python's standard library. Visual inspection
+was limited to the smaller pilot capture; no perceptual DLAA comparison is claimed.
+
+### Interpretation and limits
+
+GPU: RTX 5090, NVIDIA 610.47 / UMD 32.0.16.1047. OS build: 26100.9168 (24H2).
+The pilot's median GPU intervals varied from roughly 1.5 to 3.8 ms; a bounded
+read-only `nvidia-smi` log also observed P0/P8 and memory-clock changes. Source
+inspection identified the engine's inactive-window 15-Hz sleep. Profiling now uses
+existing `com_fixedTic=1` to bypass that sleep, while normal smoke/play keeps its
+normal timing. No system clock/power policy was changed. The final workload has
+closely agreeing repeated medians/p95; this does not prove stable clocks everywhere.
+
+See the table in `LIGHTING_BASELINE.md` for the final per-configuration ranges.
+These are graphics-queue intervals for one active-world spawn scene, not FPS,
+end-to-end latency, or a broad GPU recommendation. The existing SSR counter is
+unwired; empty CSV cells preserve unavailable data. Likewise, DLAA evaluation has
+no standalone timer and should not be inferred from a missing TAA sample.
+
+The current scene logs 392 missing environment-image warning lines plus existing
+startup/resource/content warnings. Probe-lighting quality is therefore not a
+validated baseline. Bridge/NR appearance, HDR calibration, motion artifacts and
+other maps remain outside this timing task. Next: audit missing probe loading and
+fallbacks, then add two representative fixed-camera lighting scenarios.
