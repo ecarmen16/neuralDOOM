@@ -40,6 +40,8 @@ extern idCVar s_volume_dB;
 extern idCVar r_exposure; // RB: use this to control HDR exposure or brightness in LDR mode
 extern idCVar r_lightScale;
 extern idCVar r_useSSR;
+extern idCVar swf_hudMaxAspect;
+extern idCVar swf_hudScale;
 
 /*
 ========================
@@ -91,6 +93,24 @@ void idMenuScreen_Shell_SystemOptions::Initialize( idMenuHandler* data )
 	control->SetDataSource( &systemData, idMenuDataSource_SystemSettings::SYSTEM_FIELD_FULLSCREEN );
 	control->SetupEvents( DEFAULT_REPEAT_TIME, options->GetChildren().Num() );
 	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, idMenuDataSource_SystemSettings::SYSTEM_FIELD_FULLSCREEN );
+	options->AddChild( control );
+
+	control = new( TAG_SWF ) idMenuWidget_ControlButton();
+	control->SetOptionType( OPTION_SLIDER_TEXT );
+	control->SetLabel( "HUD Layout" );
+	control->SetDescription( "Automatically fits the HUD to the current window. Auto keeps it within a centered 16:9 region." );
+	control->SetDataSource( &systemData, idMenuDataSource_SystemSettings::SYSTEM_FIELD_HUD_LAYOUT );
+	control->SetupEvents( DEFAULT_REPEAT_TIME, options->GetChildren().Num() );
+	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, idMenuDataSource_SystemSettings::SYSTEM_FIELD_HUD_LAYOUT );
+	options->AddChild( control );
+
+	control = new( TAG_SWF ) idMenuWidget_ControlButton();
+	control->SetOptionType( OPTION_SLIDER_TEXT );
+	control->SetLabel( "HUD Size" );
+	control->SetDescription( "Changes gameplay HUD size. Saved automatically when leaving this menu; no restart needed." );
+	control->SetDataSource( &systemData, idMenuDataSource_SystemSettings::SYSTEM_FIELD_HUD_SCALE );
+	control->SetupEvents( DEFAULT_REPEAT_TIME, options->GetChildren().Num() );
+	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, idMenuDataSource_SystemSettings::SYSTEM_FIELD_HUD_SCALE );
 	options->AddChild( control );
 
 	control = new( TAG_SWF ) idMenuWidget_ControlButton();
@@ -442,6 +462,8 @@ void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::LoadData
 	originalVsync = r_swapInterval.GetInteger();
 	originalBrightness = r_exposure.GetFloat();
 	originalVolume = s_volume_dB.GetFloat();
+	originalHudLayout = swf_hudMaxAspect.GetFloat();
+	originalHudScale = swf_hudScale.GetFloat();
 	// RB begin
 	originalRenderMode = r_renderMode.GetInteger();
 	originalAmbientBrightness = r_forceAmbient.GetFloat();
@@ -580,6 +602,28 @@ void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustFi
 			static const int numValues = 2;
 			static const int values[numValues] = { 60, 120 };
 			com_engineHz.SetInteger( AdjustOption( com_engineHz.GetInteger(), values, numValues, adjustAmount ) );
+			break;
+		}
+		case SYSTEM_FIELD_HUD_LAYOUT:
+		{
+			const float values[] = { 0.0f, 16.0f / 9.0f, 21.0f / 9.0f };
+			const int indices[] = { 0, 1, 2 };
+			int index = 0;
+			for( int i = 0; i < 3; i++ )
+			{
+				if( idMath::Fabs( swf_hudMaxAspect.GetFloat() - values[i] ) < 0.001f )
+				{
+					index = i;
+					break;
+				}
+			}
+			swf_hudMaxAspect.SetFloat( values[AdjustOption( index, indices, 3, adjustAmount )] );
+			break;
+		}
+		case SYSTEM_FIELD_HUD_SCALE:
+		{
+			const int percent = idMath::Ftoi( swf_hudScale.GetFloat() * 100.0f + 0.5f );
+			swf_hudScale.SetFloat( idMath::ClampInt( 50, 150, percent + 5 * adjustAmount ) / 100.0f );
 			break;
 		}
 		case SYSTEM_FIELD_VSYNC:
@@ -764,6 +808,23 @@ idSWFScriptVar idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings
 				return "#str_swf_disabled";
 			}
 
+		case SYSTEM_FIELD_HUD_LAYOUT:
+			if( swf_hudMaxAspect.GetFloat() <= 0.0f )
+			{
+				return "Full width";
+			}
+			if( idMath::Fabs( swf_hudMaxAspect.GetFloat() - 16.0f / 9.0f ) < 0.001f )
+			{
+				return "Auto (16:9)";
+			}
+			if( idMath::Fabs( swf_hudMaxAspect.GetFloat() - 21.0f / 9.0f ) < 0.001f )
+			{
+				return "Centered (21:9)";
+			}
+			return va( "Custom (%.2f:1)", swf_hudMaxAspect.GetFloat() );
+		case SYSTEM_FIELD_HUD_SCALE:
+			return va( "%d%%", idMath::Ftoi( swf_hudScale.GetFloat() * 100.0f + 0.5f ) );
+
 		case SYSTEM_FIELD_ANTIALIASING:
 		{
 			if( r_antiAliasing.GetInteger() == 0 )
@@ -937,6 +998,11 @@ bool idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsDataCh
 	}
 
 	if( originalBrightness != r_exposure.GetFloat() )
+	{
+		return true;
+	}
+
+	if( originalHudLayout != swf_hudMaxAspect.GetFloat() || originalHudScale != swf_hudScale.GetFloat() )
 	{
 		return true;
 	}

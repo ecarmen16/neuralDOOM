@@ -1366,6 +1366,8 @@ public:
 			SYSTEM_FIELD_RENDERAPI, // RB: choose between DX12 and Vulkan on Windows
 #endif
 			SYSTEM_FIELD_FULLSCREEN,
+			SYSTEM_FIELD_HUD_LAYOUT,
+			SYSTEM_FIELD_HUD_SCALE,
 			SYSTEM_FIELD_FRAMERATE,
 			SYSTEM_FIELD_VSYNC,
 			SYSTEM_FIELD_ANTIALIASING,
@@ -1408,6 +1410,8 @@ public:
 		int originalVsync;
 		float originalBrightness;
 		float originalVolume;
+		float originalHudLayout;
+		float originalHudScale;
 		// RB begin
 		//int originalShadowMapping; // TODO use for quality of shadowmaps?
 		int originalRenderMode;

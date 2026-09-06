@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$RepoRoot,
-    [switch]$AllowDirty
+    [switch]$AllowDirty,
+    [switch]$Staged
 )
 
 Set-StrictMode -Version Latest
@@ -41,7 +42,7 @@ try {
         if ($forbiddenLeafNames -contains $leaf.ToLowerInvariant()) {
             $failures += "Tracked local runtime: $trackedFile"
         }
-        if ($normalized -match '(^|/)(local-proprietary|local-research|\.neuraldoom-cache|mod_D3HDP_Lite)(/|$)') {
+        if ($normalized -match '(^|/)(captures|neural-local|local-proprietary|local-research|\.neuraldoom-cache|mod_D3HDP_Lite)(/|$)') {
             $failures += "Tracked local-only path: $trackedFile"
         }
         if ($normalized -match '(?i)\.(resources?|pk4|rdc)$') {
@@ -54,7 +55,9 @@ try {
         [Environment]::GetFolderPath('UserProfile')
     )
     foreach ($machinePath in $machinePaths) {
-        $personalPathMatches = @(& git grep -I -n -F -- $machinePath . 2>$null)
+        $grepArgs = @('grep', '-I', '-n', '-F')
+        if ($Staged) { $grepArgs += '--cached' }
+        $personalPathMatches = @(& git @grepArgs -- $machinePath . 2>$null)
         if ($LASTEXITCODE -eq 0) {
             foreach ($match in $personalPathMatches) {
                 $failures += "Machine-specific path in tracked text: $match"

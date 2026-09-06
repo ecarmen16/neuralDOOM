@@ -8,3 +8,5 @@ neo/libs/* linguist-vendored
 
 # Make sure script files always have CRLF line endings for save file checksum portability
 *.script text eol=crlf
+
+.githooks/* text eol=lf

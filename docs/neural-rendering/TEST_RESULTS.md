@@ -464,3 +464,16 @@ Use one section per tested commit/configuration. Include failures; do not rewrit
 ### Conclusion
 -
 ```
+
+
+## 2026-09-06: HUD settings and downstream identity
+
+- Added System Options HUD Layout and HUD Size fields with matching enum/control ordering, change detection and existing archive commit behavior. HUD preferences do not participate in restart detection. The render path recalculates layout from the current viewport each frame; new configs default to centered 16:9, while saved overrides remain intact.
+- Updated Licensee.h game title/branch and Windows executable metadata to neuralDoom, preserving upstream credits and save/config identifiers.
+- Build-RBDOOM.ps1 -Configuration RelWithDebInfo passed for both build (SDK OFF) and build-streamline (SDK ON); logs: captures/neural/hud-settings-build-off.log and hud-settings-build-on.log.
+- Test-NeuralBuildIdentity.ps1 passed exact-target, stale-output/configuration isolation, missing-output and script syntax checks.
+- Native 2560x720, aspect 1.777778, scale 1.15: PASS, captures/neural/smoke-20260906-120459-41267828. Inspected after.png: centered health/ammo and full-width world rendering. DLAA 2560x720, aspect 1.777778: PASS, captures/neural/smoke-20260906-120607-d4a602b7. Both advanced 64 primary frames and passed reset/capture/backend checks. DLAA used normal GPU access outside the restricted sandbox.
+- Commit-guard fixtures rejected a dummy forbidden runtime filename and a staged machine path even after the working file was cleaned; accepted clean staged text. Initial sandbox PowerShell launch failed from language-mode restrictions; the same checks passed with normal process access.
+- Focused diff review covered enum ordering, live cvar reads, archive/change detection, restart behavior, upstream attributes and branding compatibility. Interactive menu navigation, save/relaunch persistence and live window-resize visual tests remain pending; runtime smoke checks use explicit HUD values and do not exercise those UI flows.
+- Git setup uses origin ecarmen16/neuralDoom and upstream RobertBeckebans/RBDOOM-3-BFG. Remote provisioning/push remains pending repository availability and authenticated GitHub CLI. No proprietary payloads are included in the source checkpoint.
+- Next: validate menu interaction and resize persistence, then implement the first native HDR capability/output negotiation slice described in MODERNIZATION_PLAN.md.

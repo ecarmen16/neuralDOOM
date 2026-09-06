@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+git diff --cached --check
+if command -v pwsh >/dev/null 2>&1; then
+    pwsh -NoProfile -File tools/neural-rendering/Test-NeuralDoom-PublicSource.ps1 -AllowDirty -Staged
+elif command -v powershell.exe >/dev/null 2>&1; then
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/neural-rendering/Test-NeuralDoom-PublicSource.ps1 -AllowDirty -Staged
+else
+    echo "neuralDoom pre-commit audit requires PowerShell (pwsh or powershell.exe)." >&2
+    exit 1
+fi

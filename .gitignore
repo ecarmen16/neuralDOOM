@@ -61,3 +61,10 @@ neo/bin/
 /nvngx_dlss.dll.original
 /local-research/
 /.neuraldoom-cache/
+
+# Source checkouts must remain safe without machine-local excludes.
+/local-proprietary/
+/captures/
+/neural-local/
+*.nv-gpudmp
+*.rdc

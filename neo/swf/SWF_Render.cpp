@@ -36,7 +36,7 @@ idCVar swf_stopat( "swf_stopat", "0", CVAR_FLOAT, "stop at a specific frame" );
 idCVar swf_titleSafe( "swf_titleSafe", "0.005", CVAR_FLOAT, "space between UI elements and screen edge", 0.0f, 0.075f );
 
 idCVar swf_hudScale( "swf_hudScale", "1", CVAR_FLOAT | CVAR_ARCHIVE | CVAR_NEW, "uniform gameplay HUD scale; menus and world GUIs are unaffected", 0.5f, 1.5f );
-idCVar swf_hudMaxAspect( "swf_hudMaxAspect", "0", CVAR_FLOAT | CVAR_ARCHIVE | CVAR_NEW, "maximum gameplay HUD width divided by height; 0 uses the full screen, 1.777778 centers a 16:9 HUD on ultrawide displays", 0.0f, 4.0f );
+idCVar swf_hudMaxAspect( "swf_hudMaxAspect", "1.777778", CVAR_FLOAT | CVAR_ARCHIVE | CVAR_NEW, "maximum gameplay HUD width divided by height; 0 uses the full screen, 1.777778 centers a 16:9 HUD on ultrawide displays", 0.0f, 4.0f );
 
 idCVar swf_forceAlpha( "swf_forceAlpha", "0", CVAR_FLOAT, "force an alpha value on all elements, useful to show invisible animating elements", 0.0f, 1.0f );
 
