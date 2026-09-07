@@ -45,3 +45,14 @@ $script:publisher = 'CN=Microsoft Corporation, O=Microsoft Corporation, C=US'
 Install-SetupVCRuntime -RepoRoot $root
 if ($script:processes -ne 1) { throw 'Verified missing-runtime path not executed' }
 Write-Host 'PASS: publisher verification before execution and restart-required handling (mock process only).'
+
+$gameFixture = Join-Path $root 'Steam BFG'
+New-Item -ItemType Directory -Path (Join-Path $gameFixture 'base/maps') -Force | Out-Null
+'owned-data-path-fixture' | Set-Content -LiteralPath (Join-Path $gameFixture 'base/maps/mars_city2.resources')
+function Get-ItemProperty {
+    param($LiteralPath, $ErrorAction)
+    if ($LiteralPath -like '*Steam App 208200') { return [pscustomobject]@{ InstallLocation=$gameFixture } }
+    return $null
+}
+if ((Find-SetupBFG) -ne $gameFixture) { throw 'Steam installation detection failed.' }
+Write-Host 'PASS: Steam BFG detection with a registry/path fixture.'

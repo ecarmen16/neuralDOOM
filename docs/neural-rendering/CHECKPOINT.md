@@ -2,6 +2,8 @@
 
 ## Current: internal native RTX Release ready for testing
 
+A single-file setup EXE now extracts our package and automatically obtains/verifies/extracts public supporting files, handles the Microsoft runtime, detects BFG and creates a desktop shortcut. See INTERNAL_TESTING.md for the current one-file flow. Automatic download/extraction and Windows PowerShell 5.1 install checks passed.
+
 Graphics controls and visible dynamic geometry are implemented. The internal installer/package includes native RTX Release and matching source; DLAA/NR runtimes remain local only. Safe keys use F3 for reflections and preserve F5/F9/F12. See [INTERNAL_TESTING.md](../../INTERNAL_TESTING.md) for exact keys and installation, and TEST_RESULTS.md for current verification. The exported installer, package hash/tamper checks, relocated Release gameplay and resize passed on the development machine. Friends' fresh-machine and visual tests remain pending. Earlier entries below are historical.
 
 ## 2026-09-07 - User playtest feedback and brightness tuning
