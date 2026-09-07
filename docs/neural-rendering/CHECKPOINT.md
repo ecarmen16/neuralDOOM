@@ -1,5 +1,12 @@
 # Pre-playtest checkpoint - 2026-09-06
 
+## 2026-09-07 - User playtest feedback and brightness tuning
+
+The user reports the lighting/reflections and HDR look good, with screen reflections stronger and overall lighting brighter than desired. The active local NR INI tuning overrides were cleared, retaining only NR enabled and full-resolution rendering. Local playtest bounce was found at 1.5 and set to 1.125; reflection strength was reduced from 1 to 0.65. HDR settings and other controls were preserved. Both original config files were backed up under the ignored `captures/dogfood/tuning-backups` directory.
+
+`base/neural_rtx_contrast.cfg` reproduces the two lighting settings on request. No renderer code or shader changed; existing binaries remain current and no rebuild or game launch was needed. Next: compare the lower reflection/bounce settings, and assess the add-on's restored NR defaults separately. Earlier overnight notes below retain their historical validation boundary.
+
+
 ## Overnight stop — NR controls
 
 The user requested a quick stop for the night. Launcher option 3 / `-Profile NR` now selects the current Streamline build, validates the already-installed embedded compatibility stack, and reserves F6 for its existing NR hotkey. Bounce moves to F4. `-ValidateOnly` is read-only; `-PrepareOnly` stages only the verified engine executable and prepares the local settings without starting the game. No runtime binaries are obtained or copied. Native/DLAA remain independent; NR retains the existing SDR compatibility output.

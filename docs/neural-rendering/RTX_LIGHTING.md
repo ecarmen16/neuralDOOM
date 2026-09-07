@@ -4,6 +4,12 @@
 
 `Launch-NeuralDoom-RTX.cmd` enables reflections, material bounce, contact shadows and AO. It supports Native and optional DLAA rendering, with native HDR output when Windows HDR is enabled. `Launch-NeuralDoom.cmd` preserves saved feature choices. Both select the exact CMake output and verify its build manifest. No ReShade bridge is required.
 
+## Subdued lighting preset
+
+For the 2026-09-07 brightness feedback, `exec neural_rtx_contrast.cfg` sets diffuse bounce strength to **1.125** and reflection blend to **0.65**. This is an optional tuning preset, not a shader change or new factory default. It leaves HDR, AO, contact shadows, ray samples and render resolution unchanged. The current local playtest settings were set to those values with a backup. Compare this first before changing HDR calibration; a 35% lower reflection blend does not imply a 35% darker image, because native probe specular remains the fallback.
+
+The active local `reshade.ini` NR section was reset by removing its saved tuning overrides so the installed add-on supplies its own defaults. Only NR enabled and upscaling disabled remain explicit, retaining full-resolution rendering. Other ReShade sections and earlier backups were preserved. This is distinct from setting every tuning slider to 1, which would not necessarily match the add-on's defaults.
+
 ## Controls
 
 Direct edits to any RTX cvar now reset temporal history on the next primary view, including intensity, radius, samples and debug mode. A separate `neuralHistoryReset` is optional.
