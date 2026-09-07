@@ -392,14 +392,22 @@ enum
 	BUILTIN_VERTEX_COLOR,
 
 	BUILTIN_AMBIENT_LIGHTING_IBL,
+	BUILTIN_AMBIENT_LIGHTING_IBL_RT_CAPTURE,
 	BUILTIN_AMBIENT_LIGHTING_IBL_SKINNED,
+	BUILTIN_AMBIENT_LIGHTING_IBL_SKINNED_RT_CAPTURE,
 	BUILTIN_AMBIENT_LIGHTING_IBL_PBR,
+	BUILTIN_AMBIENT_LIGHTING_IBL_PBR_RT_CAPTURE,
 	BUILTIN_AMBIENT_LIGHTING_IBL_PBR_SKINNED,
+	BUILTIN_AMBIENT_LIGHTING_IBL_PBR_SKINNED_RT_CAPTURE,
 
 	BUILTIN_AMBIENT_LIGHTGRID_IBL,
+	BUILTIN_AMBIENT_LIGHTGRID_IBL_RT_CAPTURE,
 	BUILTIN_AMBIENT_LIGHTGRID_IBL_SKINNED,
+	BUILTIN_AMBIENT_LIGHTGRID_IBL_SKINNED_RT_CAPTURE,
 	BUILTIN_AMBIENT_LIGHTGRID_IBL_PBR,
+	BUILTIN_AMBIENT_LIGHTGRID_IBL_PBR_RT_CAPTURE,
 	BUILTIN_AMBIENT_LIGHTGRID_IBL_PBR_SKINNED,
+	BUILTIN_AMBIENT_LIGHTGRID_IBL_PBR_SKINNED_RT_CAPTURE,
 
 	BUILTIN_SMALL_GEOMETRY_BUFFER,
 	BUILTIN_SMALL_GEOMETRY_BUFFER_SKINNED,
@@ -593,45 +601,45 @@ public:
 		BindShader_Builtin( BUILTIN_VERTEX_COLOR );
 	}
 
-	void	BindShader_ImageBasedLighting()
+	void	BindShader_ImageBasedLighting( bool capture = false )
 	{
-		BindShader_Builtin( BUILTIN_AMBIENT_LIGHTING_IBL );
+		BindShader_Builtin( capture ? BUILTIN_AMBIENT_LIGHTING_IBL_RT_CAPTURE : BUILTIN_AMBIENT_LIGHTING_IBL );
 	}
 
-	void	BindShader_ImageBasedLightingSkinned()
+	void	BindShader_ImageBasedLightingSkinned( bool capture = false )
 	{
-		BindShader_Builtin( BUILTIN_AMBIENT_LIGHTING_IBL_SKINNED );
+		BindShader_Builtin( capture ? BUILTIN_AMBIENT_LIGHTING_IBL_SKINNED_RT_CAPTURE : BUILTIN_AMBIENT_LIGHTING_IBL_SKINNED );
 	}
 
-	void	BindShader_ImageBasedLighting_PBR()
+	void	BindShader_ImageBasedLighting_PBR( bool capture = false )
 	{
-		BindShader_Builtin( BUILTIN_AMBIENT_LIGHTING_IBL_PBR );
+		BindShader_Builtin( capture ? BUILTIN_AMBIENT_LIGHTING_IBL_PBR_RT_CAPTURE : BUILTIN_AMBIENT_LIGHTING_IBL_PBR );
 	}
 
-	void	BindShader_ImageBasedLightingSkinned_PBR()
+	void	BindShader_ImageBasedLightingSkinned_PBR( bool capture = false )
 	{
-		BindShader_Builtin( BUILTIN_AMBIENT_LIGHTING_IBL_PBR_SKINNED );
+		BindShader_Builtin( capture ? BUILTIN_AMBIENT_LIGHTING_IBL_PBR_SKINNED_RT_CAPTURE : BUILTIN_AMBIENT_LIGHTING_IBL_PBR_SKINNED );
 	}
 
 
-	void	BindShader_ImageBasedLightGrid()
+	void	BindShader_ImageBasedLightGrid( bool capture = false )
 	{
-		BindShader_Builtin( BUILTIN_AMBIENT_LIGHTGRID_IBL );
+		BindShader_Builtin( capture ? BUILTIN_AMBIENT_LIGHTGRID_IBL_RT_CAPTURE : BUILTIN_AMBIENT_LIGHTGRID_IBL );
 	}
 
-	void	BindShader_ImageBasedLightGridSkinned()
+	void	BindShader_ImageBasedLightGridSkinned( bool capture = false )
 	{
-		BindShader_Builtin( BUILTIN_AMBIENT_LIGHTGRID_IBL_SKINNED );
+		BindShader_Builtin( capture ? BUILTIN_AMBIENT_LIGHTGRID_IBL_SKINNED_RT_CAPTURE : BUILTIN_AMBIENT_LIGHTGRID_IBL_SKINNED );
 	}
 
-	void	BindShader_ImageBasedLightGrid_PBR()
+	void	BindShader_ImageBasedLightGrid_PBR( bool capture = false )
 	{
-		BindShader_Builtin( BUILTIN_AMBIENT_LIGHTGRID_IBL_PBR );
+		BindShader_Builtin( capture ? BUILTIN_AMBIENT_LIGHTGRID_IBL_PBR_RT_CAPTURE : BUILTIN_AMBIENT_LIGHTGRID_IBL_PBR );
 	}
 
-	void	BindShader_ImageBasedLightGridSkinned_PBR()
+	void	BindShader_ImageBasedLightGridSkinned_PBR( bool capture = false )
 	{
-		BindShader_Builtin( BUILTIN_AMBIENT_LIGHTGRID_IBL_PBR_SKINNED );
+		BindShader_Builtin( capture ? BUILTIN_AMBIENT_LIGHTGRID_IBL_PBR_SKINNED_RT_CAPTURE : BUILTIN_AMBIENT_LIGHTGRID_IBL_PBR_SKINNED );
 	}
 
 

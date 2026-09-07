@@ -20,12 +20,18 @@ static idCVar r_rayTracedAOSamples( "r_rayTracedAOSamples", "8", CVAR_RENDERER |
 static idCVar r_rayTracedContactShadows( "r_rayTracedContactShadows", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Supplement direct-light shadows with static-world ray-traced contact shadows" );
 static idCVar r_rayTracedContactDistance( "r_rayTracedContactDistance", "128", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Contact-shadow ray reach in Doom world units", 1, 512 );
 static idCVar r_rayTracedContactStrength( "r_rayTracedContactStrength", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Contact-shadow strength", 0, 1 );
-static idCVar r_rayTracingDebug( "r_rayTracingDebug", "0", CVAR_RENDERER | CVAR_INTEGER, "0=shaded scene, 1=AO visibility, 2=contact-shadow visibility, 3=indirect material lighting, 4=ray-scene diffuse albedo", 0, 4 );
+static idCVar r_rayTracingDebug( "r_rayTracingDebug", "0", CVAR_RENDERER | CVAR_INTEGER, "0=shaded scene, 1=AO visibility, 2=contact-shadow visibility, 3=indirect material lighting, 4=ray-scene diffuse albedo, 5=reflections, 6=reflection receiver roughness", 0, 6 );
 static idCVar r_rayTracedGI( "r_rayTracedGI", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Experimental material-aware single-bounce diffuse lighting for static opaque world geometry" );
-static idCVar r_rayTracedGIStrength( "r_rayTracedGIStrength", "1.5", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Indirect material lighting intensity", 0, 4 );
+static idCVar r_rayTracedGIStrength( "r_rayTracedGIStrength", "1.125", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Indirect material lighting intensity (25 percent lower default)", 0, 4 );
 static idCVar r_rayTracedGIRadius( "r_rayTracedGIRadius", "384", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Maximum diffuse bounce distance in Doom world units", 16, 2048 );
 static idCVar r_rayTracedGISamples( "r_rayTracedGISamples", "4", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "Diffuse bounce samples per full-resolution pixel", 1, 16 );
 static idCVar r_rayTracedGIEmissive( "r_rayTracedGIEmissive", "2", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Emissive material contribution to indirect lighting", 0, 8 );
+
+static idCVar r_rayTracedReflections( "r_rayTracedReflections", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Full-resolution static-world reflections using native material roughness and normal maps" );
+static idCVar r_rayTracedReflectionStrength( "r_rayTracedReflectionStrength", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Blend from native probe specular to traced reflections", 0, 1 );
+static idCVar r_rayTracedReflectionSamples( "r_rayTracedReflectionSamples", "4", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "Reflection rays per full-resolution eligible pixel", 1, 16 );
+static idCVar r_rayTracedReflectionRoughness( "r_rayTracedReflectionRoughness", "0.7", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Maximum reflection roughness, with a 0.15 fade into native probes", 0.1, 1 );
+static idCVar r_rayTracedReflectionDistance( "r_rayTracedReflectionDistance", "2048", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Maximum reflection ray distance in Doom world units", 16, 8192 );
 
 void RB_GetShaderTextureMatrix( const float* shaderRegisters, const textureStage_t* texture, float matrix[16] );
 void RB_BakeTextureMatrixIntoTexgen( idPlane lightProject[3], const float* textureMatrix );
@@ -36,7 +42,8 @@ bool R_RayTracingSettingsChanged()
 #if defined( USE_RAYTRACING )
 	idCVar* settings[] = { &r_rayTracedAO, &r_rayTracedAORadius, &r_rayTracedAOStrength, &r_rayTracedAOSamples,
 		&r_rayTracedContactShadows, &r_rayTracedContactDistance, &r_rayTracedContactStrength,
-		&r_rayTracedGI, &r_rayTracedGIStrength, &r_rayTracedGIRadius, &r_rayTracedGISamples, &r_rayTracedGIEmissive, &r_rayTracingDebug };
+		&r_rayTracedGI, &r_rayTracedGIStrength, &r_rayTracedGIRadius, &r_rayTracedGISamples, &r_rayTracedGIEmissive, &r_rayTracingDebug, &r_rayTracedReflections, &r_rayTracedReflectionStrength,
+		&r_rayTracedReflectionSamples, &r_rayTracedReflectionRoughness, &r_rayTracedReflectionDistance };
 	for( idCVar* setting : settings )
 	{
 		changed |= setting->IsModified();
@@ -842,6 +849,13 @@ struct rtBounceConstants_t
 };
 static_assert( sizeof( rtBounceMaterial_t ) == 96 && sizeof( rtBounceLight_t ) == 96 && sizeof( rtBounceConstants_t ) == 192, "Bounce data must match HLSL" );
 
+struct rtReflectionConstants_t
+{
+	idRenderMatrix previousWorldToClip;
+	idVec4 previousCamera, options, historyOptions;
+};
+static_assert( sizeof( rtReflectionConstants_t ) == 112, "Reflection constants must match HLSL" );
+
 class RayTracedLighting
 {
 public:
@@ -918,6 +932,79 @@ public:
 		return true;
 	}
 
+	bool BeginReflections( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color )
+	{
+		reflectionView = nullptr;
+		if( reflectionFailed ) { return false; }
+		if( !reflectionPipeline && !InitializeReflections() )
+		{
+			reflectionFailed = true;
+			common->Warning( "Ray-traced reflections unavailable; retaining native probe lighting" );
+			return false;
+		}
+		if( captureDepth != depth || captureColor != color || !captureFramebuffer )
+		{
+			nvrhi::TextureDesc desc;
+			desc.width = color->getDesc().width;
+			desc.height = color->getDesc().height;
+			desc.format = nvrhi::Format::RGBA16_FLOAT;
+			desc.isRenderTarget = true;
+			desc.initialState = nvrhi::ResourceStates::ShaderResource;
+			desc.keepInitialState = true;
+			desc.debugName = "Native probe specular for ray reflection replacement";
+			probeSpecular = device->createTexture( desc );
+			desc.debugName = "Native specular BRDF response and roughness";
+			specularResponse = device->createTexture( desc );
+			desc.debugName = "Native normal-mapped reflection direction";
+			reflectionNormal = device->createTexture( desc );
+			if( !probeSpecular || !specularResponse || !reflectionNormal ) { return false; }
+			captureFramebuffer = device->createFramebuffer( nvrhi::FramebufferDesc().addColorAttachment( color )
+				.addColorAttachment( probeSpecular ).addColorAttachment( specularResponse ).addColorAttachment( reflectionNormal ).setDepthAttachment( depth ) );
+			if( !captureFramebuffer ) { return false; }
+			captureDepth = depth;
+			captureColor = color;
+			reflectionRaw = nullptr;
+		}
+		globalFramebuffers.rayReflectionFBO->SetApiObject( captureFramebuffer );
+		list->clearTextureFloat( probeSpecular, nvrhi::AllSubresources, nvrhi::Color( 0.0f ) );
+		list->clearTextureFloat( specularResponse, nvrhi::AllSubresources, nvrhi::Color( 0.0f ) );
+		list->clearTextureFloat( reflectionNormal, nvrhi::AllSubresources, nvrhi::Color( 0.0f ) );
+		reflectionView = view;
+		captureFrame = view->taaFrameCount;
+		return true;
+	}
+
+	bool HasReflectionCapture( const viewDef_t* view ) const
+	{
+		return reflectionView == view && captureFrame == view->taaFrameCount;
+	}
+
+	void PrintReflectionStatus()
+	{
+		if( !reflectionFrames || !reflectionRaw ) { common->Printf( "RTREFLECTION_STATUS active=0 frames=0\n" ); return; }
+		nvrhi::BufferDesc desc;
+		desc.byteSize = 32;
+		desc.cpuAccess = nvrhi::CpuAccessMode::Read;
+		desc.initialState = nvrhi::ResourceStates::CopyDest;
+		desc.keepInitialState = true;
+		nvrhi::BufferHandle readback = device->createBuffer( desc );
+		nvrhi::CommandListParameters params;
+		params.enableImmediateExecution = false;
+		nvrhi::CommandListHandle list = device->createCommandList( params );
+		if( !readback || !list ) { return; }
+		list->open();
+		list->copyBuffer( readback, 0, reflectionStats, 0, 32 );
+		list->close();
+		device->executeCommandList( list );
+		device->waitForIdle();
+		const uint32* counts = static_cast<const uint32*>( device->mapBuffer( readback, nvrhi::CpuAccessMode::Read ) );
+		if( !counts ) { return; }
+		common->Printf( "RTREFLECTION_STATUS active=%d frames=%u width=%u height=%u fullResolution=1 samples=%u matched=%u rays=%u hits=%u modified=%u invalid=%u cached=%u emissive=%u\n",
+			r_rayTracedReflections.GetBool(), reflectionFrames, reflectionRaw->getDesc().width, reflectionRaw->getDesc().height,
+			counts[0], counts[1], counts[2], counts[3], counts[4], counts[5], counts[6], counts[7] );
+		device->unmapBuffer( readback );
+	}
+
 	bool Render( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color )
 	{
 		const int width = view->viewport.GetWidth(), height = view->viewport.GetHeight();
@@ -952,6 +1039,7 @@ public:
 			if( !bounceBindings || !compositeBindings ) { return false; }
 			boundDepth = depth;
 			boundColor = color;
+			reflectionRaw = nullptr;
 		}
 		std::vector<rtBounceMaterial_t> data( materials.size() );
 		float localParms[MAX_ENTITY_SHADER_PARMS] = { 1, 1, 1, 1 };
@@ -985,18 +1073,22 @@ public:
 		// Reuse complete native material shading at visible ray hits, including
 		// probes and normal maps. Snapshot before adding GI prevents feedback.
 		list->copyTexture( surfaceRadiance, nvrhi::TextureSlice(), color, nvrhi::TextureSlice() );
-		nvrhi::ComputeState state;
-		state.pipeline = bouncePipeline;
-		state.bindings = { bounceBindings };
-		list->beginMarker( "Ray-traced material bounce" );
-		list->setComputeState( state );
-		list->dispatch( ( width + 7 ) / 8, ( height + 7 ) / 8, 1 );
-		state.pipeline = compositePipeline;
-		state.bindings = { compositeBindings };
-		list->setComputeState( state );
-		list->dispatch( ( view->viewport.GetWidth() + 7 ) / 8, ( view->viewport.GetHeight() + 7 ) / 8, 1 );
-		list->endMarker();
-		frames++;
+		if( r_rayTracedGI.GetBool() )
+		{
+			nvrhi::ComputeState state;
+			state.pipeline = bouncePipeline;
+			state.bindings = { bounceBindings };
+			list->beginMarker( "Ray-traced material bounce" );
+			list->setComputeState( state );
+			list->dispatch( ( width + 7 ) / 8, ( height + 7 ) / 8, 1 );
+			state.pipeline = compositePipeline;
+			state.bindings = { compositeBindings };
+			list->setComputeState( state );
+			list->dispatch( ( view->viewport.GetWidth() + 7 ) / 8, ( view->viewport.GetHeight() + 7 ) / 8, 1 );
+			list->endMarker();
+			frames++;
+		}
+		if( r_rayTracedReflections.GetBool() && HasReflectionCapture( view ) ) { RenderReflections( list, view, cb, depth, color ); }
 		return true;
 	}
 
@@ -1026,6 +1118,120 @@ public:
 	uint32 frames = 0;
 private:
 	static const int TILE_SIZE = 256, MAX_LIGHTS = 16;
+	bool InitializeReflections()
+	{
+		reflectionConstants = ConstantBuffer( sizeof( rtReflectionConstants_t ), 16, "Ray reflection temporal constants" );
+		reflectionStats = StructuredBuffer( 32, 4, "Reflection sampled counters", true );
+		if( !reflectionConstants || !reflectionStats ) { return false; }
+		nvrhi::BindingLayoutDesc layout;
+		layout.visibility = nvrhi::ShaderType::Compute;
+		layout.bindings = { nvrhi::BindingLayoutItem::VolatileConstantBuffer( 0 ), nvrhi::BindingLayoutItem::VolatileConstantBuffer( 1 ),
+			nvrhi::BindingLayoutItem::RayTracingAccelStruct( 0 ), nvrhi::BindingLayoutItem::Texture_SRV( 1 ),
+			nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 2 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 3 ),
+			nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 4 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 5 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 6 ),
+			nvrhi::BindingLayoutItem::Texture_SRV( 7 ), nvrhi::BindingLayoutItem::Texture_SRV( 8 ), nvrhi::BindingLayoutItem::Texture_SRV( 9 ),
+			nvrhi::BindingLayoutItem::Texture_SRV( 10 ), nvrhi::BindingLayoutItem::Texture_SRV( 11 ),
+			nvrhi::BindingLayoutItem::Sampler( 0 ), nvrhi::BindingLayoutItem::Sampler( 1 ), nvrhi::BindingLayoutItem::Texture_UAV( 0 ),
+			nvrhi::BindingLayoutItem::StructuredBuffer_UAV( 1 ), nvrhi::BindingLayoutItem::Texture_UAV( 2 ) };
+		if( !Pipeline( "reflections", layout, reflectionLayout, reflectionPipeline ) ) { return false; }
+		layout.bindings = { nvrhi::BindingLayoutItem::VolatileConstantBuffer( 0 ), nvrhi::BindingLayoutItem::VolatileConstantBuffer( 1 ),
+			nvrhi::BindingLayoutItem::Texture_SRV( 0 ), nvrhi::BindingLayoutItem::Texture_SRV( 1 ), nvrhi::BindingLayoutItem::Texture_SRV( 2 ),
+			nvrhi::BindingLayoutItem::Texture_SRV( 3 ), nvrhi::BindingLayoutItem::Texture_SRV( 4 ), nvrhi::BindingLayoutItem::Texture_UAV( 0 ) };
+		if( !Pipeline( "reflection_filter", layout, reflectionFilterLayout, reflectionFilterPipeline ) ) { return false; }
+		layout.bindings = { nvrhi::BindingLayoutItem::VolatileConstantBuffer( 0 ), nvrhi::BindingLayoutItem::VolatileConstantBuffer( 1 ),
+			nvrhi::BindingLayoutItem::Texture_SRV( 0 ), nvrhi::BindingLayoutItem::Texture_SRV( 1 ), nvrhi::BindingLayoutItem::Texture_SRV( 2 ),
+			nvrhi::BindingLayoutItem::Texture_SRV( 3 ), nvrhi::BindingLayoutItem::Texture_UAV( 0 ) };
+		if( !Pipeline( "reflection_composite", layout, reflectionCompositeLayout, reflectionCompositePipeline ) ) { return false; }
+		common->Printf( "RTREFLECTION_READY staticWorld=1 nativeMaterials=1 fullResolution=1 samples=%d\n", r_rayTracedReflectionSamples.GetInteger() );
+		return true;
+	}
+
+	bool RenderReflections( nvrhi::ICommandList* list, const viewDef_t* view, const rtBounceConstants_t& cb, nvrhi::ITexture* depth, nvrhi::ITexture* color )
+	{
+		const int width = view->viewport.GetWidth(), height = view->viewport.GetHeight();
+		if( !reflectionRaw || reflectionRaw->getDesc().width != width || reflectionRaw->getDesc().height != height )
+		{
+			lastReflectionFrame = -1;
+			nvrhi::TextureDesc desc;
+			desc.width = width;
+			desc.height = height;
+			desc.format = nvrhi::Format::RGBA16_FLOAT;
+			desc.isUAV = true;
+			desc.initialState = nvrhi::ResourceStates::ShaderResource;
+			desc.keepInitialState = true;
+			desc.debugName = "Full-resolution raw ray reflection and hit coverage";
+			reflectionRaw = device->createTexture( desc );
+			if( !reflectionRaw ) { return false; }
+			for( int i = 0; i < 2; i++ )
+			{
+				desc.debugName = "Full-resolution reflection history and hit coverage";
+				reflectionHistory[i] = device->createTexture( desc );
+				desc.debugName = "Full-resolution reflection normal distance roughness guide";
+				reflectionGuide[i] = device->createTexture( desc );
+				if( !reflectionHistory[i] || !reflectionGuide[i] ) { reflectionRaw = nullptr; return false; }
+				list->clearTextureFloat( reflectionHistory[i], nvrhi::AllSubresources, nvrhi::Color( 0.0f ) );
+				list->clearTextureFloat( reflectionGuide[i], nvrhi::AllSubresources, nvrhi::Color( 0.0f ) );
+			}
+			for( int i = 0; i < 2; i++ )
+			{
+				nvrhi::BindingSetDesc bindings;
+				bindings.bindings = { nvrhi::BindingSetItem::ConstantBuffer( 0, constants ), nvrhi::BindingSetItem::ConstantBuffer( 1, reflectionConstants ),
+					nvrhi::BindingSetItem::RayTracingAccelStruct( 0, scene.Scene() ), nvrhi::BindingSetItem::Texture_SRV( 1, depth ),
+					nvrhi::BindingSetItem::StructuredBuffer_SRV( 2, scene.Positions() ), nvrhi::BindingSetItem::StructuredBuffer_SRV( 3, scene.Indices() ),
+					nvrhi::BindingSetItem::StructuredBuffer_SRV( 4, uvBuffer ), nvrhi::BindingSetItem::StructuredBuffer_SRV( 5, materialBuffer ),
+					nvrhi::BindingSetItem::StructuredBuffer_SRV( 6, lightBuffer ), nvrhi::BindingSetItem::Texture_SRV( 7, atlas ),
+					nvrhi::BindingSetItem::Texture_SRV( 8, surfaceRadiance ), nvrhi::BindingSetItem::Texture_SRV( 9, probeSpecular ),
+					nvrhi::BindingSetItem::Texture_SRV( 10, specularResponse ), nvrhi::BindingSetItem::Texture_SRV( 11, reflectionNormal ),
+					nvrhi::BindingSetItem::Sampler( 0, wrapSampler ), nvrhi::BindingSetItem::Sampler( 1, clampSampler ),
+					nvrhi::BindingSetItem::Texture_UAV( 0, reflectionRaw ), nvrhi::BindingSetItem::StructuredBuffer_UAV( 1, reflectionStats ),
+					nvrhi::BindingSetItem::Texture_UAV( 2, reflectionGuide[i] ) };
+				reflectionBindings[i] = device->createBindingSet( bindings, reflectionLayout );
+				bindings.bindings = { nvrhi::BindingSetItem::ConstantBuffer( 0, constants ), nvrhi::BindingSetItem::ConstantBuffer( 1, reflectionConstants ),
+					nvrhi::BindingSetItem::Texture_SRV( 0, reflectionRaw ), nvrhi::BindingSetItem::Texture_SRV( 1, reflectionGuide[i] ),
+					nvrhi::BindingSetItem::Texture_SRV( 2, reflectionHistory[i ^ 1] ), nvrhi::BindingSetItem::Texture_SRV( 3, reflectionGuide[i ^ 1] ),
+					nvrhi::BindingSetItem::Texture_SRV( 4, depth ), nvrhi::BindingSetItem::Texture_UAV( 0, reflectionHistory[i] ) };
+				reflectionFilterBindings[i] = device->createBindingSet( bindings, reflectionFilterLayout );
+				bindings.bindings = { nvrhi::BindingSetItem::ConstantBuffer( 0, constants ), nvrhi::BindingSetItem::ConstantBuffer( 1, reflectionConstants ),
+					nvrhi::BindingSetItem::Texture_SRV( 0, reflectionHistory[i] ), nvrhi::BindingSetItem::Texture_SRV( 1, probeSpecular ),
+					nvrhi::BindingSetItem::Texture_SRV( 2, reflectionGuide[i] ), nvrhi::BindingSetItem::Texture_SRV( 3, specularResponse ), nvrhi::BindingSetItem::Texture_UAV( 0, color ) };
+				reflectionCompositeBindings[i] = device->createBindingSet( bindings, reflectionCompositeLayout );
+				if( !reflectionBindings[i] || !reflectionFilterBindings[i] || !reflectionCompositeBindings[i] ) { reflectionRaw = nullptr; return false; }
+			}
+		}
+		rtReflectionConstants_t reflectionCB = {};
+		const bool historyValid = lastReflectionFrame >= 0 && view->taaFrameCount == lastReflectionFrame + 1 &&
+			reflectionEpoch == view->temporalHistoryEpoch && reflectionViewport == cb.viewport;
+		reflectionCB.previousWorldToClip = historyValid ? previousReflectionMatrix : cb.worldToClip;
+		reflectionCB.previousCamera = historyValid ? previousReflectionCamera : cb.cameraRadius;
+		reflectionCB.options = idVec4( r_rayTracedReflectionSamples.GetInteger(), r_rayTracedReflectionStrength.GetFloat(),
+			r_rayTracedReflectionRoughness.GetFloat(), r_rayTracedReflectionDistance.GetFloat() );
+		reflectionCB.historyOptions = idVec4( historyValid ? 1 : 0, view->taaFrameCount & 0xffff, r_rayTracingDebug.GetInteger(), 0 );
+		list->writeBuffer( reflectionConstants, &reflectionCB, sizeof( reflectionCB ) );
+		list->clearBufferUInt( reflectionStats, 0 );
+		const int index = reflectionFrames & 1;
+		nvrhi::ComputeState state;
+		state.pipeline = reflectionPipeline;
+		state.bindings = { reflectionBindings[index] };
+		list->beginMarker( "Full-resolution material ray reflections" );
+		list->setComputeState( state );
+		list->dispatch( ( width + 7 ) / 8, ( height + 7 ) / 8, 1 );
+		state.pipeline = reflectionFilterPipeline;
+		state.bindings = { reflectionFilterBindings[index] };
+		list->setComputeState( state );
+		list->dispatch( ( width + 7 ) / 8, ( height + 7 ) / 8, 1 );
+		state.pipeline = reflectionCompositePipeline;
+		state.bindings = { reflectionCompositeBindings[index] };
+		list->setComputeState( state );
+		list->dispatch( ( width + 7 ) / 8, ( height + 7 ) / 8, 1 );
+		list->endMarker();
+		previousReflectionMatrix = cb.worldToClip;
+		previousReflectionCamera = cb.cameraRadius;
+		reflectionViewport = cb.viewport;
+		lastReflectionFrame = view->taaFrameCount;
+		reflectionEpoch = view->temporalHistoryEpoch;
+		reflectionFrames++;
+		return true;
+	}
 	nvrhi::BufferHandle StructuredBuffer( size_t bytes, uint32 stride, const char* name, bool uav = false )
 	{
 		nvrhi::BufferDesc desc;
@@ -1163,6 +1369,20 @@ private:
 	nvrhi::BindingSetHandle bounceBindings, compositeBindings;
 	nvrhi::SamplerHandle wrapSampler, clampSampler;
 	uint32 lightCount = 0;
+	nvrhi::TextureHandle probeSpecular, specularResponse, reflectionNormal, reflectionRaw, captureDepth, captureColor;
+	nvrhi::TextureHandle reflectionHistory[2], reflectionGuide[2];
+	nvrhi::FramebufferHandle captureFramebuffer;
+	nvrhi::BufferHandle reflectionConstants, reflectionStats;
+	nvrhi::BindingLayoutHandle reflectionLayout, reflectionFilterLayout, reflectionCompositeLayout;
+	nvrhi::ComputePipelineHandle reflectionPipeline, reflectionFilterPipeline, reflectionCompositePipeline;
+	nvrhi::BindingSetHandle reflectionBindings[2], reflectionFilterBindings[2], reflectionCompositeBindings[2];
+	const viewDef_t* reflectionView = nullptr;
+	idRenderMatrix previousReflectionMatrix;
+	idVec4 previousReflectionCamera, reflectionViewport;
+	uint64 reflectionEpoch = 0;
+	uint32 reflectionFrames = 0;
+	int lastReflectionFrame = -1, captureFrame = -1;
+	bool reflectionFailed = false;
 };
 
 class RayVisibilityDebug
@@ -1334,16 +1554,16 @@ void R_EndRayTracedContactLight( nvrhi::ICommandList* list )
 #endif
 }
 
-bool R_RenderRayTracedGI( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color )
-{
 #if defined( USE_RAYTRACING )
-	if( !r_rayTracedGI.GetBool() || !view->renderWorld || !view->viewEntitys || view->isSubview || view->targetRender ||
-		( view->renderView.rdflags & RDF_IRRADIANCE ) || color->getDesc().sampleCount != 1 || !color->getDesc().isUAV ) { return false; }
+static RayTracedLighting* PrepareRayTracedLighting( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* color )
+{
+	if( !view->renderWorld || !view->viewEntitys || view->isSubview || view->targetRender ||
+		( view->renderView.rdflags & RDF_IRRADIANCE ) || color->getDesc().sampleCount != 1 || !color->getDesc().isUAV ) { return nullptr; }
 	nvrhi::IDevice* device = deviceManager->GetDevice();
 	if( device->getGraphicsAPI() != nvrhi::GraphicsAPI::D3D12 || !device->queryFeatureSupport( nvrhi::Feature::RayQuery ) ||
-		!device->queryFeatureSupport( nvrhi::Feature::RayTracingAccelStruct ) ) { return false; }
+		!device->queryFeatureSupport( nvrhi::Feature::RayTracingAccelStruct ) ) { return nullptr; }
 	if( aoWorld != view->renderWorld ) { R_ClearRayTracedAO(); aoWorld = view->renderWorld; }
-	if( giFailed ) { return false; }
+	if( giFailed ) { return nullptr; }
 	if( !rayTracedLighting )
 	{
 		rayTracedLighting = new RayTracedLighting( device );
@@ -1353,10 +1573,30 @@ bool R_RenderRayTracedGI( nvrhi::ICommandList* list, const viewDef_t* view, nvrh
 			rayTracedLighting = nullptr;
 			giFailed = true;
 			common->Warning( "Ray-traced material lighting unavailable; retaining raster lighting for this map" );
-			return false;
 		}
 	}
-	return rayTracedLighting->Render( list, view, depth, color );
+	return rayTracedLighting;
+}
+#endif
+
+bool R_BeginRayTracedReflections( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color )
+{
+#if defined( USE_RAYTRACING )
+	if( !r_rayTracedReflections.GetBool() || ( view->renderView.rdflags & RDF_NOAMBIENT ) ) { return false; }
+	RayTracedLighting* lighting = PrepareRayTracedLighting( list, view, color );
+	return lighting && lighting->BeginReflections( list, view, depth, color );
+#else
+	return false;
+#endif
+}
+
+bool R_RenderRayTracedGI( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color )
+{
+#if defined( USE_RAYTRACING )
+	if( !r_rayTracedGI.GetBool() && !r_rayTracedReflections.GetBool() ) { return false; }
+	RayTracedLighting* lighting = PrepareRayTracedLighting( list, view, color );
+	if( !lighting || ( !r_rayTracedGI.GetBool() && !lighting->HasReflectionCapture( view ) ) ) { return false; }
+	return lighting->Render( list, view, depth, color );
 #else
 	return false;
 #endif
@@ -1389,23 +1629,33 @@ CONSOLE_COMMAND_SHIP( rayTracingContactStatus, "Report contact-shadow lights and
 	common->Printf( "RTCONTACT_STATUS active=0 frames=0 lights=0 dispatches=0 samples=0 matched=0 hits=0 modified=0 invalid=0\n" );
 }
 
-CONSOLE_COMMAND_SHIP( rayTracingToggle, "Toggle AO, contact shadows and material bounce lighting together; bindable", NULL )
+CONSOLE_COMMAND_SHIP( rayTracingToggle, "Toggle AO, contact shadows, material bounce and reflections together; bindable", NULL )
 {
-	const bool enabled = !( r_rayTracedAO.GetBool() || r_rayTracedContactShadows.GetBool() || r_rayTracedGI.GetBool() );
+	const bool enabled = !( r_rayTracedAO.GetBool() || r_rayTracedContactShadows.GetBool() || r_rayTracedGI.GetBool() || r_rayTracedReflections.GetBool() );
 	r_rayTracedAO.SetBool( enabled );
 	r_rayTracedContactShadows.SetBool( enabled );
 	r_rayTracedGI.SetBool( enabled );
+	r_rayTracedReflections.SetBool( enabled );
 	r_rayTracingDebug.SetInteger( 0 );
 	if( enabled ) { r_useSSAO.SetBool( true ); r_useNewSsaoPass.SetBool( true ); }
 	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "neuralHistoryReset\n" );
 	common->Printf( "Ray-traced lighting requested: %s (requires RT build and supported GPU)\n", enabled ? "ON" : "OFF" );
 }
 
-CONSOLE_COMMAND_SHIP( rayTracingDebugCycle, "Cycle shaded scene, AO, contact visibility and material bounce views; bindable", NULL )
+CONSOLE_COMMAND_SHIP( rayTracingDebugCycle, "Cycle shaded scene, visibility, bounce and reflection views; bindable", NULL )
 {
-	r_rayTracingDebug.SetInteger( ( r_rayTracingDebug.GetInteger() + 1 ) % 5 );
+	r_rayTracingDebug.SetInteger( ( r_rayTracingDebug.GetInteger() + 1 ) % 7 );
 	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "neuralHistoryReset\n" );
-	common->Printf( "Ray-tracing view %d: 0=scene, 1=AO, 2=contacts, 3=material bounce, 4=albedo (enable the corresponding feature)\n", r_rayTracingDebug.GetInteger() );
+	common->Printf( "Ray-tracing view %d: 0=scene, 1=AO, 2=contacts, 3=material bounce, 4=albedo, 5=reflections, 6=reflection roughness (enable the corresponding feature)\n", r_rayTracingDebug.GetInteger() );
+}
+
+CONSOLE_COMMAND_SHIP( rayTracingReflectionStatus, "Report full-resolution reflections and sampled GPU coverage", NULL )
+{
+#if defined( USE_RAYTRACING )
+	commonLocal.WaitGameThread();
+	if( rayTracedLighting ) { rayTracedLighting->PrintReflectionStatus(); return; }
+#endif
+	common->Printf( "RTREFLECTION_STATUS active=0 frames=0\n" );
 }
 
 CONSOLE_COMMAND_SHIP( rayTracingGIStatus, "Report material bounce lighting and sampled GPU coverage", NULL )

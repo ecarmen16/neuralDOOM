@@ -46,5 +46,5 @@ void main(uint3 tid : SV_DispatchThreadID)
             indirect /= max(weight, 1e-5);
         }
     }
-    SceneColor[pixel] = float4(AtlasOptions.y >= 3 ? indirect : color.rgb + indirect, color.a);
+    SceneColor[pixel] = float4((AtlasOptions.y == 3 || AtlasOptions.y == 4) ? indirect : color.rgb + indirect, color.a);
 }

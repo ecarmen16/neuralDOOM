@@ -1277,22 +1277,22 @@ void idRenderBackend::DrawSingleInteraction( drawInteraction_t* din, bool useFas
 			// PBR path with roughness, metal and AO
 			if( din->surf->jointCache )
 			{
-				renderProgManager.BindShader_ImageBasedLightGridSkinned_PBR();
+				renderProgManager.BindShader_ImageBasedLightGridSkinned_PBR( currentFrameBuffer == globalFramebuffers.rayReflectionFBO );
 			}
 			else
 			{
-				renderProgManager.BindShader_ImageBasedLightGrid_PBR();
+				renderProgManager.BindShader_ImageBasedLightGrid_PBR( currentFrameBuffer == globalFramebuffers.rayReflectionFBO );
 			}
 		}
 		else
 		{
 			if( din->surf->jointCache )
 			{
-				renderProgManager.BindShader_ImageBasedLightGridSkinned();
+				renderProgManager.BindShader_ImageBasedLightGridSkinned( currentFrameBuffer == globalFramebuffers.rayReflectionFBO );
 			}
 			else
 			{
-				renderProgManager.BindShader_ImageBasedLightGrid();
+				renderProgManager.BindShader_ImageBasedLightGrid( currentFrameBuffer == globalFramebuffers.rayReflectionFBO );
 			}
 		}
 
@@ -1355,22 +1355,22 @@ void idRenderBackend::DrawSingleInteraction( drawInteraction_t* din, bool useFas
 			// PBR path with roughness, metal and AO
 			if( din->surf->jointCache )
 			{
-				renderProgManager.BindShader_ImageBasedLightingSkinned_PBR();
+				renderProgManager.BindShader_ImageBasedLightingSkinned_PBR( currentFrameBuffer == globalFramebuffers.rayReflectionFBO );
 			}
 			else
 			{
-				renderProgManager.BindShader_ImageBasedLighting_PBR();
+				renderProgManager.BindShader_ImageBasedLighting_PBR( currentFrameBuffer == globalFramebuffers.rayReflectionFBO );
 			}
 		}
 		else
 		{
 			if( din->surf->jointCache )
 			{
-				renderProgManager.BindShader_ImageBasedLightingSkinned();
+				renderProgManager.BindShader_ImageBasedLightingSkinned( currentFrameBuffer == globalFramebuffers.rayReflectionFBO );
 			}
 			else
 			{
-				renderProgManager.BindShader_ImageBasedLighting();
+				renderProgManager.BindShader_ImageBasedLighting( currentFrameBuffer == globalFramebuffers.rayReflectionFBO );
 			}
 		}
 
@@ -6274,7 +6274,14 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 		//OPTICK_EVENT( "Render_AmbientPass" );
 		OPTICK_GPU_EVENT( "Render_AmbientPass" );
 
+		Framebuffer* ambientTarget = Framebuffer::GetActiveFramebuffer();
+		if( R_BeginRayTracedReflections( commandList, _viewDef, globalImages->currentDepthImage->GetTextureHandle(), globalImages->currentRenderHDRImage->GetTextureHandle() ) )
+		{
+			globalFramebuffers.rayReflectionFBO->Bind();
+			currentVertexBuffer = nullptr;
+		}
 		AmbientPass( drawSurfs, numDrawSurfs, false );
+		ambientTarget->Bind();
 	}
 
 	//-------------------------------------------------

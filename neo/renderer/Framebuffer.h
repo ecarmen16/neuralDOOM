@@ -110,6 +110,18 @@ public:
 		return apiObject;
 	}
 
+	// Optional passes populate a registered wrapper only when enabled. The
+	// wrapper remains owned by ResizeFramebuffers, like every other framebuffer.
+	void SetApiObject( nvrhi::IFramebuffer* object )
+	{
+		apiObject = object;
+		if( object )
+		{
+			width = object->getFramebufferInfo().width;
+			height = object->getFramebufferInfo().height;
+		}
+	}
+
 	idScreenRect			GetViewPortInfo() const;
 
 private:
@@ -143,6 +155,7 @@ struct globalFramebuffers_t
 	Framebuffer*				shadowAtlasFBO;
 	Framebuffer*				shadowFBO[MAX_SHADOWMAP_RESOLUTIONS][6];
 	Framebuffer*				hdrFBO;
+	Framebuffer*				rayReflectionFBO;
 	Framebuffer*				ldrFBO;
 	Framebuffer*				postProcFBO; // HDR16 used by 3D effects like heatHaze
 	Framebuffer*				taaMotionVectorsFBO;

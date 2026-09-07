@@ -22,7 +22,7 @@ $manifest = @{
 'retail-data-fixture' | Set-Content -LiteralPath (Join-Path $base 'maps/mars_city2.resources')
 $lighting = Join-Path $base '_rbdoom_global_illumination_data.pk4'
 'lighting-inventory-fixture' | Set-Content -LiteralPath $lighting
-foreach ($shader in @('ray_query', 'ambient_occlusion', 'contact_shadows', 'visibility_debug', 'material_atlas', 'diffuse_bounce', 'bounce_composite')) {
+foreach ($shader in @('ray_query', 'ambient_occlusion', 'contact_shadows', 'visibility_debug', 'material_atlas', 'diffuse_bounce', 'bounce_composite', 'reflections', 'reflection_filter', 'reflection_composite')) {
     'shader-fixture' | Set-Content -LiteralPath (Join-Path $shaderRoot "$shader.cs.dxil")
 }
 $setup = Join-Path $PSScriptRoot 'Setup-NeuralDoom.ps1'

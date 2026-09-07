@@ -9,6 +9,7 @@ param(
     [switch]$RayTracedAO,
     [switch]$RayTracedContactShadows,
     [switch]$RayTracedGI,
+    [switch]$RayTracedReflections,
     [ValidateSet('Saved', 'SDR', 'AutoHDR')][string]$DisplayOutput = 'Saved'
 )
 
@@ -43,7 +44,7 @@ if ($manifest.sha256 -ne (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
 if ($manifest.features.dx12 -ne 'ON' -or $manifest.features.rayTracing -ne 'ON') {
     throw 'This checklist requires a DX12 build configured with -RayTracing ON.'
 }
-foreach ($shader in @('ray_query', 'ambient_occlusion', 'contact_shadows', 'visibility_debug', 'material_atlas', 'diffuse_bounce', 'bounce_composite')) {
+foreach ($shader in @('ray_query', 'ambient_occlusion', 'contact_shadows', 'visibility_debug', 'material_atlas', 'diffuse_bounce', 'bounce_composite', 'reflections', 'reflection_filter', 'reflection_composite')) {
     $shaderPath = Join-Path $RepoRoot "base/renderprogs2/dxil/rt/$shader.cs.dxil"
     if (-not (Test-Path -LiteralPath $shaderPath -PathType Leaf) -or (Get-Item -LiteralPath $shaderPath).Length -eq 0) {
         throw "Missing RTX shader: $shader. Rebuild before playtesting."
@@ -77,6 +78,7 @@ if ($RayTracedAO) {
 }
 if ($RayTracedContactShadows) { $launchArgs += @('+set', 'r_rayTracedContactShadows', '1') }
 if ($RayTracedGI) { $launchArgs += @('+set', 'r_rayTracedGI', '1') }
+if ($RayTracedReflections) { $launchArgs += @('+set', 'r_rayTracedReflections', '1') }
 # Seed display settings once. Later HUD, resolution and HDR edits must survive relaunch.
 if ($firstRun) {
     $launchArgs += @('+set', 'r_fullscreen', '0', '+set', 'r_windowWidth', '2560',
@@ -91,8 +93,9 @@ if ([Text.Encoding]::UTF8.GetByteCount(($launchArgs -join ' ')) -ge 1024) {
 Write-Host "Profile:    $Profile"
 if ($RayTracedAO) { Write-Host 'RTX AO:     Enabled (static world). Toggle live with r_rayTracedAO 0 / 1.' }
 if ($RayTracedContactShadows) { Write-Host 'RTX contact shadows: Enabled. Toggle with r_rayTracedContactShadows 0 / 1.' }
+if ($RayTracedReflections) { Write-Host 'RTX reflections: Enabled at full resolution. Toggle with r_rayTracedReflections 0 / 1.' }
 if ($RayTracedGI) { Write-Host 'RTX material bounce: Enabled. Toggle with r_rayTracedGI 0 / 1; strength: r_rayTracedGIStrength.' }
-Write-Host 'Optional keybinds: exec neural_rtx_keys.cfg (F6 GI, F7 AO, F8 contacts, F10 views, F11 all).'
+Write-Host 'Optional keybinds: exec neural_rtx_keys.cfg (F6 GI, F7 AO, F8 contacts, F9 reflections, F10 views, F11 all).'
 Write-Host "Executable: $exe"
 Write-Host "Commit:     $($manifest.commit) (dirty=$($manifest.dirty))"
 Write-Host "Settings:   $saveRoot"

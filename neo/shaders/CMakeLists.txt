@@ -61,13 +61,15 @@ if(USE_RAYTRACING)
         set(rt_output_root "${CMAKE_CURRENT_SOURCE_DIR}/../../base/renderprogs2")
     endif()
     set(rt_shaders)
-    foreach(rt_name ray_query ambient_occlusion contact_shadows visibility_debug material_atlas diffuse_bounce bounce_composite)
+    foreach(rt_name ray_query ambient_occlusion contact_shadows visibility_debug material_atlas diffuse_bounce bounce_composite reflections reflection_filter reflection_composite)
         set(rt_shader "${rt_output_root}/dxil/rt/${rt_name}.cs.dxil")
         add_custom_command(OUTPUT "${rt_shader}"
             COMMAND ${CMAKE_COMMAND} -E make_directory "${rt_output_root}/dxil/rt"
             COMMAND "${DXC_PATH}" -T cs_6_5 -E main -WX -O3 -Zpr
                 -Fo "${rt_shader}" "${CMAKE_CURRENT_SOURCE_DIR}/rt/${rt_name}.cs.hlsl"
             DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/rt/${rt_name}.cs.hlsl"
+                "${CMAKE_CURRENT_SOURCE_DIR}/rt/ray_materials.hlsli"
+                "${CMAKE_CURRENT_SOURCE_DIR}/rt/reflection_parameters.hlsli"
             VERBATIM)
         list(APPEND rt_shaders "${rt_shader}")
     endforeach()

@@ -153,6 +153,9 @@ void Framebuffer::ResizeFramebuffers( bool reloadImages )
 			nvrhi::FramebufferDesc()
 			.addColorAttachment( globalImages->currentRenderImage->texture ) );
 
+	// No GPU allocation until native reflection capture is requested.
+	globalFramebuffers.rayReflectionFBO = new Framebuffer( "_rayReflection", 0, 0 );
+
 	globalFramebuffers.taaMotionVectorsFBO = new Framebuffer( "_taaMotionVectors",
 			nvrhi::FramebufferDesc()
 			.addColorAttachment( globalImages->taaMotionVectorsImage->texture )

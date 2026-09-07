@@ -66,6 +66,11 @@ struct PS_IN
 struct PS_OUT
 {
 	float4 color : SV_Target0;
+#if RT_REFLECTION_CAPTURE
+	float4 probeSpecular : SV_Target1;
+	float4 specularResponse : SV_Target2;
+	float4 reflectionNormal : SV_Target3;
+#endif
 };
 // *INDENT-ON*
 
@@ -398,4 +403,12 @@ void main( PS_IN fragment, out PS_OUT result )
 	//result.color.rgb = localNormal.xyz * 0.5 + 0.5;
 	//result.color.rgb = float3( ao );
 	result.color.w = fragment.color.a;
+#if RT_REFLECTION_CAPTURE
+	// Store the exact native contribution and its matching material response.
+	// Ray hits replace this layer; misses retain the original probe lighting.
+	float3 materialWeight = specAO * pc.rpSpecularModifier.xyz * horiz * lightColor * fragment.color.rgb;
+	result.probeSpecular = float4( specularLight * horiz * lightColor * fragment.color.rgb, 1.0 );
+	result.specularResponse = float4( ( kS * envBRDF.x + envBRDF.y ) * materialWeight, roughness );
+	result.reflectionNormal = float4( globalNormal, 1.0 );
+#endif
 }

@@ -1,12 +1,12 @@
 # neuralDoom
 
-neuralDoom modernizes Doom 3 BFG on the RBDOOM-3-BFG source port. It adds full-resolution ray-traced material bounce, contact shadows and AO, native DX12 HDR, optional native DLAA, and ultrawide HUD/FOV controls. Active development is on `codex/rt-foundation`; the downstream remote is `ecarmen16/neuralDoom`.
+neuralDoom modernizes Doom 3 BFG on the RBDOOM-3-BFG source port. It adds full-resolution ray-traced material reflections, diffuse bounce, contact shadows and AO, native DX12 HDR, optional native DLAA, and ultrawide HUD/FOV controls. Active development is on `codex/rt-foundation`; the downstream remote is `ecarmen16/neuralDoom`.
 
-The [pre-playtest review](docs/neural-rendering/REVIEW_2026-09-06.md) records fixes, passing builds and three quick visual checks. See the [current checkpoint](docs/neural-rendering/CHECKPOINT.md) for validation limits.
+The new [material reflection pass](docs/neural-rendering/RAY_TRACED_REFLECTIONS.md) adds normal-mapped, rough reflections and reduces the default diffuse bounce intensity by 25%. The earlier [review](docs/neural-rendering/REVIEW_2026-09-06.md) records the preceding fixes. See the [current checkpoint](docs/neural-rendering/CHECKPOINT.md) for validation limits.
 
 **Start here:** [RTX lighting and keybinds](docs/neural-rendering/RTX_LIGHTING.md), [quick playtest](docs/neural-rendering/DOGFOOD_CHECKLIST.md), [build instructions](docs/neural-rendering/WINDOWS_SETUP.md).
 
-There are two supported launchers: `Launch-NeuralDoom.cmd` preserves saved settings; `Launch-NeuralDoom-RTX.cmd` enables all three ray-traced lighting effects and native HDR. Both offer Native or DLAA and select the manifest-verified build. The older NR/mod launchers are in [tools/neural-rendering/legacy](tools/neural-rendering/legacy/README.md). Existing playtest saves and display preferences remain in the same folder.
+There are two supported launchers: `Launch-NeuralDoom.cmd` preserves saved settings; `Launch-NeuralDoom-RTX.cmd` enables all four ray-traced lighting effects and native HDR. Both offer Native or DLAA and select the manifest-verified build. The older NR/mod launchers are in [tools/neural-rendering/legacy](tools/neural-rendering/legacy/README.md). Existing playtest saves and display preferences remain in the same folder.
 
 **Settings > System Options** provides automatic ultrawide HUD layout and size controls. **Settings > Game Options > Field of View** supports 60–100, including narrower base FOVs for 5120×1440. Native HDR uses Windows HDR and separate scene/UI brightness controls.
 

@@ -225,7 +225,7 @@ function Assert-NeuralShaderManifest {
         }
     }
     if ($Manifest.features.rayTracing -eq 'ON') {
-        foreach ($shader in @('ray_query', 'ambient_occlusion', 'contact_shadows', 'visibility_debug', 'material_atlas', 'diffuse_bounce', 'bounce_composite')) {
+        foreach ($shader in @('ray_query', 'ambient_occlusion', 'contact_shadows', 'visibility_debug', 'material_atlas', 'diffuse_bounce', 'bounce_composite', 'reflections', 'reflection_filter', 'reflection_composite')) {
             if (-not $recorded.ContainsKey("base/renderprogs2/dxil/rt/$shader.cs.dxil") -and
                 -not $recorded.ContainsKey("content/renderprogs2/dxil/rt/$shader.cs.dxil")) {
                 throw "Build manifest lacks RTX shader identity: $shader. Rebuild before playtesting."

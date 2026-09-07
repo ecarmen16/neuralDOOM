@@ -1,10 +1,12 @@
 # Native ray tracing and path tracing
 
-Current addition: [RAY_TRACED_AO.md](RAY_TRACED_AO.md) implements opt-in static-world
-ambient occlusion with a persistent AS, reusing the validated intersection path.
-This supplies an early gameplay effect while the full scene/material/motion
-gates below remain open. `sceneImplemented=0` still describes the incomplete full
-scene; `rayTracingAOStatus` reports the actual AO dispatch and shaded receivers.
+Current implementation: [RTX_LIGHTING.md](RTX_LIGHTING.md) covers static-world
+AO, contact shadows and diffuse material bounce; [RAY_TRACED_REFLECTIONS.md](RAY_TRACED_REFLECTIONS.md)
+adds full-resolution native-material reflections. The new reflection pass has
+build/offline contract validation and awaits the user's GPU playtest. Dynamic
+instance/material/motion gates below remain open. The following reconnaissance
+records the earlier capability baseline; `sceneImplemented=0` describes the
+incomplete full scene, not the absence of these optional static-world effects.
 
 Source review and capability check: 2026-09-06, starting at `5ca342cf` on `codex/probe-lighting`. The user expanded the modernization scope to investigate RTX/path tracing while AFK. This extends the initial project's scope; it does not claim a ray-traced renderer is implemented.
 

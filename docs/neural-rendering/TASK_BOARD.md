@@ -22,6 +22,7 @@ Working branch: `codex/rt-foundation`, prepared from the completed `codex/probe-
 | ND3-661 | DONE | Synchronize DX12 presentation before releasing resized backbuffers | Reproduced debug-runtime failure with RT compiled out; post-Present fence fixes Native, DLAA/scRGB and default-build resize/shutdown checks |
 | RT-001B | READY | Persistent scene registration and material mapping | Next: stable mesh/instance IDs, owned persistent AS resources, map cleanup/rebuild; then rigid/skinned/cutout coverage and selected-light ray shadows |
 | RT-AO | DONE | Opt-in static-world ray-traced ambient occlusion prototype | Clean Native/DLAA/compiled-OFF builds; sampled occlusion, live rollback/resume, ultrawide resize, active HDR and two map lifetimes pass; visual acceptance remains |
+| RT-REFLECTIONS | VERIFY | Full-resolution native-material reflections, probe replacement, temporal/spatial filter and 25% lower GI default | Native RT, DLAA and RT-OFF builds plus offline shader contracts; GPU playtest pending. See RAY_TRACED_REFLECTIONS.md. |
 
 The implemented diagnostics and exact resource contract are in
 [RAY_TRACING_DIAGNOSTICS.md](RAY_TRACING_DIAGNOSTICS.md). The user's short manual

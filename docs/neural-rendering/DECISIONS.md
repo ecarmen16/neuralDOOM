@@ -126,3 +126,12 @@ Resolve these only after `RECON_REPORT.md` and targeted captures provide evidenc
 **Reasoning:** The renderer already has linear HDR scene inputs. Native Windows scRGB allows those highlights to survive into presentation without the temporary NR bridge. SDR LUTs, filmic scratch targets and retro modes require explicit handling to avoid silently clipping the new path.
 
 **Consequence:** `r_hdrOutput 1` requests FP16 scRGB on DX12, while SDR remains the default. Scene reference white, peak and nominal UI white are separate saved controls. The prototype retains extended gamma-coded HUD composition, converts only the presentation blit to linear scRGB, and bounds SDR fallback. Legacy retro/CRT/SMAA content remains SDR; the embedded bridge retains 8-bit transport. A non-archived diagnostic tests HDR tone mapping without changing Windows display settings. See NATIVE_HDR.md for the exact formats and limitations.
+
+
+## 2026-09-06 - Preserve native material energy when adding reflections
+
+Capture the native probe specular layer and its material response during IBL shading, then blend ray hits into that layer. Keep probes for ray misses and unsupported receivers. This preserves native material roughness/normal maps and avoids unconditional extra specular light. For multi-stage materials, overwrite the three capture targets together and replace only that matching layer.
+
+Share the existing static-world GI scene/material/light cache; do not duplicate its atlas or add a denoiser SDK. Filter incident radiance at full viewport resolution and apply current-pixel BRDF response afterward. Reuse engine temporal epochs with explicit normal/distance/roughness rejection. Keep compiled-out and feature-off fallbacks, and require offline shader permutation/output/binding checks alongside builds while the user handles visual validation.
+
+Reduce default diffuse bounce strength 1.5 to 1.125 in response to the user's brightness feedback. Do not reduce render resolution. Rigid dynamic geometry is the next bounded scene-coverage task after reflection playtesting.

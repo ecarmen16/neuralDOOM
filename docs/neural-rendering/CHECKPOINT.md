@@ -1,10 +1,10 @@
 # Pre-playtest checkpoint - 2026-09-06
 
-The user is handling visual comparisons. No game was launched during the review. All three RelWithDebInfo configurations built successfully and both Native/DLAA local readiness checks passed. See [the review, fixes and three-check playtest](REVIEW_2026-09-06.md).
+The user reported a strong visual improvement with the preceding material-lighting/review build. The next addition is [full-resolution material reflections](RAY_TRACED_REFLECTIONS.md), with the diffuse bounce default reduced 25%. No game was launched for this addition; reflection visual validation remains pending.
 
 ## Current state
 
-- Full-resolution static-world ray-traced AO, contact shadows and material-aware diffuse bounce; five debug modes and optional bindings. No half-resolution rendering.
+- Full-resolution static-world ray-traced reflections, AO, contact shadows and material-aware diffuse bounce; seven debug modes and optional bindings. No half-resolution rendering.
 - Native scRGB HDR, official optional DLAA, automatic ultrawide HUD layout and FOV 60-100.
 - Review fixes: automatic DLAA joint history, correct object-motion depth/jitter handling, RTX cvar history resets, executable/shader bundle identity, and guarded clean builds.
 - Supported launchers: `Launch-NeuralDoom.cmd` and `Launch-NeuralDoom-RTX.cmd`. Legacy NR/mod wrappers remain under `tools/neural-rendering/legacy`.
@@ -12,8 +12,8 @@ The user is handling visual comparisons. No game was launched during the review.
 
 ## Validation boundary
 
-Final review binaries compile and pass read-only local setup validation. Their latest renderer changes have not had a new GPU run. The last passing material-lighting gameplay test remains `captures/neural/smoke-20260906-192933-7ef79bd1/result.json` in the game checkout: Native RT, 1280x720 to 1920x1080, debug validation, on/off/resume/resize, normal exit. It predates albedo mode 4 and the review fixes. That evidence must not be attributed to the final binaries.
+The reflection changes build in Native RT, DLAA and RT-OFF configurations. The final artifact identities and CPU checks are recorded in TEST_RESULTS.md. This new pass has not had a GPU run. The last passing material-lighting gameplay test remains `captures/neural/smoke-20260906-192933-7ef79bd1/result.json` in the game checkout: Native RT, 1280x720 to 1920x1080, debug validation, on/off/resume/resize, normal exit. It predates albedo mode 4 and the review fixes. That evidence must not be attributed to the final binaries.
 
-Remaining gameplay checks: 5120x1440 DLAA/HDR with all RTX features; animated characters/weapon motion and live cvar transitions; map/save reload; new material-shader fallback. The earlier elevator bounce was subtle. Counters do not establish visual impact. See [TEST_RESULTS.md](TEST_RESULTS.md) for exact build evidence.
+Remaining gameplay checks: 5120x1440 DLAA/HDR with all RTX features; animated characters/weapon motion and live cvar transitions; map/save reload; new material-shader fallback. The user liked the subsequent material-lighting result but requested 25% less bounce; the default and the existing local 1.5 setting were changed to 1.125, with a local config backup. Counters do not establish visual impact. See [TEST_RESULTS.md](TEST_RESULTS.md) for exact build evidence.
 
 Fresh-machine setup and combined binary redistribution are unverified. An NR DLL path/URL alone does not assemble the complete legacy bridge. No retail assets or third-party binaries are tracked. GitHub push remains pending the user's login; no automated GPU continuation is scheduled.

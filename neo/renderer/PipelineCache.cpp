@@ -88,6 +88,16 @@ nvrhi::GraphicsPipelineHandle PipelineCache::GetOrCreatePipeline( const Pipeline
 	// Specialize the state with the state key.
 	GetRenderState( key.state, key, pipelineDesc.renderState );
 
+	if( key.framebuffer == globalFramebuffers.rayReflectionFBO )
+	{
+		// Capture one matching material layer. Only target 0 accumulates native
+		// lighting; captured specular, BRDF response and normal overwrite together.
+		for( int target = 1; target <= 3; target++ )
+		{
+			pipelineDesc.renderState.blendState.targets[target].disableBlend();
+		}
+	}
+
 	auto pipeline = device->createGraphicsPipeline( pipelineDesc, key.framebuffer->GetApiObject() );
 
 	pipelineHash.Add( h, pipelines.Append( { key, pipeline } ) );

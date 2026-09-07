@@ -1,6 +1,6 @@
 # neuralDoom RTX playtest: about 5 minutes
 
-For the current review build, use the [three-check playtest](REVIEW_2026-09-06.md#three-checks-for-the-user). Detailed options follow; visual validation is assigned to the user.
+Start with the [three reflection checks](RAY_TRACED_REFLECTIONS.md#three-check-playtest). This addition has compile and offline contract checks; visual validation remains assigned to the user.
 
 In the game installation's `RBDOOM-3-BFG` folder, double-click
 `Launch-NeuralDoom-RTX.cmd`. Choose **Native** first, then quit and relaunch
@@ -16,8 +16,9 @@ settings. This playtest uses the native renderer with the bridge disabled.
 
 - [ ] **Material lighting:** Run `exec neural_rtx_keys.cfg` once for the optional
   bindings. F6 toggles full-resolution material bounce, F8 toggles contact shadows,
+  and F9 toggles reflections,
   F10 cycles comparison views, and F11 toggles all RTX effects. Check colored
-  lighting near a wall/corner; try `r_rayTracedGIStrength 3` for a stronger comparison.
+  lighting near a wall/corner; the new bounce default is `r_rayTracedGIStrength 1.125`.
   See [RTX_LIGHTING.md](RTX_LIGHTING.md) for controls and current limitations.
 - [ ] **RTX AO comparison:** In a room with corners and nearby surfaces, enter
   `r_rayTracedAO 0`, then `r_rayTracedAO 1`. Look for changes in ambient contact
@@ -51,8 +52,8 @@ settings. This playtest uses the native renderer with the bridge disabled.
 
 No manual diagnostics are required. `rayTracingAOStatus` is available if needed;
 an enabled pass in a populated room should show nonzero `matched` and `occluded`.
-Ray-traced AO is a first gameplay effect; ray shadows from authored lights,
-reflections and full path tracing remain upcoming. The ordinary dogfood launcher
+AO, contact shadows, diffuse bounce and static-world reflections are implemented.
+Dynamic ray geometry and full path tracing remain upcoming. The ordinary dogfood launcher
 uses your saved AO setting; `r_rayTracedAO 0` returns to raster SSAO immediately.
 AO replaces SSAO on matching static surfaces. Less occlusion can look brighter;
 this is a change in ambient shading, not an additional light or AA technique.
