@@ -96,7 +96,7 @@ def main():
     files['build-rt/Release/neuralDoom.exe'] = exe
     for shader in manifest['shaders']:
         path = pathlib.PurePosixPath(shader['path'])
-        if path.is_absolute() or '..' in path.parts or path.suffix != '.dxil':
+        if path.is_absolute() or '..' in path.parts or path.parts[:3] != ('base', 'renderprogs2', 'dxil') or path.suffix not in {'.dxil', '.bin'}:
             raise RuntimeError('Invalid shader manifest path')
         data = (game / path).read_bytes()
         if digest(data) != shader['sha256'].upper():
