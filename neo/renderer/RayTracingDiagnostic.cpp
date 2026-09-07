@@ -30,6 +30,22 @@ static idCVar r_rayTracedGIEmissive( "r_rayTracedGIEmissive", "2", CVAR_RENDERER
 void RB_GetShaderTextureMatrix( const float* shaderRegisters, const textureStage_t* texture, float matrix[16] );
 void RB_BakeTextureMatrixIntoTexgen( idPlane lightProject[3], const float* textureMatrix );
 
+bool R_RayTracingSettingsChanged()
+{
+	bool changed = false;
+#if defined( USE_RAYTRACING )
+	idCVar* settings[] = { &r_rayTracedAO, &r_rayTracedAORadius, &r_rayTracedAOStrength, &r_rayTracedAOSamples,
+		&r_rayTracedContactShadows, &r_rayTracedContactDistance, &r_rayTracedContactStrength,
+		&r_rayTracedGI, &r_rayTracedGIStrength, &r_rayTracedGIRadius, &r_rayTracedGISamples, &r_rayTracedGIEmissive, &r_rayTracingDebug };
+	for( idCVar* setting : settings )
+	{
+		changed |= setting->IsModified();
+		setting->ClearModified();
+	}
+#endif
+	return changed;
+}
+
 #if defined( USE_RAYTRACING )
 
 namespace

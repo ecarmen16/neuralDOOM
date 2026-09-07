@@ -45,6 +45,7 @@ $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
 if ($manifest.sha256 -ne $hash -or $manifest.executable -ne $exe -or $manifest.configuration -ne $Configuration) {
     throw 'Executable does not match the selected build manifest. Rebuild before testing.'
 }
+Assert-NeuralShaderManifest -RepoRoot $RepoRoot -Manifest $manifest
 $runRoot = Join-Path $RepoRoot ('captures/neural/smoke-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
 $saveBase = New-Item -ItemType Directory -Path (Join-Path $runRoot 'base') -Force
 $resultPath = Join-Path $runRoot 'result.json'
@@ -114,7 +115,7 @@ try {
         "set r_neuralBackend $backend", "set r_hdrDiagnostic $([int][bool]$HDRDiagnostic)", 'set r_screenFraction 100', "set r_renderMode $LegacyRenderMode",
         'set r_useTemporalAA 1', 'set r_antiAliasing 2', "set r_rayTracedAO $([int][bool]$RayTracedAO)", "set g_fov $FieldOfView",
         "set r_rayTracedContactShadows $([int][bool]$RayTracedContactShadows)", "set r_rayTracedGI $([int][bool]$RayTracedGI)",
-        'set r_rayTracingDebug 0', 'set r_rayTracedGIStrength 1.5', 'set r_rayTracedGISamples 4',
+        'set r_rayTracingDebug 0', 'set r_rayTracedGIStrength 1.5', 'set r_rayTracedGISamples 4', 'set r_neuralHistoryDebug 1',
         ('set swf_hudScale ' + $HudScale.ToString($culture)),
         ('set swf_hudMaxAspect ' + $HudMaxAspect.ToString($culture))
     )
@@ -162,11 +163,11 @@ try {
     }
     if ($RayTracedContactShadows) {
         $scriptLines += @('rayTracingContactStatus', 'set r_rayTracedContactShadows 0', 'wait 30', 'rayTracingContactStatus',
-            'screenshot screenshots/contacts_off.png', 'set r_rayTracedContactShadows 1', 'neuralHistoryReset', 'wait 30')
+            'screenshot screenshots/contacts_off.png', 'set r_rayTracedContactShadows 1', 'wait 30')
     }
     if ($RayTracedGI) {
-        $scriptLines += @('rayTracingGIStatus', 'set r_rayTracedGI 0', 'neuralHistoryReset', 'wait 30', 'rayTracingGIStatus',
-            'screenshot screenshots/gi_off.png', 'set r_rayTracedGI 1', 'neuralHistoryReset', 'wait 30')
+        $scriptLines += @('rayTracingGIStatus', 'set r_rayTracedGI 0', 'wait 30', 'rayTracingGIStatus',
+            'screenshot screenshots/gi_off.png', 'set r_rayTracedGI 1', 'wait 30')
     }
     if ($RayTracingDebugViews) {
         $scriptLines += @('exec neural_rtx_keys.cfg', 'rayTracingDebugCycle', 'wait 30', 'screenshot screenshots/ao_visibility.png',
@@ -205,6 +206,10 @@ try {
     $log = Get-Content -LiteralPath (Join-Path $saveBase.FullName 'smoke.log') -Raw
     if ($log -notmatch 'NEURAL_SMOKE_COMPLETE') { throw 'Gameplay script did not complete.' }
     if ($log -match '(?im)FATAL ERROR|D3D12 device removed|Unknown command') { throw 'Engine log contains fatal/device/command errors.' }
+    $lightingResets = [regex]::Matches($log, 'Neural temporal history reset: [^\r\n]*lighting-change').Count
+    $expectedLightingResets = 2 * ([int][bool]$RayTracedAO + [int][bool]$RayTracedContactShadows + [int][bool]$RayTracedGI)
+    if ($lightingResets -lt $expectedLightingResets) { throw 'Direct RTX cvar changes failed to reset temporal history.' }
+    $result.lightingHistoryResets = $lightingResets
     $aoSamples = [regex]::Matches($log, 'RTAO_STATUS active=([01]) frames=(\d+) samples=(\d+) matched=(\d+) occluded=(\d+)')
     $result.rayTracedAOStatus = @($aoSamples | ForEach-Object {
         [pscustomobject]@{ active = $_.Groups[1].Value -eq '1'; frames = [int]$_.Groups[2].Value;

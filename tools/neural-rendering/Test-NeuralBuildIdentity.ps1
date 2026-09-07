@@ -45,6 +45,19 @@ try {
     Remove-Item Function:\cmake
 }
 
+# Cleaning must refuse the repository, source, assets and an unrelated directory.
+$source = New-Item -ItemType Directory -Path (Join-Path $fixture 'neo') -Force
+$assets = New-Item -ItemType Directory -Path (Join-Path $fixture 'base') -Force
+foreach ($unsafePath in @($fixture, $source.FullName, $assets.FullName, $repo)) {
+    $threw = $false
+    try { Assert-NeuralCleanBuildDirectory -RepoRoot $fixture -BuildDirectory $unsafePath } catch { $threw = $true }
+    if (-not $threw) { throw "Unsafe -Clean target accepted: $unsafePath" }
+}
+@("CMAKE_HOME_DIRECTORY:INTERNAL=$($source.FullName)", "CMAKE_CACHEFILE_DIR:INTERNAL=$tree") |
+    Set-Content -LiteralPath (Join-Path $tree 'CMakeCache.txt')
+Assert-NeuralCleanBuildDirectory -RepoRoot $fixture -BuildDirectory $tree
+# Validation only: never delete even the accepted fixture.
+
 # Parser errors must fail, including inability to invoke the parser itself.
 foreach ($script in Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.ps1') {
     $tokens = $null
@@ -52,5 +65,5 @@ foreach ($script in Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.ps1') {
     [void][System.Management.Automation.Language.Parser]::ParseFile($script.FullName, [ref]$tokens, [ref]$parseErrors)
     if ($parseErrors.Count -gt 0) { throw "$($script.Name): $parseErrors" }
 }
-Write-Host 'PASS: exact target, custom directory, stale-output rejection, configuration isolation, PowerShell syntax.'
+Write-Host 'PASS: exact target, stale-output rejection, configuration isolation, safe clean targets, PowerShell syntax.'
 Write-Host "Fixtures retained at $fixture"

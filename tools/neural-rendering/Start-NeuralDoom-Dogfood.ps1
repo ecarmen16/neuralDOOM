@@ -49,6 +49,7 @@ foreach ($shader in @('ray_query', 'ambient_occlusion', 'contact_shadows', 'visi
         throw "Missing RTX shader: $shader. Rebuild before playtesting."
     }
 }
+Assert-NeuralShaderManifest -RepoRoot $RepoRoot -Manifest $manifest
 if ($Profile -eq 'DLAA') {
     if ($manifest.features.streamline -ne 'ON') { throw 'DLAA requires the existing official Streamline build.' }
     foreach ($dll in @('sl.interposer.dll', 'sl.common.dll', 'sl.dlss.dll', 'nvngx_dlss.dll')) {

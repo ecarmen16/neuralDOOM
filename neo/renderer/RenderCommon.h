@@ -450,7 +450,8 @@ enum neuralTemporalResetReason_t
 	NTRR_CAMERA_CUT = BIT( 5 ),
 	NTRR_FOV_CHANGE = BIT( 6 ),
 	NTRR_VIEWPORT_CHANGE = BIT( 7 ),
-	NTRR_MANUAL = BIT( 8 )
+	NTRR_MANUAL = BIT( 8 ),
+	NTRR_LIGHTING_CHANGE = BIT( 9 )
 };
 
 // RB: viewEnvprobes are allocated on the frame temporary stack memory
@@ -1855,6 +1856,7 @@ void RB_DrawBounds( const idBounds& bounds );
 
 void RB_ShutdownDebugTools();
 void R_ClearRayTracedAO();
+bool R_RayTracingSettingsChanged();
 void R_RenderRayTracedAO( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* output );
 void R_BeginRayTracedContacts( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color );
 bool R_BeginRayTracedContactLight( nvrhi::ICommandList* list, const viewDef_t* view, const viewLight_t* light );

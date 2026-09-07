@@ -97,7 +97,7 @@ Extract `base/_rbdoom_global_illumination_data.pk4` from the official RBDOOM 1.6
 .\tools\neural-rendering\Setup-NeuralDoom.ps1 -RepoRoot . -ValidateOnly
 ```
 
-This configures native DX12 ray tracing in `build-rt` and builds RelWithDebInfo. It does not require an NR DLL. Setup checks executable identity, RT shader availability, game data and lighting candidates. Fresh-machine end-to-end installation remains a pending validation item; see [CHECKPOINT.md](CHECKPOINT.md).
+This configures native DX12 ray tracing in `build-rt` and builds RelWithDebInfo. It does not require an NR DLL. Setup checks the exact executable and compiled shader hashes, game data and lighting candidates. Old manifests require a rebuild. Fresh-machine end-to-end installation remains a pending validation item; see [CHECKPOINT.md](CHECKPOINT.md).
 
 ## Optional DLAA and legacy neural rendering
 
@@ -114,3 +114,5 @@ Useful later, not required for the baseline build:
 - PresentMon or another repeatable frame-time capture tool.
 
 Install capture tools only from their canonical vendor/project sources. Record versions in test results.
+
+`Configure-RBDOOM-DX12.ps1 -Clean` only accepts an existing dedicated build directory inside the repository whose CMake cache matches this source tree. Source, asset and redirected directories are rejected.

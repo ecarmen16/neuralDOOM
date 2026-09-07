@@ -53,8 +53,12 @@ $commit = & git -C $RepoRoot rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Cannot record build commit.' }
 $changes = @(& git -C $RepoRoot status --porcelain)
 if ($LASTEXITCODE -ne 0) { throw 'Cannot record build worktree state.' }
+$formats = @()
+if ($cache['USE_DX12'] -eq 'ON') { $formats += $(if ($cache['USE_DXIL_ON_DX12'] -eq 'OFF') { 'dxbc' } else { 'dxil' }) }
+if ($cache['USE_VULKAN'] -eq 'ON') { $formats += 'spirv' }
+$contentDirectory = if ($cache['STANDALONE'] -eq 'ON') { 'content' } else { 'base' }
 $manifest = [ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     builtAt = (Get-Date -Format o)
     commit = "$commit".Trim()
     dirty = $changes.Count -gt 0
@@ -62,6 +66,7 @@ $manifest = [ordered]@{
     executable = $exe
     sha256 = $hash
     features = [ordered]@{ dx12 = $cache['USE_DX12']; vulkan = $cache['USE_VULKAN']; streamline = $cache['USE_STREAMLINE']; rayTracing = $cache['USE_RAYTRACING'] }
+    shaders = @(Get-NeuralShaderManifest -RepoRoot $RepoRoot -RayTracing ($cache['USE_RAYTRACING'] -eq 'ON') -Formats $formats -ContentDirectory $contentDirectory)
 }
 $manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
 $docs = Join-Path $RepoRoot 'docs\neural-rendering'

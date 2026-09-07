@@ -32,6 +32,7 @@ struct VS_OUT
 {
 	float4 position : SV_Position;
 	float4 previousClipPosition : TEXCOORD0;
+	float4 currentClipPosition : TEXCOORD1;
 };
 
 void main( VS_IN vertex, out VS_OUT result )
@@ -94,6 +95,12 @@ void main( VS_IN vertex, out VS_OUT result )
 	result.position.y = dot4( modelPosition, pc.rpMVPmatrixY );
 	result.position.z = dot4( modelPosition, pc.rpMVPmatrixZ );
 	result.position.w = dot4( modelPosition, pc.rpMVPmatrixW );
+
+	// These otherwise unused set-6 rows hold the current unjittered MVP.
+	result.currentClipPosition.x = dot4( modelPosition, pc.rpGlobalLightOrigin );
+	result.currentClipPosition.y = dot4( modelPosition, pc.rpJitterTexScale );
+	result.currentClipPosition.z = dot4( modelPosition, pc.rpJitterTexOffset );
+	result.currentClipPosition.w = dot4( modelPosition, pc.rpCascadeDistances );
 
 	result.previousClipPosition.x = dot4( previousModelPosition, pc.rpModelMatrixX );
 	result.previousClipPosition.y = dot4( previousModelPosition, pc.rpModelMatrixY );

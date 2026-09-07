@@ -459,8 +459,8 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 	// Joint cache handles are frame-local, so retain the previous CPU palette on the
 	// entity and upload it into this frame's cache for the motion-vector pass.
 	const idRenderModelStatic* jointModel = NULL;
-	if( modelIsVisible && r_useGPUSkinning.GetBool() && r_taaMotionVectors.GetBool() &&
-		( r_neuralSkinnedMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2 ||
+	if( modelIsVisible && r_useGPUSkinning.GetBool() && ( r_taaMotionVectors.GetBool() || r_neuralBackend.GetBool() ) &&
+		( r_neuralSkinnedMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2 || r_neuralBackend.GetBool() ||
 		  ( r_neuralViewmodelMotionVectors.GetBool() && renderEntity->weaponDepthHack ) ) )
 	{
 		for( int surfaceNum = 0; surfaceNum < model->NumSurfaces(); surfaceNum++ )

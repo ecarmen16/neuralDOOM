@@ -1,10 +1,12 @@
 # Full-resolution RTX material lighting
 
-**2026-09-06 checkpoint:** GPU work is paused at the user's request. Native gameplay passed before the final albedo debug-view and empty-light debug-state edits. The final checkpoint rebuild, RT-OFF check, DLAA/HDR 5120×1440 run and visual material review remain pending. See [CHECKPOINT.md](CHECKPOINT.md).
+**2026-09-06 review:** Native RT, DLAA + RT and RT-OFF builds pass, including the albedo debug view and motion/history fixes. The user will perform visual comparisons; these final changes have not had a new gameplay run. See [the review and short checklist](REVIEW_2026-09-06.md).
 
 `Launch-NeuralDoom-RTX.cmd` enables material bounce, contact shadows and AO. It supports Native and optional DLAA rendering, with native HDR output when Windows HDR is enabled. `Launch-NeuralDoom.cmd` preserves saved feature choices. Both select the exact CMake output and verify its build manifest. No ReShade bridge is required.
 
 ## Controls
+
+Direct edits to any RTX cvar now reset temporal history on the next primary view, including intensity, radius, samples and debug mode. A separate `neuralHistoryReset` is optional.
 
 Open the console and run `exec neural_rtx_keys.cfg` to install the example bindings. The file is editable; use preferred key or mouse-button names. It is not executed automatically over existing bindings.
 

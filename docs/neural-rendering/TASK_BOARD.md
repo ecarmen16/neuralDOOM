@@ -89,3 +89,8 @@ Planning checkpoint: development branch is `codex/modernization-foundation`, bas
 | ND3-520 | VERIFY | Add guided local acquisition and public-source audit | D3HDP download plus NR file/URL staging implemented; local dry-run and 2,445-file source audit pass; clean-machine end-to-end run remains |
 
 Codex should update statuses only from observed evidence and add links to reports/commits where useful.
+
+## 2026-09-06 review handoff
+
+- DONE: reviewed accumulated renderer/setup changes, fixed DLAA joint history and object-motion jitter/depth, added automatic RTX history resets and shader bundle validation, guarded clean-build targets. All three RelWithDebInfo builds and offline/local readiness checks pass.
+- VERIFY: user visual comparisons and live regression checks on the final binaries; no new GPU run during this review. [Findings and three checks](REVIEW_2026-09-06.md).

@@ -15,10 +15,10 @@ $exact = Join-Path $build 'fixture.exe'
 $exact | Set-Content -LiteralPath (Join-Path $build 'neuraldoom-artifact-RelWithDebInfo.txt')
 $manifestPath = Join-Path $build 'neuraldoom-build-RelWithDebInfo.json'
 $manifest = @{
+    schemaVersion = 2
     sha256 = (Get-FileHash -LiteralPath $exact).Hash; executable = $exact; configuration = 'RelWithDebInfo';
     commit = 'fixture'; dirty = $false; features = @{ dx12 = 'ON'; rayTracing = 'ON'; streamline = 'OFF' }
 }
-$manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath
 'retail-data-fixture' | Set-Content -LiteralPath (Join-Path $base 'maps/mars_city2.resources')
 $lighting = Join-Path $base '_rbdoom_global_illumination_data.pk4'
 'lighting-inventory-fixture' | Set-Content -LiteralPath $lighting
@@ -26,6 +26,8 @@ foreach ($shader in @('ray_query', 'ambient_occlusion', 'contact_shadows', 'visi
     'shader-fixture' | Set-Content -LiteralPath (Join-Path $shaderRoot "$shader.cs.dxil")
 }
 $setup = Join-Path $PSScriptRoot 'Setup-NeuralDoom.ps1'
+$manifest.shaders = @(Get-NeuralShaderManifest -RepoRoot $fixture -RayTracing $true)
+$manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath
 & $setup -RepoRoot $fixture -ValidateOnly
 if (Test-Path -LiteralPath (Join-Path $fixture 'captures/dogfood')) { throw 'Read-only readiness check created player settings.' }
 
@@ -50,7 +52,16 @@ $shaderPath = Join-Path $shaderRoot 'diffuse_bounce.cs.dxil'
 [IO.File]::WriteAllBytes($shaderPath, [byte[]]@())
 Expect-SetupFailure '*Missing RTX shader: diffuse_bounce*'
 'shader-fixture' | Set-Content -LiteralPath $shaderPath
+# A nonempty newer shader beside an older matching EXE must also be rejected.
+'new-shader-fixture' | Set-Content -LiteralPath $shaderPath
+Expect-SetupFailure '*Shader does not match its build manifest*'
+'shader-fixture' | Set-Content -LiteralPath $shaderPath
+$manifest.schemaVersion = 1
+$manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath
+Expect-SetupFailure '*Build manifest lacks shader identity*'
+$manifest.schemaVersion = 2
+$manifest | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath
 [IO.File]::WriteAllBytes($lighting, [byte[]]@())
 Expect-SetupFailure '*Full lighting data is missing*'
-Write-Host 'PASS: offline/read-only setup, exact executable identity, stale-root rejection, missing shader and missing lighting detection. No game launched.'
+Write-Host 'PASS: read-only setup, exact executable and shader identity, stale-root/old-manifest rejection, missing shader and lighting detection. No game launched.'
 Write-Host "Fixtures: $fixture"

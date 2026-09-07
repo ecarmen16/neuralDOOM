@@ -266,7 +266,8 @@ static const char* R_TemporalResetReasonsToString( int reasons )
 		{ NTRR_CAMERA_CUT, "camera-cut" },
 		{ NTRR_FOV_CHANGE, "fov-change" },
 		{ NTRR_VIEWPORT_CHANGE, "viewport-change" },
-		{ NTRR_MANUAL, "manual" }
+		{ NTRR_MANUAL, "manual" },
+		{ NTRR_LIGHTING_CHANGE, "lighting-change" }
 	};
 
 	for( int i = 0; i < ( int )ARRAY_COUNT( names ); i++ )
@@ -306,7 +307,8 @@ void idRenderSystemLocal::PrepareTemporalHistory( viewDef_t* currentView )
 		return;
 	}
 
-	int detectedReasons = NTRR_NONE;
+	// Console edits and bound toggles share the same primary-view reset path.
+	int detectedReasons = R_RayTracingSettingsChanged() ? NTRR_LIGHTING_CHANGE : NTRR_NONE;
 	const int viewWidth = currentView->viewport.x2 - currentView->viewport.x1 + 1;
 	const int viewHeight = currentView->viewport.y2 - currentView->viewport.y1 + 1;
 

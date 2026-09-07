@@ -93,6 +93,8 @@ void idRenderBackend::PrintNeuralTemporalBackendStatus() const
 {
 	const char* mode = r_neuralBackend.GetInteger() == 3 ? "Streamline DLSS Quality" : ( r_neuralBackend.GetInteger() == 2 ? "Streamline DLAA" : ( r_neuralBackend.GetInteger() == 1 ? "validate" : "disabled" ) );
 	common->Printf( "r_neuralBackend %d (%s)\n", r_neuralBackend.GetInteger(), mode );
+	common->Printf( "Neural object motion draws: rigid %llu, skinned %llu, viewmodel %llu\n",
+		neuralRigidMotionDraws, neuralSkinnedMotionDraws, neuralViewmodelMotionDraws );
 	if( neuralTemporalBackend != NULL )
 	{
 		neuralTemporalBackend->PrintStatus();
@@ -5269,15 +5271,14 @@ void idRenderBackend::DrawMotionVectors()
 			{
 				idRenderMatrix previousObjectMVP;
 				idRenderMatrix::Multiply( previousViewMVP, space->previousModelRenderMatrix, previousObjectMVP );
-				idRenderMatrix currentObjectMVP = space->unjitteredMVP;
-				if( space->weaponDepthHack )
-				{
-					idRenderMatrix::ApplyDepthHack( currentObjectMVP );
-					idRenderMatrix::ApplyDepthHack( previousObjectMVP );
-				}
-
-				RB_SetMVP( currentObjectMVP );
+				// Raster coverage and depth must exactly match the jittered depth pass,
+				// including weapon/model depth hacks. Velocity uses unjittered clips.
+				RB_SetMVP( space->mvp );
 				SetVertexParms( RENDERPARM_MODELMATRIX_X, previousObjectMVP[0], 4 );
+				SetVertexParm( RENDERPARM_GLOBALLIGHTORIGIN, space->unjitteredMVP[0] );
+				SetVertexParm( RENDERPARM_JITTERTEXSCALE, space->unjitteredMVP[1] );
+				SetVertexParm( RENDERPARM_JITTERTEXOFFSET, space->unjitteredMVP[2] );
+				SetVertexParm( RENDERPARM_CASCADEDISTANCES, space->unjitteredMVP[3] );
 				motionSpace = space;
 			}
 
@@ -5296,6 +5297,9 @@ void idRenderBackend::DrawMotionVectors()
 			}
 
 			DrawElementsWithCounters( surf );
+			if( skinned ) { neuralSkinnedMotionDraws++; }
+			else { neuralRigidMotionDraws++; }
+			if( space->weaponDepthHack ) { neuralViewmodelMotionDraws++; }
 		}
 
 		renderLog.CloseBlock();

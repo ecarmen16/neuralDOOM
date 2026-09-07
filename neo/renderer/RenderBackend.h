@@ -396,6 +396,9 @@ private:
 	TonemapPass*					toneMapPass;
 	TemporalAntiAliasingPass*		taaPass;
 	idNeuralTemporalBackend*		neuralTemporalBackend;
+	uint64 neuralRigidMotionDraws = 0;
+	uint64 neuralSkinnedMotionDraws = 0;
+	uint64 neuralViewmodelMotionDraws = 0;
 
 	BindingCache					bindingCache;
 	SamplerCache					samplerCache;

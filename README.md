@@ -2,7 +2,7 @@
 
 neuralDoom modernizes Doom 3 BFG on the RBDOOM-3-BFG source port. It adds full-resolution ray-traced material bounce, contact shadows and AO, native DX12 HDR, optional native DLAA, and ultrawide HUD/FOV controls. Active development is on `codex/rt-foundation`; the downstream remote is `ecarmen16/neuralDoom`.
 
-Current GPU testing is paused; [checkpoint and remaining validation](docs/neural-rendering/CHECKPOINT.md).
+The [pre-playtest review](docs/neural-rendering/REVIEW_2026-09-06.md) records fixes, passing builds and three quick visual checks. See the [current checkpoint](docs/neural-rendering/CHECKPOINT.md) for validation limits.
 
 **Start here:** [RTX lighting and keybinds](docs/neural-rendering/RTX_LIGHTING.md), [quick playtest](docs/neural-rendering/DOGFOOD_CHECKLIST.md), [build instructions](docs/neural-rendering/WINDOWS_SETUP.md).
 

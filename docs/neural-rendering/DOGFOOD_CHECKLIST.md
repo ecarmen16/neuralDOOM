@@ -1,5 +1,7 @@
 # neuralDoom RTX playtest: about 5 minutes
 
+For the current review build, use the [three-check playtest](REVIEW_2026-09-06.md#three-checks-for-the-user). Detailed options follow; visual validation is assigned to the user.
+
 In the game installation's `RBDOOM-3-BFG` folder, double-click
 `Launch-NeuralDoom-RTX.cmd`. Choose **Native** first, then quit and relaunch
 with **DLAA** for comparison. The launcher verifies the exact build and opens the

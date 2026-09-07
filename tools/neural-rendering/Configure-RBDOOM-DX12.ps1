@@ -41,8 +41,9 @@ if (-not $DxcDirectory -or -not (Test-Path -LiteralPath (Join-Path $DxcDirectory
 }
 
 if ($Clean -and (Test-Path $BuildDirectory)) {
+    Assert-NeuralCleanBuildDirectory -RepoRoot $RepoRoot -BuildDirectory $BuildDirectory
     if ($PSCmdlet.ShouldProcess($BuildDirectory, 'Remove existing build directory')) {
-        Remove-Item $BuildDirectory -Recurse -Force
+        Remove-Item -LiteralPath $BuildDirectory -Recurse -Force
     }
 }
 
