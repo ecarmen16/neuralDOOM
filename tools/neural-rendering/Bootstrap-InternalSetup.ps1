@@ -16,7 +16,20 @@ try {
     $reader = New-Object IO.StreamReader($archive.GetEntry('internal-package.json').Open())
     try { $manifest = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
     if ($manifest.commit -notmatch '^[0-9a-f]{40}$') { throw 'Invalid payload version.' }
-    if (-not $Destination) { $Destination = Join-Path $env:LOCALAPPDATA ("neuralDoom/Internal/" + $manifest.commit.Substring(0, 8)) }
+    if (-not $Destination) {
+        $Destination = Join-Path $env:LOCALAPPDATA ("neuralDoom/Internal/" + $manifest.commit.Substring(0, 8))
+        if (-not $NonInteractive -and -not $ExtractOnly) {
+            Add-Type -AssemblyName System.Windows.Forms
+            $picker = New-Object System.Windows.Forms.FolderBrowserDialog
+            try {
+                $picker.Description = 'Choose or create an empty folder to install neuralDoom. Your owned BFG game folder is selected separately.'
+                $picker.ShowNewFolderButton = $true
+                $picker.SelectedPath = $env:LOCALAPPDATA
+                if ($picker.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) { throw 'Installation cancelled before any files were installed.' }
+                $Destination = $picker.SelectedPath
+            } finally { $picker.Dispose() }
+        }
+    }
     $Destination = [IO.Path]::GetFullPath($Destination)
     $prefix = $Destination.TrimEnd('\') + '\'
     foreach ($entry in $archive.Entries) {

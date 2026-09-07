@@ -1103,3 +1103,15 @@ The final package refresh includes this record and the package regression script
 The complete `fc5d2fd8` package compiled into a single Windows x64 .NET setup EXE; its embedded payload self-verification passed. The bootstrap sources are extracted from and hash-matched to the included source archive before compilation, avoiding checkout line-ending differences. Windows PowerShell 5.1 installed the extracted package without a LightingPackPath: it verified cached publisher archives from the successful live-download test, extracted/verified the lighting pack, imported owned BFG data and passed exact Release/shader/lighting readiness checks. Desktop shortcut creation was suppressed for this automated test to avoid changing the user's desktop; no game was launched. Evidence: `captures/neural/automatic-installer-integration.log`. Source engine/shader bytes remain unchanged from the previously GPU-tested Release.
 
 The offline dependency suite also covers Steam path detection with a registry fixture. The final setup refresh includes these test records; `--verify` is repeated on its final EXE. Actual first-time VC++ installation/UAC and friends' fresh-machine interactive acceptance remain pending; signature rejection and installer exit handling were tested with mocked processes. Public archive download and real extraction were tested live. No third-party payload is bundled or committed. Final EXE/ZIP hashes accompany the artifacts.
+# Installer destination and workspace cleanup — 2026-09-07
+
+`Bootstrap-InternalSetup.ps1` now asks interactive setup users to choose/create an
+empty destination before extraction. Explicit destinations and noninteractive
+versioned defaults remain supported. Cancellation happens before extraction;
+existing unrelated nonempty destinations remain rejected. No renderer changed.
+
+Windows PowerShell 5.1 extraction of the verified package into an explicitly
+selected separate test directory passed. PowerShell parsing and `git diff
+--check` passed. The interactive folder picker awaits the user's installer test;
+no game was launched. See `WORKSPACE_LAYOUT.md` for the source, release, evidence,
+and preserved Desktop archive layout.

@@ -66,5 +66,6 @@ neo/bin/
 /local-proprietary/
 /captures/
 /neural-local/
+/releases/
 *.nv-gpudmp
 *.rdc
