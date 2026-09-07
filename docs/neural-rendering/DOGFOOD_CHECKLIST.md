@@ -12,6 +12,11 @@ The RTX launcher requests native HDR (Auto), using Windows HDR when enabled and
 SDR fallback otherwise. The ordinary dogfood launcher preserves saved HDR
 settings. This playtest uses the native renderer with the bridge disabled.
 
+- [ ] **Material lighting:** Run `exec neural_rtx_keys.cfg` once for the optional
+  bindings. F6 toggles full-resolution material bounce, F8 toggles contact shadows,
+  F10 cycles comparison views, and F11 toggles all RTX effects. Check colored
+  lighting near a wall/corner; try `r_rayTracedGIStrength 3` for a stronger comparison.
+  See [RTX_LIGHTING.md](RTX_LIGHTING.md) for controls and current limitations.
 - [ ] **RTX AO comparison:** In a room with corners and nearby surfaces, enter
   `r_rayTracedAO 0`, then `r_rayTracedAO 1`. Look for changes in ambient contact
   shading. Walk, turn and watch a door/character. Report flicker, seams, excessive

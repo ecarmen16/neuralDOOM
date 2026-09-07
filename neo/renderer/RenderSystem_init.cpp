@@ -1610,11 +1610,11 @@ static void R_RayTracingStatus_f( const idCmdArgs& args )
 		device->queryFeatureSupport( nvrhi::Feature::RayTracingPipeline ),
 		device->queryFeatureSupport( nvrhi::Feature::RayQuery ) );
 #if defined( USE_RAYTRACING )
-	common->Printf( "Native RT: compiled=1; optional static-world AO via r_rayTracedAO 1.\n" );
+	common->Printf( "Native RT: compiled=1; static-world AO, contact shadows and material bounce via r_rayTracedAO / r_rayTracedContactShadows / r_rayTracedGI.\n" );
 #else
 	common->Printf( "Native RT diagnostics: compiled=0.\n" );
 #endif
-	common->Printf( "Full dynamic ray scene, direct-light shadows and path tracing are not implemented.\n" );
+	common->Printf( "Material bounce uses textured diffuse/emissive surfaces and up to 16 visible light stages. Dynamic ray geometry and full path tracing are not implemented.\n" );
 }
 
 /*

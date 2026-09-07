@@ -61,7 +61,7 @@ if(USE_RAYTRACING)
         set(rt_output_root "${CMAKE_CURRENT_SOURCE_DIR}/../../base/renderprogs2")
     endif()
     set(rt_shaders)
-    foreach(rt_name ray_query ambient_occlusion)
+    foreach(rt_name ray_query ambient_occlusion contact_shadows visibility_debug material_atlas diffuse_bounce bounce_composite)
         set(rt_shader "${rt_output_root}/dxil/rt/${rt_name}.cs.dxil")
         add_custom_command(OUTPUT "${rt_shader}"
             COMMAND ${CMAKE_COMMAND} -E make_directory "${rt_output_root}/dxil/rt"

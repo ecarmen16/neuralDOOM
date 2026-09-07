@@ -5,6 +5,7 @@ cbuffer Parameters : register(b0)
     row_major float4x4 ClipToWorld;
     float4 CameraRadius;
     float4 Viewport;
+    float4 Options; // strength, hemisphere sample count
 };
 RaytracingAccelerationStructure Scene : register(t0);
 Texture2D<float> Depth : register(t1);
@@ -53,9 +54,10 @@ void main(uint3 tid : SV_DispatchThreadID)
     float3 hitPosition = primary.Origin + primary.Direction * surface.CommittedRayT();
     float blocked = 0;
     // Fixed cosine-weighted directions avoid frame-varying noise/history needs.
-    for (uint i = 0; i < 8; ++i)
+    uint sampleCount = (uint)Options.y;
+    for (uint i = 0; i < sampleCount; ++i)
     {
-        float r = sqrt((i + 0.5) / 8.0);
+        float r = sqrt((i + 0.5) / sampleCount);
         float phi = i * 2.39996323;
         RayDesc ray;
         ray.Origin = hitPosition + normal * 0.5;
@@ -68,7 +70,7 @@ void main(uint3 tid : SV_DispatchThreadID)
         if (query.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
             blocked += 1.0 - saturate(query.CommittedRayT() / CameraRadius.w);
     }
-    Occlusion[pixel] = saturate(1.0 - blocked / 8.0);
+    Occlusion[pixel] = saturate(1.0 - Options.x * blocked / sampleCount);
     if (sampleStats)
     {
         InterlockedAdd(Stats[1], 1);

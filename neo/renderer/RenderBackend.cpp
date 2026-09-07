@@ -3897,6 +3897,7 @@ idRenderBackend::DrawInteractions
 */
 void idRenderBackend::DrawInteractions( const viewDef_t* _viewDef )
 {
+	R_BeginRayTracedContacts( commandList, _viewDef, globalImages->currentDepthImage->GetTextureHandle(), globalImages->currentRenderHDRImage->GetTextureHandle() );
 	if( r_skipInteractions.GetBool() || viewDef->viewLights == NULL )
 	{
 		return;
@@ -4007,6 +4008,10 @@ void idRenderBackend::DrawInteractions( const viewDef_t* _viewDef )
 			// go back from light view to default camera view
 			ResetViewportAndScissorToDefaultCamera( _viewDef );
 
+			const bool contactLight = R_BeginRayTracedContactLight( commandList, _viewDef, vLight );
+			// The snapshot changes HDR resource state. Force the next draw to rebind graphics.
+			if( contactLight ) { currentVertexBuffer = nullptr; }
+
 			if( vLight->localInteractions != NULL )
 			{
 				renderLog.OpenBlock( "Local Light Interactions", colorPurple );
@@ -4019,6 +4024,11 @@ void idRenderBackend::DrawInteractions( const viewDef_t* _viewDef )
 				renderLog.OpenBlock( "Global Light Interactions", colorPurple );
 				RenderInteractions( vLight->globalInteractions, vLight, GLS_DEPTHFUNC_EQUAL, false, useLightDepthBounds );
 				renderLog.CloseBlock();
+			}
+			if( contactLight )
+			{
+				R_EndRayTracedContactLight( commandList );
+				currentVertexBuffer = nullptr;
 			}
 		}
 		// RB end
@@ -6412,6 +6422,15 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	// motion vectors are useful for TAA and motion blur
 	//-------------------------------------------------
 	DrawMotionVectors();
+
+	if( R_RenderRayTracedGI( commandList, _viewDef, globalImages->currentDepthImage->GetTextureHandle(), globalImages->currentRenderHDRImage->GetTextureHandle() ) )
+	{
+		currentVertexBuffer = nullptr;
+	}
+	if( R_RenderRayTracingDebug( commandList, _viewDef, globalImages->ambientOcclusionImage[0]->GetTextureHandle(), globalImages->currentRenderHDRImage->GetTextureHandle() ) )
+	{
+		currentVertexBuffer = nullptr;
+	}
 
 	//-------------------------------------------------
 	// offer complete engine-owned inputs to the optional temporal backend

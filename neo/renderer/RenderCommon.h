@@ -1856,6 +1856,11 @@ void RB_DrawBounds( const idBounds& bounds );
 void RB_ShutdownDebugTools();
 void R_ClearRayTracedAO();
 void R_RenderRayTracedAO( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* output );
+void R_BeginRayTracedContacts( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color );
+bool R_BeginRayTracedContactLight( nvrhi::ICommandList* list, const viewDef_t* view, const viewLight_t* light );
+void R_EndRayTracedContactLight( nvrhi::ICommandList* list );
+bool R_RenderRayTracingDebug( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* ao, nvrhi::ITexture* color );
+bool R_RenderRayTracedGI( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color );
 void RB_SetVertexColorParms( stageVertexColor_t svc );
 
 

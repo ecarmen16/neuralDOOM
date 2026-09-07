@@ -26,6 +26,9 @@ param(
     [ValidateSet('None', 'BuildDisabled', 'Synthetic', 'Scene', 'MissingShader')][string]$RayTracingDiagnostics = 'None',
     [ValidateRange(0, 2)][int]$ValidationLayers = 1,
     [switch]$RayTracedAO,
+    [switch]$RayTracedContactShadows,
+    [switch]$RayTracedGI,
+    [switch]$RayTracingDebugViews,
     [switch]$PassThru
 )
 
@@ -71,6 +74,10 @@ $result.rayTracingCapabilities = $null
 $result.rayTracingDiagnostics = $RayTracingDiagnostics
 $result.validationLayers = $ValidationLayers
 $result.rayTracedAO = [bool]$RayTracedAO
+$result.rayTracedContactShadows = [bool]$RayTracedContactShadows
+$result.rayTracedGI = [bool]$RayTracedGI
+if (($RayTracedContactShadows -or $RayTracedGI) -and $manifest.features.rayTracing -ne 'ON') { throw 'Contact shadows and material bounce require an RT build.' }
+if ($RayTracingDebugViews -and (-not $RayTracedAO -or -not $RayTracedContactShadows -or -not $RayTracedGI)) { throw 'The comparison-view check requires all three RT features.' }
 $result.rayTracedAOStatus = @()
 if ($RayTracedAO -and ($manifest.features.rayTracing -ne 'ON' -or $LightingVariant -eq 'NoSSAO')) { throw 'RTAO requires a ray-tracing build with SSAO enabled.' }
 if (-not $GpuProfile -and $LightingVariant -ne 'Baseline') { throw 'Lighting variants require -GpuProfile.' }
@@ -106,6 +113,8 @@ try {
     $scriptLines = @(
         "set r_neuralBackend $backend", "set r_hdrDiagnostic $([int][bool]$HDRDiagnostic)", 'set r_screenFraction 100', "set r_renderMode $LegacyRenderMode",
         'set r_useTemporalAA 1', 'set r_antiAliasing 2', "set r_rayTracedAO $([int][bool]$RayTracedAO)", "set g_fov $FieldOfView",
+        "set r_rayTracedContactShadows $([int][bool]$RayTracedContactShadows)", "set r_rayTracedGI $([int][bool]$RayTracedGI)",
+        'set r_rayTracingDebug 0', 'set r_rayTracedGIStrength 1.5', 'set r_rayTracedGISamples 4',
         ('set swf_hudScale ' + $HudScale.ToString($culture)),
         ('set swf_hudMaxAspect ' + $HudMaxAspect.ToString($culture))
     )
@@ -135,6 +144,7 @@ try {
     if ($RayTracingDiagnostics -in @('Synthetic', 'Scene')) { $scriptLines += 'rayTracingTest' }
     if ($RayTracingDiagnostics -eq 'Scene') { $scriptLines += @('rayTracingScene', 'rayTracingTest') }
     $scriptLines += @('rayTracingAOStatus', 'hdrStatus', 'neuralHistoryStatus', 'neuralBackendStatus', 'probeLightingStatus', 'screenshot screenshots/before.png')
+    $scriptLines += @('rayTracingContactStatus', 'rayTracingGIStatus')
     if ($GpuProfile) {
         # Let the screenshot stall and its queued frames drain before requesting samples.
         $scriptLines += @('wait 30', "set r_gpuProfileFrames $Frames", "wait $($Frames + 60)")
@@ -150,10 +160,24 @@ try {
         $scriptLines += @('rayTracingAOStatus', 'set r_rayTracedAO 0', 'wait 30', 'rayTracingAOStatus',
             'screenshot screenshots/rt_off.png', 'set r_rayTracedAO 1', 'wait 30')
     }
+    if ($RayTracedContactShadows) {
+        $scriptLines += @('rayTracingContactStatus', 'set r_rayTracedContactShadows 0', 'wait 30', 'rayTracingContactStatus',
+            'screenshot screenshots/contacts_off.png', 'set r_rayTracedContactShadows 1', 'neuralHistoryReset', 'wait 30')
+    }
+    if ($RayTracedGI) {
+        $scriptLines += @('rayTracingGIStatus', 'set r_rayTracedGI 0', 'neuralHistoryReset', 'wait 30', 'rayTracingGIStatus',
+            'screenshot screenshots/gi_off.png', 'set r_rayTracedGI 1', 'neuralHistoryReset', 'wait 30')
+    }
+    if ($RayTracingDebugViews) {
+        $scriptLines += @('exec neural_rtx_keys.cfg', 'rayTracingDebugCycle', 'wait 30', 'screenshot screenshots/ao_visibility.png',
+            'rayTracingDebugCycle', 'wait 30', 'screenshot screenshots/contact_visibility.png',
+            'rayTracingDebugCycle', 'wait 30', 'screenshot screenshots/material_bounce.png',
+            'rayTracingDebugCycle', 'wait 30', 'screenshot screenshots/material_albedo.png', 'rayTracingDebugCycle', 'wait 30')
+    }
     if ($ResizeWidth -gt 0) {
         $scriptLines += @("set r_windowWidth $ResizeWidth", "set r_windowHeight $ResizeHeight", 'vid_restart', 'wait 90', 'hdrStatus', 'neuralHistoryStatus', 'screenshot screenshots/resized.png')
     }
-    $scriptLines += @('rayTracingAOStatus', 'echo NEURAL_SMOKE_COMPLETE', 'quit')
+    $scriptLines += @('rayTracingAOStatus', 'rayTracingContactStatus', 'rayTracingGIStatus', 'echo NEURAL_SMOKE_COMPLETE', 'quit')
     $scriptLines | Set-Content -LiteralPath (Join-Path $saveBase.FullName 'neural_smoke.cfg') -Encoding ASCII
     # Values are scalar/validated; quote filesystem paths explicitly for Windows argv.
     # Win32 stores the command line in MAX_STRING_CHARS (1024 bytes).
@@ -212,6 +236,33 @@ try {
             $rtCapture = Join-Path $saveBase.FullName 'screenshots/rt_static_world.png'
             if (-not (Test-Path -LiteralPath $rtCapture)) { throw 'Missing ray-traced static-world panorama.' }
         }
+    }
+    foreach ($feature in @('Contact', 'GI')) {
+        $pattern = if ($feature -eq 'Contact') {
+            'RTCONTACT_STATUS active=([01]) frames=(\d+) lights=(\d+) dispatches=(\d+) samples=(\d+) matched=(\d+) hits=(\d+) modified=(\d+) invalid=(\d+)'
+        } else {
+            'RTGI_STATUS active=([01]) frames=(\d+) lights=(\d+) samples=(\d+) matched=(\d+) hits=(\d+) colored=(\d+) modified=(\d+) invalid=(\d+)'
+        }
+        $samples = @([regex]::Matches($log, $pattern) | ForEach-Object {
+            [pscustomobject]@{ active = $_.Groups[1].Value -eq '1'; frames = [int]$_.Groups[2].Value;
+                lights = [int]$_.Groups[3].Value; modified = [int]$_.Groups[8].Value; invalid = [int]$_.Groups[9].Value; raw = $_.Value }
+        })
+        $result["rayTracing${feature}Status"] = $samples
+        $enabled = if ($feature -eq 'Contact') { $RayTracedContactShadows } else { $RayTracedGI }
+        if ($enabled) {
+            if ($samples.Count -ne 4 -or -not $samples[0].active -or -not $samples[1].active -or $samples[2].active -or -not $samples[3].active -or
+                $samples[1].frames -le $samples[0].frames -or $samples[2].frames -gt $samples[1].frames + 3 -or $samples[3].frames -le $samples[2].frames -or
+                $samples[1].modified -le 0 -or $samples[3].modified -le 0 -or @($samples | Where-Object { $_.invalid -ne 0 }).Count -gt 0) {
+                throw "$feature failed shading, live disable/enable, resize, or finite-value checks."
+            }
+        } elseif ($samples.Count -ne 2 -or @($samples | Where-Object { $_.active -or $_.frames -ne 0 }).Count -gt 0) {
+            throw "Disabled $feature unexpectedly allocated or dispatched gameplay rays."
+        }
+    }
+    if ($RayTracingDebugViews) {
+        $savedConfig = Get-Content -LiteralPath (Join-Path $saveBase.FullName 'D3BFGConfig.cfg') -Raw
+        if ($savedConfig -notmatch 'bind\s+"?F6"?\s+"toggle r_rayTracedGI; neuralHistoryReset"' -or
+            $savedConfig -notmatch 'bind\s+"?F11"?\s+"rayTracingToggle"' -or [regex]::Matches($log, 'Ray-tracing view [0-4]:').Count -ne 5) { throw 'RTX example bindings or debug-view cycle failed.' }
     }
     $probes = [regex]::Matches($log, 'PROBE_LIGHTING world=1 map=(\S+) probes=(\d+) irradianceReady=(\d+) radianceReady=(\d+) complete=(\d+) defaulted=(\d+) unloaded=(\d+)')
     $selections = [regex]::Matches($log, 'PROBE_SELECTION valid=1 area=(-?\d+) diffuseFallback=(\d) specularFallbacks=(\d) activeSpecularFallbacks=(\d)')
@@ -287,6 +338,9 @@ try {
     if ($ResizeWidth -gt 0 -and ($history.Count -lt 4 -or [long]$history[3].Groups[1].Value -le [long]$history[2].Groups[1].Value)) { throw 'Resize did not advance history epoch.' }
     $names = @('before', 'after')
     if ($RayTracedAO) { $names += 'rt_off' }
+    if ($RayTracedContactShadows) { $names += 'contacts_off' }
+    if ($RayTracedGI) { $names += 'gi_off' }
+    if ($RayTracingDebugViews) { $names += @('ao_visibility', 'contact_visibility', 'material_bounce', 'material_albedo') }
     if ($ResizeWidth -gt 0) { $names += 'resized' }
     foreach ($name in $names) {
         $capture = Join-Path $saveBase.FullName "screenshots/$name.png"

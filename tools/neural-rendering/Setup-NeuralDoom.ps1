@@ -2,10 +2,15 @@
 param(
     [string]$RepoRoot,
     [string]$GamePath,
+    [string]$LightingPackPath,
     [string]$D3HDPArchivePath,
     [string]$D3HDPArchiveUrl,
     [string]$NRRuntimePath,
     [string]$NRRuntimeUrl,
+    [ValidateSet('Native', 'DLAA')][string]$Profile = 'Native',
+    [switch]$BuildEngine,
+    [switch]$ValidateOnly,
+    [switch]$IncludeLegacyNR,
     [switch]$SkipD3HDP,
     [switch]$SkipNRRuntime,
     [switch]$ForceNRRuntime,
@@ -251,32 +256,32 @@ function Install-SetupNRRuntime {
     return $true
 }
 
-function Find-SetupEngine {
+function Test-SetupReady {
     param(
         [Parameter(Mandatory)][string]$Root,
-        [string]$Configuration = 'RelWithDebInfo'
+        [Parameter(Mandatory)][string]$RenderingProfile
     )
-
-    $candidates = @(
-        (Join-Path $Root 'neuralDoom.exe'),
-        (Join-Path $Root "build\$Configuration\neuralDoom.exe"),
-        (Join-Path $Root "build-streamline\$Configuration\neuralDoom.exe"),
-        (Join-Path $Root 'RBDoom3BFG.exe'),
-        (Join-Path $Root "build\$Configuration\RBDoom3BFG.exe"),
-        (Join-Path $Root "build-streamline\$Configuration\RBDoom3BFG.exe")
-    )
-    foreach ($candidate in $candidates) {
-        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
-            return (Resolve-Path -LiteralPath $candidate).Path
-        }
+    & (Join-Path $PSScriptRoot 'Start-NeuralDoom-Dogfood.ps1') -RepoRoot $Root -Profile $RenderingProfile -ValidateOnly
+    $lighting = & (Join-Path $PSScriptRoot 'Get-NeuralLightingData.ps1') -RepoRoot $Root
+    Write-Host "[lighting] $($lighting.detail)"
+    if (-not $lighting.hasCandidates) {
+        throw 'Full lighting data is missing. Extract base/_rbdoom_global_illumination_data.pk4 from the official RBDOOM-3-BFG 1.6.0 release, then rerun setup with -LightingPackPath pointing to that file. See docs/neural-rendering/PROBE_LIGHTING.md.'
     }
-    return $null
+    Write-Host 'READY: Launch-NeuralDoom.cmd for saved settings; Launch-NeuralDoom-RTX.cmd enables all RTX lighting.' -ForegroundColor Green
 }
 
 if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
     $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 }
 $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
+if ($ValidateOnly) {
+    if ($BuildEngine) { throw '-ValidateOnly does not build or install files; omit -BuildEngine.' }
+    Test-SetupReady -Root $RepoRoot -RenderingProfile $Profile
+    return
+}
+# Native RTX/HDR needs no compatibility runtime. Legacy setup is an explicit opt-in.
+if (-not $IncludeLegacyNR -and -not $NRRuntimePath -and -not $NRRuntimeUrl) { $SkipNRRuntime = $true }
+if ($NonInteractive -and -not $D3HDPArchivePath -and -not $D3HDPArchiveUrl) { $SkipD3HDP = $true }
 
 $d3hdpSourcePage = 'https://www.moddb.com/mods/d3hdp-bfg-lite/downloads/d3hdp-bfg-lite'
 if ([string]::IsNullOrWhiteSpace($D3HDPArchiveUrl)) {
@@ -330,6 +335,21 @@ if ($robocopyExit -gt 7) {
     throw "robocopy failed with exit code $robocopyExit"
 }
 Write-Host "Retail data ready: $destinationBase" -ForegroundColor Green
+
+if ($LightingPackPath) {
+    $LightingPackPath = (Resolve-Path -LiteralPath $LightingPackPath).Path
+    $lightingDestination = Join-Path $destinationBase '_rbdoom_global_illumination_data.pk4'
+    if ((Get-Item -LiteralPath $LightingPackPath).Length -ne 1478656988 -or
+        (Get-SetupFileSha256 -Path $LightingPackPath) -ne 'D83D1D1D4F9F72D4DC1B8F7870BC0C379ADEEE5A405C2AB1FE4308851FBB303F') {
+        throw 'Lighting pack does not match the locally verified official 1.6.0 pack documented in PROBE_LIGHTING.md.'
+    }
+    if ($LightingPackPath -ine $lightingDestination) {
+        if (Test-Path -LiteralPath $lightingDestination) {
+            if ((Get-SetupFileSha256 -Path $lightingDestination) -ne (Get-SetupFileSha256 -Path $LightingPackPath)) { throw 'A different lighting pack is already installed; preserving it.' }
+        } else { Copy-Item -LiteralPath $LightingPackPath -Destination $lightingDestination }
+    }
+    Write-Host '[lighting] Verified RBDOOM 1.6.0 lighting pack installed locally.' -ForegroundColor Green
+}
 
 if (-not $SkipD3HDP -and (Test-Path -LiteralPath $d3hdpFolder -PathType Container)) {
     Write-SetupStep 'D3HDP BFG Lite is already installed; leaving it unchanged'
@@ -414,66 +434,18 @@ if (-not $SkipNRRuntime -and
     Install-SetupNRRuntime -SourcePath $NRRuntimePath -SourceUrl $NRRuntimeUrl -Destination $nrRuntimeDestination -CacheDirectory $cacheDirectory | Out-Null
 }
 
-Write-SetupStep 'Checking neuralDoom engine and optional local runtime components'
-$engine = Find-SetupEngine -Root $RepoRoot
-if ($engine) {
-    Write-Host "[present] Engine: $engine" -ForegroundColor Green
-} else {
-    Write-Host '[missing] Build neuralDoom with the scripts in tools\neural-rendering.' -ForegroundColor Yellow
-}
-
-$lighting = & (Join-Path $PSScriptRoot 'Get-NeuralLightingData.ps1') -RepoRoot $RepoRoot
-if ($lighting.hasCandidates) {
-    Write-Host "[lighting] $($lighting.detail)" -ForegroundColor DarkGray
-} else {
-    Write-Warning $lighting.detail
-}
-
-$runtimeFiles = @(
-    'sl.interposer.dll',
-    'sl.common.dll',
-    'sl.dlss.dll',
-    'nvngx_dlss.dll',
-    'dxgi.dll',
-    'neuraldoom-reshade64.dll',
-    'renodx-dlss5.addon64',
-    'nvngx_dlssnr.dll'
-)
-foreach ($runtimeFile in $runtimeFiles) {
-    $present = Test-Path -LiteralPath (Join-Path $RepoRoot $runtimeFile)
-    $color = if ($present) { 'Green' } else { 'Yellow' }
-    $state = if ($present) { 'present' } else { 'missing' }
-    Write-Host "[$state] $runtimeFile" -ForegroundColor $color
-}
-
-$proxyReShadePresent = Test-Path -LiteralPath (Join-Path $RepoRoot 'dxgi.dll')
-$embeddedReShadePresent = Test-Path -LiteralPath (Join-Path $RepoRoot 'neuraldoom-reshade64.dll')
-if ($proxyReShadePresent -and $embeddedReShadePresent) {
-    Write-Warning 'Both ReShade startup modes are present. Keep exactly one of dxgi.dll or neuraldoom-reshade64.dll.'
-} elseif ($embeddedReShadePresent) {
-    Write-Host '[mode] ReShade will be loaded explicitly by neuralDoom.' -ForegroundColor Green
-} elseif ($proxyReShadePresent) {
-    Write-Host '[mode] ReShade is currently installed as a DXGI proxy. Run Switch-NeuralDoom-ReShadeMode.cmd to use embedded startup.' -ForegroundColor Yellow
-}
-
-Write-Host ''
-if (Test-Path -LiteralPath $nrRuntimeDestination -PathType Leaf) {
-    Write-Host 'DLSS Neural Rendering runtime is staged locally and ignored by Git.' -ForegroundColor Green
-} else {
-    Write-Host 'DLSS Neural Rendering runtime was skipped; rerun setup to browse for it or supply an HTTPS URL.' -ForegroundColor Yellow
-}
-Write-Host 'Third-party archives and runtime DLLs remain local installation inputs; they are not part of the source repository.' -ForegroundColor DarkGray
-Write-Host ''
-if (Test-Path -LiteralPath $d3hdpFolder) {
-    if ($embeddedReShadePresent -and -not $proxyReShadePresent) {
-        Write-Host 'Ready: double-click Launch-NeuralDoom-EmbeddedNR-D3HDP.cmd' -ForegroundColor Green
-    } else {
-        Write-Host 'Ready: double-click Launch-NeuralDoom-D3HDP.cmd' -ForegroundColor Green
+if ($BuildEngine) {
+    $buildDirectory = Join-Path $RepoRoot $(if ($Profile -eq 'DLAA') { 'build-streamline' } else { 'build-rt' })
+    if ($Profile -eq 'DLAA' -and -not (Test-Path -LiteralPath (Join-Path $buildDirectory 'CMakeCache.txt'))) {
+        throw 'Configure the optional official Streamline SDK build first, or use -Profile Native.'
     }
-} else {
-    if ($embeddedReShadePresent -and -not $proxyReShadePresent) {
-        Write-Host 'Ready: double-click Launch-NeuralDoom-EmbeddedNR.cmd' -ForegroundColor Green
-    } else {
-        Write-Host 'Ready: double-click Launch-NeuralDoom.cmd' -ForegroundColor Green
-    }
+    Write-SetupStep "Building $Profile with native ray tracing"
+    & (Join-Path $PSScriptRoot 'Configure-RBDOOM-DX12.ps1') -RepoRoot $RepoRoot -BuildDirectory $buildDirectory -RayTracing ON
+    & (Join-Path $PSScriptRoot 'Build-RBDOOM.ps1') -RepoRoot $RepoRoot -BuildDirectory $buildDirectory -Configuration RelWithDebInfo
 }
+Write-SetupStep 'Validating the exact native RTX build, shaders and local game installation'
+Test-SetupReady -Root $RepoRoot -RenderingProfile $Profile
+if ($IncludeLegacyNR -or $NRRuntimePath -or $NRRuntimeUrl) {
+    Write-Host 'Legacy compatibility launchers are in tools/neural-rendering/legacy. They use separately staged local components.'
+}
+Write-Host 'Setup assembles local files. Retail assets, downloaded lighting/mod packs and NVIDIA runtimes are excluded from the GitHub source.'

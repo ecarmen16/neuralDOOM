@@ -1,5 +1,14 @@
 # Test results
 
+## 2026-09-06 — RTX material lighting, GPU pause checkpoint
+
+Implemented full-resolution textured diffuse bounce/emission, contact shadows, AO controls and bindable comparison commands in `RayTracingDiagnostic.cpp`, with opaque-light and pre-temporal hooks in `RenderBackend.cpp`/`RenderCommon.h`, updated capability text in `RenderSystem_init.cpp`, and SM6.5 shaders under `neo/shaders/rt`. Resource formats, coordinates, shading scope and controls are documented in [RTX_LIGHTING.md](RTX_LIGHTING.md).
+
+`Build-RBDOOM.ps1 -BuildDirectory build-rt -Configuration RelWithDebInfo` passed. Native smoke `smoke-20260906-192933-7ef79bd1` passed with AO, contacts, material GI, live off/on, debug views, example key bindings and 1280×720 → 1920×1080 resize under native DX12/NVRHI validation. GPU samples reported zero invalid contact/GI values. The earlier native DX12 error 538 was caused by NVRHI retaining a framebuffer binding across the HDR snapshot copy; clearing the command-list state after the copy and invalidating the engine vertex-buffer cache fixed the reproduced error. No submodule changes were needed.
+
+The user then requested no further launches to use the GPU. Final albedo-debug/empty-light-state edits have not been rebuilt. SDK-ON, RT-OFF, 5120×1440 HDR/DLAA, new-resource map reload and fallback checks remain pending. [CHECKPOINT.md](CHECKPOINT.md) records the precise tested artifact, completed CPU installer tests, known visual limits and resume steps. This is an implementation checkpoint, not a release validation claim.
+
+
 ## 2026-09-06 — Ultrawide feedback and narrower FOV control
 
 User dogfood feedback: brighter/smoother appearance with AO enabled, ultrawide

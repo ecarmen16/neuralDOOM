@@ -7,12 +7,28 @@
 #include "../framework/Common_local.h"
 #include "../sys/DeviceManager.h"
 #include <cmath>
+#include <algorithm>
 #include <vector>
 
 extern DeviceManager* deviceManager;
+extern idCVar r_useNewSsaoPass;
 
 idCVar r_rayTracedAO( "r_rayTracedAO", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Experimental native ray-traced AO for static opaque world surfaces; requires USE_RAYTRACING and new SSAO" );
 static idCVar r_rayTracedAORadius( "r_rayTracedAORadius", "64", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Ray-traced AO radius in Doom world units", 1, 256 );
+static idCVar r_rayTracedAOStrength( "r_rayTracedAOStrength", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Ray-traced AO darkening strength", 0, 2 );
+static idCVar r_rayTracedAOSamples( "r_rayTracedAOSamples", "8", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "Ray-traced AO hemisphere samples per pixel", 1, 32 );
+static idCVar r_rayTracedContactShadows( "r_rayTracedContactShadows", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Supplement direct-light shadows with static-world ray-traced contact shadows" );
+static idCVar r_rayTracedContactDistance( "r_rayTracedContactDistance", "128", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Contact-shadow ray reach in Doom world units", 1, 512 );
+static idCVar r_rayTracedContactStrength( "r_rayTracedContactStrength", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Contact-shadow strength", 0, 1 );
+static idCVar r_rayTracingDebug( "r_rayTracingDebug", "0", CVAR_RENDERER | CVAR_INTEGER, "0=shaded scene, 1=AO visibility, 2=contact-shadow visibility, 3=indirect material lighting, 4=ray-scene diffuse albedo", 0, 4 );
+static idCVar r_rayTracedGI( "r_rayTracedGI", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Experimental material-aware single-bounce diffuse lighting for static opaque world geometry" );
+static idCVar r_rayTracedGIStrength( "r_rayTracedGIStrength", "1.5", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Indirect material lighting intensity", 0, 4 );
+static idCVar r_rayTracedGIRadius( "r_rayTracedGIRadius", "384", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Maximum diffuse bounce distance in Doom world units", 16, 2048 );
+static idCVar r_rayTracedGISamples( "r_rayTracedGISamples", "4", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "Diffuse bounce samples per full-resolution pixel", 1, 16 );
+static idCVar r_rayTracedGIEmissive( "r_rayTracedGIEmissive", "2", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Emissive material contribution to indirect lighting", 0, 8 );
+
+void RB_GetShaderTextureMatrix( const float* shaderRegisters, const textureStage_t* texture, float matrix[16] );
+void RB_BakeTextureMatrixIntoTexgen( idPlane lightProject[3], const float* textureMatrix );
 
 #if defined( USE_RAYTRACING )
 
@@ -348,7 +364,8 @@ static float ReferenceDistance( const rtRay_t& ray, const std::vector<idVec3>& p
 	return hit ? closest : -1;
 }
 
-static bool GatherStaticWorld( const idRenderWorldLocal* world, std::vector<idVec3>& positions, std::vector<uint32>& indices, int& models, int& surfaces, int& excluded )
+static bool GatherStaticWorld( const idRenderWorldLocal* world, std::vector<idVec3>& positions, std::vector<uint32>& indices, int& models, int& surfaces, int& excluded, bool shadowCastersOnly = false,
+	std::vector<idVec4>* uvMaterials = nullptr, std::vector<const idMaterial*>* materials = nullptr )
 {
 	for( int m = 0; m < world->localModels.Num(); m++ )
 	{
@@ -361,7 +378,8 @@ static bool GatherStaticWorld( const idRenderWorldLocal* world, std::vector<idVe
 			const srfTriangles_t* tri = surface ? surface->geometry : nullptr;
 			const idMaterial* material = surface ? surface->shader : nullptr;
 			if( !tri || !material || !material->IsDrawn() || material->Coverage() != MC_OPAQUE ||
-				material->Deform() != DFRM_NONE || material->IsPortalSky() )
+				material->Deform() != DFRM_NONE || material->IsPortalSky() ||
+				( shadowCastersOnly && ( !material->SurfaceCastsShadow() || material->TestMaterialFlag( MF_NOSELFSHADOW ) ) ) )
 			{
 				excluded++;
 				continue;
@@ -373,6 +391,13 @@ static bool GatherStaticWorld( const idRenderWorldLocal* world, std::vector<idVe
 				common->Printf( "RT_SCENE status=FAIL reason=invalid-or-oversized-geometry\n" );
 				return false;
 			}
+			uint32 materialIndex = 0;
+			if( materials )
+			{
+				auto found = std::find( materials->begin(), materials->end(), material );
+				materialIndex = static_cast<uint32>( found - materials->begin() );
+				if( found == materials->end() ) { materials->push_back( material ); }
+			}
 			uint32 offset = static_cast<uint32>( positions.size() );
 			for( int v = 0; v < tri->numVerts; v++ )
 			{
@@ -383,6 +408,11 @@ static bool GatherStaticWorld( const idRenderWorldLocal* world, std::vector<idVe
 					return false;
 				}
 				positions.push_back( point );
+				if( uvMaterials )
+				{
+					const idVec2 uv = tri->verts[v].GetTexCoord();
+					uvMaterials->push_back( idVec4( uv.x, uv.y, materialIndex, 0 ) );
+				}
 			}
 			for( int j = 0; j < tri->numIndexes; j++ )
 			{
@@ -479,8 +509,9 @@ struct rtAOConstants_t
 	idRenderMatrix clipToWorld;
 	idVec4 cameraRadius;
 	idVec4 viewport;
+	idVec4 options;
 };
-static_assert( sizeof( rtAOConstants_t ) == 96, "RT AO constants must match HLSL" );
+static_assert( sizeof( rtAOConstants_t ) == 112, "RT AO constants must match HLSL" );
 
 class RayTracedAO
 {
@@ -553,6 +584,7 @@ public:
 		data.clipToWorld = view->unprojectionToWorldRenderMatrix;
 		data.cameraRadius = idVec4( view->renderView.vieworg.x, view->renderView.vieworg.y, view->renderView.vieworg.z, r_rayTracedAORadius.GetFloat() );
 		data.viewport = idVec4( view->viewport.x1, view->viewport.y1, view->viewport.GetWidth(), view->viewport.GetHeight() );
+		data.options = idVec4( r_rayTracedAOStrength.GetFloat(), r_rayTracedAOSamples.GetInteger(), 0, 0 );
 		list->writeBuffer( constants, &data, sizeof( data ) );
 		list->clearBufferUInt( stats, 0 );
 		nvrhi::ComputeState state;
@@ -601,9 +633,598 @@ private:
 	nvrhi::TextureHandle boundDepth, boundOutput;
 };
 
+struct rtContactConstants_t
+{
+	idRenderMatrix clipToWorld;
+	idVec4 cameraRadius, viewport, lightStrength, rectangle;
+};
+static_assert( sizeof( rtContactConstants_t ) == 128, "RT contact constants must match HLSL" );
+
+class RayTracedContacts
+{
+public:
+	explicit RayTracedContacts( nvrhi::IDevice* device ) : scene( device ), device( device ) {}
+	bool Initialize( const idRenderWorldLocal* world )
+	{
+		std::vector<idVec3> positions;
+		std::vector<uint32> indices;
+		int models = 0, surfaces = 0, excluded = 0;
+		if( !GatherStaticWorld( world, positions, indices, models, surfaces, excluded, true ) ) { return false; }
+		std::vector<nvrhi::rt::InstanceDesc> instances( 1 );
+		instances[0].setInstanceID( 7 ).setInstanceMask( 255 ).setFlags( nvrhi::rt::InstanceFlags::TriangleCullDisable );
+		if( !scene.Initialize( positions, indices, instances ) ) { return false; }
+		void* bytes = nullptr;
+		int size = fileSystem->ReadFile( "renderprogs2/dxil/rt/contact_shadows.cs.dxil", &bytes );
+		if( size <= 0 || !bytes )
+		{
+			if( bytes ) { fileSystem->FreeFile( bytes ); }
+			return false;
+		}
+		nvrhi::ShaderHandle shader = device->createShader( nvrhi::ShaderDesc( nvrhi::ShaderType::Compute ), bytes, size );
+		fileSystem->FreeFile( bytes );
+		if( !shader ) { return false; }
+		nvrhi::BindingLayoutDesc desc;
+		desc.visibility = nvrhi::ShaderType::Compute;
+		desc.bindings = { nvrhi::BindingLayoutItem::VolatileConstantBuffer( 0 ),
+			nvrhi::BindingLayoutItem::RayTracingAccelStruct( 0 ), nvrhi::BindingLayoutItem::Texture_SRV( 1 ),
+			nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 2 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 3 ),
+			nvrhi::BindingLayoutItem::Texture_SRV( 4 ), nvrhi::BindingLayoutItem::Texture_UAV( 0 ),
+			nvrhi::BindingLayoutItem::Texture_UAV( 1 ), nvrhi::BindingLayoutItem::StructuredBuffer_UAV( 2 ) };
+		layout = device->createBindingLayout( desc );
+		if( !layout ) { return false; }
+		nvrhi::ComputePipelineDesc pipelineDesc;
+		pipelineDesc.CS = shader;
+		pipelineDesc.bindingLayouts = { layout };
+		pipeline = device->createComputePipeline( pipelineDesc );
+		nvrhi::BufferDesc cb;
+		cb.byteSize = sizeof( rtContactConstants_t );
+		cb.isConstantBuffer = true;
+		cb.isVolatile = true;
+		cb.maxVersions = 4096;
+		cb.debugName = "Ray-traced contact constants";
+		constants = device->createBuffer( cb );
+		nvrhi::BufferDesc counters;
+		counters.byteSize = 32;
+		counters.structStride = 4;
+		counters.canHaveUAVs = true;
+		counters.initialState = nvrhi::ResourceStates::UnorderedAccess;
+		counters.keepInitialState = true;
+		counters.debugName = "Ray-traced contact sampled counters";
+		stats = device->createBuffer( counters );
+		return pipeline && constants && stats;
+	}
+
+	bool BeginView( nvrhi::ICommandList* list, nvrhi::ITexture* depth, nvrhi::ITexture* color )
+	{
+		if( boundDepth != depth || boundColor != color || !bindingSet )
+		{
+			const auto& source = color->getDesc();
+			nvrhi::TextureDesc desc;
+			desc.width = source.width;
+			desc.height = source.height;
+			desc.format = source.format;
+			desc.initialState = nvrhi::ResourceStates::ShaderResource;
+			desc.keepInitialState = true;
+			desc.debugName = "HDR before contact-shadow light";
+			beforeLight = device->createTexture( desc );
+			desc.format = nvrhi::Format::R8_UNORM;
+			desc.isUAV = true;
+			desc.debugName = "Contact-shadow visibility";
+			visibility = device->createTexture( desc );
+			if( !beforeLight || !visibility ) { return false; }
+			nvrhi::BindingSetDesc bindings;
+			bindings.bindings = { nvrhi::BindingSetItem::ConstantBuffer( 0, constants ),
+				nvrhi::BindingSetItem::RayTracingAccelStruct( 0, scene.Scene() ), nvrhi::BindingSetItem::Texture_SRV( 1, depth ),
+				nvrhi::BindingSetItem::StructuredBuffer_SRV( 2, scene.Positions() ), nvrhi::BindingSetItem::StructuredBuffer_SRV( 3, scene.Indices() ),
+				nvrhi::BindingSetItem::Texture_SRV( 4, beforeLight ), nvrhi::BindingSetItem::Texture_UAV( 0, color ),
+				nvrhi::BindingSetItem::Texture_UAV( 1, visibility ), nvrhi::BindingSetItem::StructuredBuffer_UAV( 2, stats ) };
+			bindingSet = device->createBindingSet( bindings, layout );
+			if( !bindingSet ) { return false; }
+			boundDepth = depth;
+			boundColor = color;
+		}
+		list->clearBufferUInt( stats, 0 );
+		list->clearTextureFloat( visibility, nvrhi::AllSubresources, nvrhi::Color( 1.0f ) );
+		frames++;
+		lights = 0;
+		return true;
+	}
+
+	bool BeginLight( nvrhi::ICommandList* list, const viewDef_t* view, const viewLight_t* light )
+	{
+		if( light->parallel || light->shadowLOD < 0 || !light->lightShader->LightCastsShadows() ||
+			( !light->localInteractions && !light->globalInteractions ) ) { return false; }
+		// Frontend scissors use GL's lower-left origin; texture slices use upper-left.
+		const int x0 = idMath::ClampInt( 0, boundColor->getDesc().width, view->viewport.x1 + light->scissorRect.x1 );
+		const int y0 = idMath::ClampInt( 0, boundColor->getDesc().height, view->viewport.y2 - light->scissorRect.y2 );
+		const int x1 = idMath::ClampInt( x0, boundColor->getDesc().width, view->viewport.x1 + light->scissorRect.x2 + 1 );
+		const int y1 = idMath::ClampInt( y0, boundColor->getDesc().height, view->viewport.y2 - light->scissorRect.y1 + 1 );
+		width = x1 - x0;
+		height = y1 - y0;
+		if( width <= 0 || height <= 0 ) { return false; }
+		rtContactConstants_t data;
+		data.clipToWorld = view->unprojectionToWorldRenderMatrix;
+		data.cameraRadius = idVec4( view->renderView.vieworg.x, view->renderView.vieworg.y, view->renderView.vieworg.z, r_rayTracedContactDistance.GetFloat() );
+		data.viewport = idVec4( view->viewport.x1, view->viewport.y1, view->viewport.GetWidth(), view->viewport.GetHeight() );
+		data.lightStrength = idVec4( light->globalLightOrigin.x, light->globalLightOrigin.y, light->globalLightOrigin.z, r_rayTracedContactStrength.GetFloat() );
+		data.rectangle = idVec4( x0, y0, width, height );
+		list->writeBuffer( constants, &data, sizeof( data ) );
+		nvrhi::TextureSlice slice;
+		slice.setOrigin( x0, y0 ).setSize( width, height, 1 );
+		list->copyTexture( beforeLight, slice, boundColor, slice );
+		// NVRHI caches framebuffer bindings independently of the engine. A copy
+		// changes texture state without invalidating that cache; force RTV rebinding.
+		list->clearState();
+		return true;
+	}
+
+	void EndLight( nvrhi::ICommandList* list )
+	{
+		nvrhi::ComputeState state;
+		state.pipeline = pipeline;
+		state.bindings = { bindingSet };
+		list->beginMarker( "Ray-traced contact shadows" );
+		list->setComputeState( state );
+		list->dispatch( ( width + 7 ) / 8, ( height + 7 ) / 8, 1 );
+		list->endMarker();
+		lights++;
+		dispatches++;
+	}
+
+	void PrintStatus()
+	{
+		nvrhi::BufferDesc desc;
+		desc.byteSize = 32;
+		desc.cpuAccess = nvrhi::CpuAccessMode::Read;
+		desc.initialState = nvrhi::ResourceStates::CopyDest;
+		desc.keepInitialState = true;
+		nvrhi::BufferHandle readback = device->createBuffer( desc );
+		nvrhi::CommandListParameters params;
+		params.enableImmediateExecution = false;
+		nvrhi::CommandListHandle list = device->createCommandList( params );
+		if( !readback || !list ) { return; }
+		list->open();
+		list->copyBuffer( readback, 0, stats, 0, 32 );
+		list->close();
+		device->executeCommandList( list );
+		device->waitForIdle();
+		const uint32* counts = static_cast<const uint32*>( device->mapBuffer( readback, nvrhi::CpuAccessMode::Read ) );
+		if( !counts ) { return; }
+		common->Printf( "RTCONTACT_STATUS active=%d frames=%u lights=%u dispatches=%u samples=%u matched=%u hits=%u modified=%u invalid=%u\n",
+			r_rayTracedContactShadows.GetBool(), frames, lights, dispatches, counts[0], counts[1], counts[2], counts[3], counts[4] );
+		device->unmapBuffer( readback );
+	}
+	nvrhi::ITexture* Visibility() const { return visibility; }
+	uint32 frames = 0;
+private:
+	RayQueryDiagnostic scene;
+	nvrhi::IDevice* device;
+	nvrhi::BindingLayoutHandle layout;
+	nvrhi::ComputePipelineHandle pipeline;
+	nvrhi::BufferHandle constants, stats;
+	nvrhi::BindingSetHandle bindingSet;
+	nvrhi::TextureHandle beforeLight, visibility, boundDepth, boundColor;
+	int width = 0, height = 0;
+	uint32 lights = 0, dispatches = 0;
+};
+
+// The bounce pass reuses the immutable BSP traversal contract but adds UVs,
+// actual material textures and frame-local light expressions. It owns no game data.
+struct rtBounceMaterial_t
+{
+	idVec4 diffuse, emissive, diffuseS, diffuseT, emissiveS, emissiveT;
+};
+struct rtBounceLight_t
+{
+	idVec4 originShadow, color, projectS, projectT, projectQ, falloff;
+};
+struct rtBounceConstants_t
+{
+	idRenderMatrix clipToWorld;
+	idRenderMatrix worldToClip;
+	idVec4 cameraRadius, viewport, options, atlasOptions;
+};
+static_assert( sizeof( rtBounceMaterial_t ) == 96 && sizeof( rtBounceLight_t ) == 96 && sizeof( rtBounceConstants_t ) == 192, "Bounce data must match HLSL" );
+
+class RayTracedLighting
+{
+public:
+	explicit RayTracedLighting( nvrhi::IDevice* device ) : scene( device ), device( device ) {}
+	bool Initialize( const idRenderWorldLocal* world, nvrhi::ICommandList* list )
+	{
+		std::vector<idVec3> positions;
+		std::vector<uint32> indices;
+		std::vector<idVec4> uvMaterials;
+		int models = 0, surfaces = 0, excluded = 0;
+		if( !GatherStaticWorld( world, positions, indices, models, surfaces, excluded, false, &uvMaterials, &materials ) || materials.size() > 512 ) { return false; }
+		std::vector<nvrhi::rt::InstanceDesc> instances( 1 );
+		instances[0].setInstanceID( 7 ).setInstanceMask( 255 ).setFlags( nvrhi::rt::InstanceFlags::TriangleCullDisable );
+		if( !scene.Initialize( positions, indices, instances ) ) { return false; }
+		uvBuffer = StructuredBuffer( uvMaterials.size() * sizeof( idVec4 ), sizeof( idVec4 ), "Bounce UV and material indices" );
+		materialBuffer = StructuredBuffer( materials.size() * sizeof( rtBounceMaterial_t ), sizeof( rtBounceMaterial_t ), "Bounce materials" );
+		lightBuffer = StructuredBuffer( MAX_LIGHTS * sizeof( rtBounceLight_t ), sizeof( rtBounceLight_t ), "Bounce lights" );
+		stats = StructuredBuffer( 32, 4, "Bounce sampled counters", true );
+		constants = ConstantBuffer( sizeof( rtBounceConstants_t ), 16, "Bounce constants" );
+		atlasConstants = ConstantBuffer( sizeof( idVec4 ), 4096, "Bounce atlas constants" );
+		if( !uvBuffer || !materialBuffer || !lightBuffer || !stats || !constants || !atlasConstants ) { return false; }
+		list->writeBuffer( uvBuffer, uvMaterials.data(), uvMaterials.size() * sizeof( idVec4 ) );
+
+		nvrhi::BindingLayoutDesc layout;
+		layout.visibility = nvrhi::ShaderType::Compute;
+		layout.bindings = { nvrhi::BindingLayoutItem::VolatileConstantBuffer( 0 ), nvrhi::BindingLayoutItem::Texture_SRV( 0 ),
+			nvrhi::BindingLayoutItem::Sampler( 0 ), nvrhi::BindingLayoutItem::Texture_UAV( 0 ) };
+		if( !Pipeline( "material_atlas", layout, atlasLayout, atlasPipeline ) ) { return false; }
+		layout.bindings = { nvrhi::BindingLayoutItem::VolatileConstantBuffer( 0 ), nvrhi::BindingLayoutItem::RayTracingAccelStruct( 0 ),
+			nvrhi::BindingLayoutItem::Texture_SRV( 1 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 2 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 3 ),
+			nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 4 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 5 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 6 ),
+			nvrhi::BindingLayoutItem::Texture_SRV( 7 ), nvrhi::BindingLayoutItem::Texture_SRV( 8 ), nvrhi::BindingLayoutItem::Sampler( 0 ), nvrhi::BindingLayoutItem::Sampler( 1 ),
+			nvrhi::BindingLayoutItem::Texture_UAV( 0 ), nvrhi::BindingLayoutItem::StructuredBuffer_UAV( 1 ) };
+		if( !Pipeline( "diffuse_bounce", layout, bounceLayout, bouncePipeline ) ) { return false; }
+		layout.bindings = { nvrhi::BindingLayoutItem::VolatileConstantBuffer( 0 ), nvrhi::BindingLayoutItem::Texture_SRV( 0 ),
+			nvrhi::BindingLayoutItem::Texture_SRV( 1 ), nvrhi::BindingLayoutItem::Texture_UAV( 0 ) };
+		if( !Pipeline( "bounce_composite", layout, compositeLayout, compositePipeline ) ) { return false; }
+		nvrhi::SamplerDesc sampler;
+		sampler.setAllFilters( true ).setAllAddressModes( nvrhi::SamplerAddressMode::Wrap );
+		wrapSampler = device->createSampler( sampler );
+		sampler.setAllAddressModes( nvrhi::SamplerAddressMode::Clamp );
+		clampSampler = device->createSampler( sampler );
+		if( !wrapSampler || !clampSampler ) { return false; }
+		nvrhi::TextureDesc atlasDesc;
+		atlasDesc.width = atlasDesc.height = TILE_SIZE;
+		atlasDesc.arraySize = materials.size() * 2 + MAX_LIGHTS * 2;
+		atlasDesc.dimension = nvrhi::TextureDimension::Texture2DArray;
+		atlasDesc.format = nvrhi::Format::RGBA16_FLOAT;
+		atlasDesc.isUAV = true;
+		atlasDesc.initialState = nvrhi::ResourceStates::ShaderResource;
+		atlasDesc.keepInitialState = true;
+		atlasDesc.debugName = "Ray material and light texture cache";
+		atlas = device->createTexture( atlasDesc );
+		if( !atlas ) { return false; }
+		list->clearTextureFloat( atlas, nvrhi::AllSubresources, nvrhi::Color( 0.0f ) );
+		atlasSources.resize( atlasDesc.arraySize );
+		atlasBindings.resize( atlasDesc.arraySize );
+		materialStages.resize( materials.size() * 2, nullptr );
+		int diffuseCount = 0, emissiveCount = 0;
+		for( size_t m = 0; m < materials.size(); m++ )
+		{
+			for( int s = 0; s < materials[m]->GetNumStages(); s++ )
+			{
+				const shaderStage_t* stage = materials[m]->GetStage( s );
+				if( !stage->texture.image || stage->texture.cinematic || stage->texture.texgen != TG_EXPLICIT ||
+					stage->newStage || stage->vertexColor != SVC_IGNORE ) { continue; }
+				if( stage->lighting == SL_DIFFUSE && !materialStages[m * 2] ) { materialStages[m * 2] = stage; diffuseCount++; }
+				if( stage->lighting == SL_AMBIENT && !materials[m]->HasGui() && !materialStages[m * 2 + 1] &&
+					( stage->drawStateBits & GLS_SRCBLEND_BITS ) == GLS_SRCBLEND_ONE &&
+					( stage->drawStateBits & GLS_DSTBLEND_BITS ) == GLS_DSTBLEND_ONE ) { materialStages[m * 2 + 1] = stage; emissiveCount++; }
+			}
+		}
+		common->Printf( "RTGI_READY materials=%u diffuse=%d emissive=%d textureSize=%d fullResolution=1\n", static_cast<uint32>( materials.size() ), diffuseCount, emissiveCount, TILE_SIZE );
+		return true;
+	}
+
+	bool Render( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color )
+	{
+		const int width = view->viewport.GetWidth(), height = view->viewport.GetHeight();
+		if( boundDepth != depth || boundColor != color || !bounce || bounce->getDesc().width != width || bounce->getDesc().height != height )
+		{
+			nvrhi::TextureDesc desc;
+			desc.width = width;
+			desc.height = height;
+			desc.format = nvrhi::Format::RGBA16_FLOAT;
+			desc.isUAV = true;
+			desc.initialState = nvrhi::ResourceStates::ShaderResource;
+			desc.keepInitialState = true;
+			desc.debugName = "Full-resolution material bounce radiance and receiver distance";
+			bounce = device->createTexture( desc );
+			desc.width = color->getDesc().width;
+			desc.height = color->getDesc().height;
+			desc.isUAV = false;
+			desc.debugName = "Material radiance before ray-traced bounce";
+			surfaceRadiance = device->createTexture( desc );
+			if( !bounce || !surfaceRadiance ) { return false; }
+			nvrhi::BindingSetDesc bindings;
+			bindings.bindings = { nvrhi::BindingSetItem::ConstantBuffer( 0, constants ), nvrhi::BindingSetItem::RayTracingAccelStruct( 0, scene.Scene() ),
+				nvrhi::BindingSetItem::Texture_SRV( 1, depth ), nvrhi::BindingSetItem::StructuredBuffer_SRV( 2, scene.Positions() ),
+				nvrhi::BindingSetItem::StructuredBuffer_SRV( 3, scene.Indices() ), nvrhi::BindingSetItem::StructuredBuffer_SRV( 4, uvBuffer ),
+				nvrhi::BindingSetItem::StructuredBuffer_SRV( 5, materialBuffer ), nvrhi::BindingSetItem::StructuredBuffer_SRV( 6, lightBuffer ),
+				nvrhi::BindingSetItem::Texture_SRV( 7, atlas ), nvrhi::BindingSetItem::Texture_SRV( 8, surfaceRadiance ), nvrhi::BindingSetItem::Sampler( 0, wrapSampler ), nvrhi::BindingSetItem::Sampler( 1, clampSampler ),
+				nvrhi::BindingSetItem::Texture_UAV( 0, bounce ), nvrhi::BindingSetItem::StructuredBuffer_UAV( 1, stats ) };
+			bounceBindings = device->createBindingSet( bindings, bounceLayout );
+			bindings.bindings = { nvrhi::BindingSetItem::ConstantBuffer( 0, constants ), nvrhi::BindingSetItem::Texture_SRV( 0, bounce ),
+				nvrhi::BindingSetItem::Texture_SRV( 1, depth ), nvrhi::BindingSetItem::Texture_UAV( 0, color ) };
+			compositeBindings = device->createBindingSet( bindings, compositeLayout );
+			if( !bounceBindings || !compositeBindings ) { return false; }
+			boundDepth = depth;
+			boundColor = color;
+		}
+		std::vector<rtBounceMaterial_t> data( materials.size() );
+		float localParms[MAX_ENTITY_SHADER_PARMS] = { 1, 1, 1, 1 };
+		for( size_t m = 0; m < materials.size(); m++ )
+		{
+			// Static BSP entities use these world defaults; never read mutable entityDefs.
+			std::vector<float> evaluated;
+			const float* regs = materials[m]->ConstantRegisters();
+			if( !regs )
+			{
+				evaluated.resize( materials[m]->GetNumRegisters() );
+				materials[m]->EvaluateRegisters( evaluated.data(), localParms, view->renderView.shaderParms, view->renderView.time[0] * 0.001f, nullptr );
+				regs = evaluated.data();
+			}
+			PrepareStage( list, materialStages[m * 2], regs, m * 2, 1, data[m].diffuse, data[m].diffuseS, data[m].diffuseT );
+			PrepareStage( list, materialStages[m * 2 + 1], regs, m * 2 + 1, 2, data[m].emissive, data[m].emissiveS, data[m].emissiveT );
+			// UV's third component is zero, leaving this component free for shadow policy.
+			data[m].diffuseS.z = materials[m]->SurfaceCastsShadow() && !materials[m]->TestMaterialFlag( MF_NOSELFSHADOW ) ? 1.0f : 0.0f;
+		}
+		list->writeBuffer( materialBuffer, data.data(), data.size() * sizeof( rtBounceMaterial_t ) );
+		PrepareLights( list, view );
+		rtBounceConstants_t cb;
+		cb.clipToWorld = view->unprojectionToWorldRenderMatrix;
+		idRenderMatrix::Inverse( cb.clipToWorld, cb.worldToClip );
+		cb.cameraRadius = idVec4( view->renderView.vieworg.x, view->renderView.vieworg.y, view->renderView.vieworg.z, r_rayTracedGIRadius.GetFloat() );
+		cb.viewport = idVec4( view->viewport.x1, view->viewport.y1, view->viewport.GetWidth(), view->viewport.GetHeight() );
+		cb.options = idVec4( r_rayTracedGISamples.GetInteger(), r_rayTracedGIStrength.GetFloat(), r_rayTracedGIEmissive.GetFloat(), lightCount );
+		cb.atlasOptions = idVec4( materials.size() * 2, r_rayTracingDebug.GetInteger(), 0, 0 );
+		list->writeBuffer( constants, &cb, sizeof( cb ) );
+		list->clearBufferUInt( stats, 0 );
+		// Reuse complete native material shading at visible ray hits, including
+		// probes and normal maps. Snapshot before adding GI prevents feedback.
+		list->copyTexture( surfaceRadiance, nvrhi::TextureSlice(), color, nvrhi::TextureSlice() );
+		nvrhi::ComputeState state;
+		state.pipeline = bouncePipeline;
+		state.bindings = { bounceBindings };
+		list->beginMarker( "Ray-traced material bounce" );
+		list->setComputeState( state );
+		list->dispatch( ( width + 7 ) / 8, ( height + 7 ) / 8, 1 );
+		state.pipeline = compositePipeline;
+		state.bindings = { compositeBindings };
+		list->setComputeState( state );
+		list->dispatch( ( view->viewport.GetWidth() + 7 ) / 8, ( view->viewport.GetHeight() + 7 ) / 8, 1 );
+		list->endMarker();
+		frames++;
+		return true;
+	}
+
+	void PrintStatus()
+	{
+		nvrhi::BufferDesc desc;
+		desc.byteSize = 32;
+		desc.cpuAccess = nvrhi::CpuAccessMode::Read;
+		desc.initialState = nvrhi::ResourceStates::CopyDest;
+		desc.keepInitialState = true;
+		nvrhi::BufferHandle readback = device->createBuffer( desc );
+		nvrhi::CommandListParameters params;
+		params.enableImmediateExecution = false;
+		nvrhi::CommandListHandle list = device->createCommandList( params );
+		if( !readback || !list ) { return; }
+		list->open();
+		list->copyBuffer( readback, 0, stats, 0, 32 );
+		list->close();
+		device->executeCommandList( list );
+		device->waitForIdle();
+		const uint32* counts = static_cast<const uint32*>( device->mapBuffer( readback, nvrhi::CpuAccessMode::Read ) );
+		if( !counts ) { return; }
+		common->Printf( "RTGI_STATUS active=%d frames=%u lights=%u samples=%u matched=%u hits=%u colored=%u modified=%u invalid=%u cached=%u emissive=%u\n",
+			r_rayTracedGI.GetBool(), frames, lightCount, counts[0], counts[1], counts[2], counts[3], counts[4], counts[5], counts[6], counts[7] );
+		device->unmapBuffer( readback );
+	}
+	uint32 frames = 0;
+private:
+	static const int TILE_SIZE = 256, MAX_LIGHTS = 16;
+	nvrhi::BufferHandle StructuredBuffer( size_t bytes, uint32 stride, const char* name, bool uav = false )
+	{
+		nvrhi::BufferDesc desc;
+		desc.byteSize = bytes;
+		desc.structStride = stride;
+		desc.canHaveUAVs = uav;
+		desc.initialState = uav ? nvrhi::ResourceStates::UnorderedAccess : nvrhi::ResourceStates::ShaderResource;
+		desc.keepInitialState = true;
+		desc.debugName = name;
+		return device->createBuffer( desc );
+	}
+	nvrhi::BufferHandle ConstantBuffer( size_t bytes, uint32 versions, const char* name )
+	{
+		nvrhi::BufferDesc desc;
+		desc.byteSize = bytes;
+		desc.isConstantBuffer = desc.isVolatile = true;
+		desc.maxVersions = versions;
+		desc.debugName = name;
+		return device->createBuffer( desc );
+	}
+	bool Pipeline( const char* name, const nvrhi::BindingLayoutDesc& desc, nvrhi::BindingLayoutHandle& layout, nvrhi::ComputePipelineHandle& pipeline )
+	{
+		void* bytes = nullptr;
+		int size = fileSystem->ReadFile( va( "renderprogs2/dxil/rt/%s.cs.dxil", name ), &bytes );
+		if( size <= 0 || !bytes )
+		{
+			if( bytes ) { fileSystem->FreeFile( bytes ); }
+			return false;
+		}
+		nvrhi::ShaderHandle shader = device->createShader( nvrhi::ShaderDesc( nvrhi::ShaderType::Compute ), bytes, size );
+		fileSystem->FreeFile( bytes );
+		if( !shader ) { return false; }
+		layout = device->createBindingLayout( desc );
+		if( !layout ) { return false; }
+		nvrhi::ComputePipelineDesc pipelineDesc;
+		pipelineDesc.CS = shader;
+		pipelineDesc.bindingLayouts = { layout };
+		pipeline = device->createComputePipeline( pipelineDesc );
+		return pipeline != nullptr;
+	}
+	bool CacheTexture( nvrhi::ICommandList* list, idImage* image, uint32 slice, int decode )
+	{
+		if( !image ) { return false; }
+		if( !image->GetTextureHandle() ) { image->ActuallyLoadImage( true, list ); }
+		nvrhi::TextureHandle texture = image->GetTextureHandle();
+		if( !texture || texture->getDesc().dimension != nvrhi::TextureDimension::Texture2D || texture->getDesc().sampleCount != 1 ) { return false; }
+		if( atlasSources[slice] == texture ) { return true; }
+		nvrhi::BindingSetDesc bindings;
+		bindings.bindings = { nvrhi::BindingSetItem::ConstantBuffer( 0, atlasConstants ), nvrhi::BindingSetItem::Texture_SRV( 0, texture ),
+			nvrhi::BindingSetItem::Sampler( 0, wrapSampler ), nvrhi::BindingSetItem::Texture_UAV( 0, atlas ) };
+		atlasBindings[slice] = device->createBindingSet( bindings, atlasLayout );
+		if( !atlasBindings[slice] ) { return false; }
+		const auto& desc = texture->getDesc();
+		const float mip = idMath::ClampFloat( 0, desc.mipLevels - 1, std::log2( static_cast<float>( std::max( desc.width, desc.height ) ) / TILE_SIZE ) );
+		idVec4 options( slice, decode, mip, TILE_SIZE );
+		list->writeBuffer( atlasConstants, &options, sizeof( options ) );
+		nvrhi::ComputeState state;
+		state.pipeline = atlasPipeline;
+		state.bindings = { atlasBindings[slice] };
+		list->setComputeState( state );
+		list->dispatch( TILE_SIZE / 8, TILE_SIZE / 8, 1 );
+		atlasSources[slice] = texture;
+		return true;
+	}
+	void PrepareStage( nvrhi::ICommandList* list, const shaderStage_t* stage, const float* regs, uint32 slice, int decode, idVec4& tint, idVec4& s, idVec4& t )
+	{
+		tint = idVec4( 0, 0, 0, slice );
+		s = idVec4( 1, 0, 0, 0 );
+		t = idVec4( 0, 1, 0, 0 );
+		if( !stage || !regs[stage->conditionRegister] || !CacheTexture( list, stage->texture.image, slice, decode ) ) { return; }
+		for( int c = 0; c < 3; c++ ) { tint[c] = std::isfinite( regs[stage->color.registers[c]] ) ? idMath::ClampFloat( 0, 16, regs[stage->color.registers[c]] ) : 0; }
+		if( stage->texture.hasMatrix )
+		{
+			float matrix[16];
+			RB_GetShaderTextureMatrix( regs, &stage->texture, matrix );
+			s = idVec4( matrix[0], matrix[4], 0, matrix[12] );
+			t = idVec4( matrix[1], matrix[5], 0, matrix[13] );
+		}
+	}
+	void PrepareLights( nvrhi::ICommandList* list, const viewDef_t* view )
+	{
+		struct candidate_t { const viewLight_t* light; const shaderStage_t* stage; float importance; };
+		std::vector<candidate_t> candidates;
+		for( const viewLight_t* light = view->viewLights; light; light = light->next )
+		{
+			if( light->parallel || light->lightShader->IsFogLight() || light->lightShader->IsBlendLight() || light->lightShader->IsAmbientLight() ) { continue; }
+			for( int s = 0; s < light->lightShader->GetNumStages(); s++ )
+			{
+				const shaderStage_t* stage = light->lightShader->GetStage( s );
+				if( !stage->texture.image || stage->texture.cinematic || !light->shaderRegisters[stage->conditionRegister] ) { continue; }
+				float energy = 0;
+				for( int c = 0; c < 3; c++ ) { energy += light->shaderRegisters[stage->color.registers[c]]; }
+				const float importance = energy / ( 1 + ( light->globalLightOrigin - view->renderView.vieworg ).LengthSqr() / 16384.0f );
+				if( std::isfinite( importance ) && importance > 0 ) { candidates.push_back( { light, stage, importance } ); }
+			}
+		}
+		std::stable_sort( candidates.begin(), candidates.end(), []( const candidate_t& a, const candidate_t& b ) { return a.importance > b.importance; } );
+		std::vector<rtBounceLight_t> data;
+		for( const auto& candidate : candidates )
+		{
+			if( data.size() == MAX_LIGHTS ) { break; }
+			uint32 slice = static_cast<uint32>( materials.size() * 2 + data.size() * 2 );
+			const viewLight_t* light = candidate.light;
+			const shaderStage_t* stage = candidate.stage;
+			if( !CacheTexture( list, stage->texture.image, slice, 0 ) || !CacheTexture( list, light->falloffImage, slice + 1, 0 ) ) { continue; }
+			rtBounceLight_t item;
+			item.originShadow = idVec4( light->globalLightOrigin.x, light->globalLightOrigin.y, light->globalLightOrigin.z,
+				!r_skipShadows.GetBool() && light->shadowLOD >= 0 && light->lightShader->LightCastsShadows() ? 1.0f : 0.0f );
+			item.color = idVec4( 0 );
+			for( int c = 0; c < 3; c++ ) { item.color[c] = idMath::ClampFloat( 0, 64, r_lightScale.GetFloat() * light->shaderRegisters[stage->color.registers[c]] ); }
+			idPlane planes[4];
+			memcpy( planes, light->lightProject, sizeof( planes ) );
+			if( stage->texture.hasMatrix )
+			{
+				float matrix[16];
+				RB_GetShaderTextureMatrix( light->shaderRegisters, &stage->texture, matrix );
+				RB_BakeTextureMatrixIntoTexgen( planes, matrix );
+			}
+			memcpy( &item.projectS, planes, sizeof( planes ) );
+			data.push_back( item );
+		}
+		lightCount = static_cast<uint32>( data.size() );
+		if( lightCount ) { list->writeBuffer( lightBuffer, data.data(), data.size() * sizeof( rtBounceLight_t ) ); }
+	}
+	RayQueryDiagnostic scene;
+	nvrhi::IDevice* device;
+	std::vector<const idMaterial*> materials;
+	std::vector<const shaderStage_t*> materialStages;
+	std::vector<nvrhi::TextureHandle> atlasSources;
+	std::vector<nvrhi::BindingSetHandle> atlasBindings;
+	nvrhi::TextureHandle atlas, bounce, surfaceRadiance, boundDepth, boundColor;
+	nvrhi::BufferHandle uvBuffer, materialBuffer, lightBuffer, stats, constants, atlasConstants;
+	nvrhi::BindingLayoutHandle atlasLayout, bounceLayout, compositeLayout;
+	nvrhi::ComputePipelineHandle atlasPipeline, bouncePipeline, compositePipeline;
+	nvrhi::BindingSetHandle bounceBindings, compositeBindings;
+	nvrhi::SamplerHandle wrapSampler, clampSampler;
+	uint32 lightCount = 0;
+};
+
+class RayVisibilityDebug
+{
+public:
+	bool Render( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* source, nvrhi::ITexture* color )
+	{
+		nvrhi::IDevice* device = deviceManager->GetDevice();
+		if( !pipeline )
+		{
+			void* bytes = nullptr;
+			int size = fileSystem->ReadFile( "renderprogs2/dxil/rt/visibility_debug.cs.dxil", &bytes );
+			if( size <= 0 || !bytes )
+			{
+				if( bytes ) { fileSystem->FreeFile( bytes ); }
+				return false;
+			}
+			nvrhi::ShaderHandle shader = device->createShader( nvrhi::ShaderDesc( nvrhi::ShaderType::Compute ), bytes, size );
+			fileSystem->FreeFile( bytes );
+			if( !shader ) { return false; }
+			nvrhi::BindingLayoutDesc desc;
+			desc.visibility = nvrhi::ShaderType::Compute;
+			desc.bindings = { nvrhi::BindingLayoutItem::VolatileConstantBuffer( 0 ),
+				nvrhi::BindingLayoutItem::Texture_SRV( 0 ), nvrhi::BindingLayoutItem::Texture_UAV( 0 ) };
+			layout = device->createBindingLayout( desc );
+			if( !layout ) { return false; }
+			nvrhi::BufferDesc cb;
+			cb.byteSize = sizeof( idVec4 );
+			cb.isConstantBuffer = true;
+			cb.isVolatile = true;
+			cb.maxVersions = 16;
+			cb.debugName = "Ray visibility debug constants";
+			constants = device->createBuffer( cb );
+			if( !constants ) { return false; }
+			nvrhi::ComputePipelineDesc pipelineDesc;
+			pipelineDesc.CS = shader;
+			pipelineDesc.bindingLayouts = { layout };
+			pipeline = device->createComputePipeline( pipelineDesc );
+			if( !pipeline ) { return false; }
+		}
+		if( boundSource != source || boundColor != color || !bindingSet )
+		{
+			nvrhi::BindingSetDesc desc;
+			desc.bindings = { nvrhi::BindingSetItem::ConstantBuffer( 0, constants ),
+				nvrhi::BindingSetItem::Texture_SRV( 0, source ), nvrhi::BindingSetItem::Texture_UAV( 0, color ) };
+			bindingSet = device->createBindingSet( desc, layout );
+			if( !bindingSet ) { return false; }
+			boundSource = source;
+			boundColor = color;
+		}
+		idVec4 viewport( view->viewport.x1, view->viewport.y1, view->viewport.GetWidth(), view->viewport.GetHeight() );
+		list->writeBuffer( constants, &viewport, sizeof( viewport ) );
+		nvrhi::ComputeState state;
+		state.pipeline = pipeline;
+		state.bindings = { bindingSet };
+		list->beginMarker( "Ray visibility debug" );
+		list->setComputeState( state );
+		list->dispatch( ( view->viewport.GetWidth() + 7 ) / 8, ( view->viewport.GetHeight() + 7 ) / 8, 1 );
+		list->endMarker();
+		return true;
+	}
+private:
+	nvrhi::BindingLayoutHandle layout;
+	nvrhi::ComputePipelineHandle pipeline;
+	nvrhi::BufferHandle constants;
+	nvrhi::BindingSetHandle bindingSet;
+	nvrhi::TextureHandle boundSource, boundColor;
+};
+
 static RayTracedAO* rayTracedAO = nullptr;
+static RayTracedContacts* rayTracedContacts = nullptr;
+static RayVisibilityDebug* rayVisibilityDebug = nullptr;
+static RayTracedLighting* rayTracedLighting = nullptr;
+static const viewDef_t* contactView = nullptr;
 static const idRenderWorldLocal* aoWorld = nullptr;
 static bool aoFailed = false;
+static bool contactFailed = false, debugFailed = false;
+static bool giFailed = false;
 } // namespace
 #endif
 
@@ -612,6 +1233,15 @@ void R_ClearRayTracedAO()
 #if defined( USE_RAYTRACING )
 	delete rayTracedAO;
 	rayTracedAO = nullptr;
+	delete rayTracedContacts;
+	rayTracedContacts = nullptr;
+	delete rayVisibilityDebug;
+	rayVisibilityDebug = nullptr;
+	delete rayTracedLighting;
+	rayTracedLighting = nullptr;
+	giFailed = false;
+	contactView = nullptr;
+	contactFailed = debugFailed = false;
 	aoWorld = nullptr;
 	aoFailed = false;
 #endif
@@ -637,10 +1267,138 @@ void R_RenderRayTracedAO( nvrhi::ICommandList* list, const viewDef_t* view, nvrh
 			common->Warning( "Ray-traced AO unavailable; retaining SSAO for this map" );
 			return;
 		}
-		common->Printf( "RTAO_READY staticWorld=1 raysPerPixel=8 radius=%.1f\n", r_rayTracedAORadius.GetFloat() );
+		common->Printf( "RTAO_READY staticWorld=1 raysPerPixel=%d radius=%.1f strength=%.2f\n", r_rayTracedAOSamples.GetInteger(), r_rayTracedAORadius.GetFloat(), r_rayTracedAOStrength.GetFloat() );
 	}
 	rayTracedAO->Render( list, view, depth, output );
 #endif
+}
+
+void R_BeginRayTracedContacts( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color )
+{
+#if defined( USE_RAYTRACING )
+	contactView = nullptr;
+	if( !r_rayTracedContactShadows.GetBool() || r_skipShadows.GetBool() || r_skipInteractions.GetBool() || !view->viewLights || !view->renderWorld || !view->viewEntitys ||
+		view->isSubview || view->targetRender || ( view->renderView.rdflags & RDF_IRRADIANCE ) ||
+		color->getDesc().sampleCount != 1 || !color->getDesc().isUAV ) { return; }
+	nvrhi::IDevice* device = deviceManager->GetDevice();
+	if( device->getGraphicsAPI() != nvrhi::GraphicsAPI::D3D12 || !device->queryFeatureSupport( nvrhi::Feature::RayQuery ) ||
+		!device->queryFeatureSupport( nvrhi::Feature::RayTracingAccelStruct ) ) { return; }
+	if( aoWorld != view->renderWorld ) { R_ClearRayTracedAO(); aoWorld = view->renderWorld; }
+	if( contactFailed ) { return; }
+	if( !rayTracedContacts )
+	{
+		rayTracedContacts = new RayTracedContacts( device );
+		if( !rayTracedContacts->Initialize( aoWorld ) )
+		{
+			delete rayTracedContacts;
+			rayTracedContacts = nullptr;
+			contactFailed = true;
+			common->Warning( "Ray-traced contact shadows unavailable; retaining raster shadows for this map" );
+			return;
+		}
+		common->Printf( "RTCONTACT_READY staticShadowCasters=1 distance=%.1f strength=%.2f\n", r_rayTracedContactDistance.GetFloat(), r_rayTracedContactStrength.GetFloat() );
+	}
+	if( rayTracedContacts->BeginView( list, depth, color ) ) { contactView = view; }
+#endif
+}
+
+bool R_BeginRayTracedContactLight( nvrhi::ICommandList* list, const viewDef_t* view, const viewLight_t* light )
+{
+#if defined( USE_RAYTRACING )
+	return contactView == view && rayTracedContacts && rayTracedContacts->BeginLight( list, view, light );
+#else
+	return false;
+#endif
+}
+
+void R_EndRayTracedContactLight( nvrhi::ICommandList* list )
+{
+#if defined( USE_RAYTRACING )
+	rayTracedContacts->EndLight( list );
+#endif
+}
+
+bool R_RenderRayTracedGI( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color )
+{
+#if defined( USE_RAYTRACING )
+	if( !r_rayTracedGI.GetBool() || !view->renderWorld || !view->viewEntitys || view->isSubview || view->targetRender ||
+		( view->renderView.rdflags & RDF_IRRADIANCE ) || color->getDesc().sampleCount != 1 || !color->getDesc().isUAV ) { return false; }
+	nvrhi::IDevice* device = deviceManager->GetDevice();
+	if( device->getGraphicsAPI() != nvrhi::GraphicsAPI::D3D12 || !device->queryFeatureSupport( nvrhi::Feature::RayQuery ) ||
+		!device->queryFeatureSupport( nvrhi::Feature::RayTracingAccelStruct ) ) { return false; }
+	if( aoWorld != view->renderWorld ) { R_ClearRayTracedAO(); aoWorld = view->renderWorld; }
+	if( giFailed ) { return false; }
+	if( !rayTracedLighting )
+	{
+		rayTracedLighting = new RayTracedLighting( device );
+		if( !rayTracedLighting->Initialize( aoWorld, list ) )
+		{
+			delete rayTracedLighting;
+			rayTracedLighting = nullptr;
+			giFailed = true;
+			common->Warning( "Ray-traced material lighting unavailable; retaining raster lighting for this map" );
+			return false;
+		}
+	}
+	return rayTracedLighting->Render( list, view, depth, color );
+#else
+	return false;
+#endif
+}
+
+bool R_RenderRayTracingDebug( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* ao, nvrhi::ITexture* color )
+{
+#if defined( USE_RAYTRACING )
+	if( !r_rayTracingDebug.GetInteger() || debugFailed || !view->viewEntitys || view->isSubview || view->targetRender ||
+		( view->renderView.rdflags & RDF_IRRADIANCE ) || color->getDesc().sampleCount != 1 || !color->getDesc().isUAV ) { return false; }
+	nvrhi::ITexture* source = nullptr;
+	if( r_rayTracingDebug.GetInteger() == 1 && r_rayTracedAO.GetBool() && r_useSSAO.GetBool() && r_useNewSsaoPass.GetBool() &&
+		rayTracedAO && rayTracedAO->frames && !( view->renderView.rdflags & RDF_NOAMBIENT ) ) { source = ao; }
+	if( r_rayTracingDebug.GetInteger() == 2 && r_rayTracedContactShadows.GetBool() && contactView == view && rayTracedContacts ) { source = rayTracedContacts->Visibility(); }
+	if( !source ) { return false; }
+	if( !rayVisibilityDebug ) { rayVisibilityDebug = new RayVisibilityDebug; }
+	if( rayVisibilityDebug->Render( list, view, source, color ) ) { return true; }
+	debugFailed = true;
+	common->Warning( "Ray visibility debug unavailable; retaining scene color" );
+#endif
+	return false;
+}
+
+CONSOLE_COMMAND_SHIP( rayTracingContactStatus, "Report contact-shadow lights and sampled GPU coverage", NULL )
+{
+#if defined( USE_RAYTRACING )
+	commonLocal.WaitGameThread();
+	if( rayTracedContacts && rayTracedContacts->frames ) { rayTracedContacts->PrintStatus(); return; }
+#endif
+	common->Printf( "RTCONTACT_STATUS active=0 frames=0 lights=0 dispatches=0 samples=0 matched=0 hits=0 modified=0 invalid=0\n" );
+}
+
+CONSOLE_COMMAND_SHIP( rayTracingToggle, "Toggle AO, contact shadows and material bounce lighting together; bindable", NULL )
+{
+	const bool enabled = !( r_rayTracedAO.GetBool() || r_rayTracedContactShadows.GetBool() || r_rayTracedGI.GetBool() );
+	r_rayTracedAO.SetBool( enabled );
+	r_rayTracedContactShadows.SetBool( enabled );
+	r_rayTracedGI.SetBool( enabled );
+	r_rayTracingDebug.SetInteger( 0 );
+	if( enabled ) { r_useSSAO.SetBool( true ); r_useNewSsaoPass.SetBool( true ); }
+	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "neuralHistoryReset\n" );
+	common->Printf( "Ray-traced lighting requested: %s (requires RT build and supported GPU)\n", enabled ? "ON" : "OFF" );
+}
+
+CONSOLE_COMMAND_SHIP( rayTracingDebugCycle, "Cycle shaded scene, AO, contact visibility and material bounce views; bindable", NULL )
+{
+	r_rayTracingDebug.SetInteger( ( r_rayTracingDebug.GetInteger() + 1 ) % 5 );
+	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "neuralHistoryReset\n" );
+	common->Printf( "Ray-tracing view %d: 0=scene, 1=AO, 2=contacts, 3=material bounce, 4=albedo (enable the corresponding feature)\n", r_rayTracingDebug.GetInteger() );
+}
+
+CONSOLE_COMMAND_SHIP( rayTracingGIStatus, "Report material bounce lighting and sampled GPU coverage", NULL )
+{
+#if defined( USE_RAYTRACING )
+	commonLocal.WaitGameThread();
+	if( rayTracedLighting && rayTracedLighting->frames ) { rayTracedLighting->PrintStatus(); return; }
+#endif
+	common->Printf( "RTGI_STATUS active=0 frames=0 lights=0 samples=0 matched=0 hits=0 colored=0 modified=0 invalid=0\n" );
 }
 
 CONSOLE_COMMAND_SHIP( rayTracingAOStatus, "Report active ray-traced AO and sampled GPU coverage", NULL )

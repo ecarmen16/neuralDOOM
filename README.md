@@ -1,27 +1,35 @@
 # neuralDoom
 
-neuralDoom is an experimental open-source Doom 3 BFG renderer project built on RBDOOM-3-BFG. It adds a reversible temporal-input interface, native DX12 Streamline/DLSS integration, and a local validation path for future neural-rendering technology.
+neuralDoom modernizes Doom 3 BFG on the RBDOOM-3-BFG source port. It adds full-resolution ray-traced material bounce, contact shadows and AO, native DX12 HDR, optional native DLAA, and ultrawide HUD/FOV controls. Active development is on `codex/rt-foundation`; the downstream remote is `ecarmen16/neuralDoom`.
 
-The modernization checkpoint is on `codex/modernization-foundation`; native HDR development uses `codex/native-hdr`. The downstream remote is intended to be `ecarmen16/neuralDoom`; upstream history and licensing remain intact. See [CONTRIBUTING.md](CONTRIBUTING.md) for commit checks and [the unattended workflow](docs/neural-rendering/UNATTENDED_WORKFLOW.md) for repeatable builds and gameplay validation.
+Current GPU testing is paused; [checkpoint and remaining validation](docs/neural-rendering/CHECKPOINT.md).
 
-**Settings > System Options** now includes **HUD Layout** and **HUD Size**. New configurations default to Auto (16:9), keeping the HUD centered on ultrawide displays. Layout responds to the current viewport on every frame, including after resolution changes; preferences are archived when leaving the menu. Existing saved layout choices remain respected.
+**Start here:** [RTX lighting and keybinds](docs/neural-rendering/RTX_LIGHTING.md), [quick playtest](docs/neural-rendering/DOGFOOD_CHECKLIST.md), [build instructions](docs/neural-rendering/WINDOWS_SETUP.md).
 
-An opt-in [native HDR prototype](docs/neural-rendering/NATIVE_HDR.md) adds DX12 scRGB output and separate scene/UI brightness controls. SDR remains the default; actual HDR monitor appearance is still awaiting visual validation.
+There are two supported launchers: `Launch-NeuralDoom.cmd` preserves saved settings; `Launch-NeuralDoom-RTX.cmd` enables all three ray-traced lighting effects and native HDR. Both offer Native or DLAA and select the manifest-verified build. The older NR/mod launchers are in [tools/neural-rendering/legacy](tools/neural-rendering/legacy/README.md). Existing playtest saves and display preferences remain in the same folder.
 
-Run `Setup-NeuralDoom.cmd` after cloning to assemble a local installation. The guided setup lets you browse to a legally owned Doom 3 BFG Edition folder, downloads and verifies D3HDP BFG Lite from ModDB (or accepts an existing archive), and lets you either browse to `nvngx_dlssnr.dll` or enter an HTTPS URL. The selected runtime is copied into the neuralDoom install directory. Downloads, retail game data, community assets, ReShade/RenoDX files, NVIDIA SDK/runtime binaries, and captures remain ignored and are never committed to this repository.
+**Settings > System Options** provides automatic ultrawide HUD layout and size controls. **Settings > Game Options > Field of View** supports 60–100, including narrower base FOVs for 5120×1440. Native HDR uses Windows HDR and separate scene/UI brightness controls.
 
-For unattended or repeatable local setup, call the PowerShell entry point directly:
+## Local installation and readiness
+
+Clone recursively, install the build prerequisites described in WINDOWS_SETUP.md, and run `Setup-NeuralDoom.cmd` to select your legally owned BFG data. Setup validates the exact current build, all RTX shaders, and supporting lighting data before reporting READY. It does not use a stale executable beside the launcher. For a source build, use:
 
 ```powershell
-.\tools\neural-rendering\Setup-NeuralDoom.ps1 `
-    -GamePath 'D:\Games\DOOM 3 BFG Edition' `
-    -NRRuntimeUrl 'https://example.invalid/nvngx_dlssnr.dll' `
-    -NonInteractive
+.\tools\neural-rendering\Setup-NeuralDoom.ps1 -RepoRoot . -GamePath '<owned BFG installation>' -LightingPackPath '<extracted lighting pack>' -BuildEngine -SkipD3HDP -NonInteractive
 ```
 
-Use `-NRRuntimePath` instead when the DLL is already downloaded, and add `-ForceNRRuntime` to replace an older staged DLL during a future update. `-SkipD3HDP` and `-SkipNRRuntime` omit either optional layer. Run `Audit-NeuralDoom-PublicSource.cmd` before publishing to verify that no local runtime, game archive/data, capture, cache, or machine-specific path has entered Git.
+`-BuildEngine` configures/builds the native RT profile with the installed toolchain. Optional DLAA requires the separately configured official Streamline SDK build. The setup script assembles a local source installation; it is not a bundled binary installer.
 
-For the experimental local NR compatibility path, run `Switch-NeuralDoom-ReShadeMode.cmd` once to rename an existing local ReShade `dxgi.dll` to `neuraldoom-reshade64.dll`, then use `Launch-NeuralDoom-EmbeddedNR.cmd` (or its `-D3HDP` variant). NeuralDoom explicitly loads that local runtime before creating D3D12, so ReShade is no longer installed as a DXGI proxy. Running `Switch-NeuralDoom-ReShadeMode.cmd Proxy` reverses the move. This mode remains optional, unsupported, and dependent on user-supplied local components.
+RBDOOM's official release includes `base/_rbdoom_global_illumination_data.pk4`, which supplies map probe/light-grid textures missing from retail BFG. Extract that file from the [official RBDOOM 1.6.0 release](https://github.com/RobertBeckebans/RBDOOM-3-BFG/releases/tag/v1.6.0) and pass it with `-LightingPackPath`; its recorded fingerprint is checked before installation. See [the lighting data investigation](docs/neural-rendering/PROBE_LIGHTING.md). neuralDoom already contains the source-port code; setup needs the supporting assets from that release.
+
+A read-only readiness check, requiring no game launch, copying or downloads:
+
+```powershell
+.\tools\neural-rendering\Setup-NeuralDoom.ps1 -RepoRoot . -ValidateOnly
+.\tools\neural-rendering\Setup-NeuralDoom.ps1 -RepoRoot . -Profile DLAA -ValidateOnly
+```
+
+D3HDP remains optional. Legacy runtime setup is only offered with `-IncludeLegacyNR` or explicit `-NRRuntimePath`/`-NRRuntimeUrl` parameters. Downloads, retail data, lighting/mod packs, ReShade/RenoDX components and NVIDIA runtimes remain local and ignored. Run `Audit-NeuralDoom-PublicSource.cmd` before pushing source; this does not approve redistribution of those binaries or assets. [CONTRIBUTING.md](CONTRIBUTING.md) documents the Git checks.
 
 neuralDoom is not affiliated with or endorsed by id Software, Bethesda, NVIDIA, the RBDOOM-3-BFG project, ReShade, or RenoDX. Upstream authorship, license terms, and the original RBDOOM documentation are preserved below.
 
