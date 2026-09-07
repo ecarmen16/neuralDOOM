@@ -1115,3 +1115,31 @@ selected separate test directory passed. PowerShell parsing and `git diff
 --check` passed. The interactive folder picker awaits the user's installer test;
 no game was launched. See `WORKSPACE_LAYOUT.md` for the source, release, evidence,
 and preserved Desktop archive layout.
+
+
+## Graphical setup wizard — 2026-09-07
+
+`InternalSetup.cs` now provides a Windows Forms wizard, a hidden asynchronous
+PowerShell worker, stage progress/details, persistent setup logs, cancellation
+at safe operation boundaries, retry, folder preflight, Steam detection and
+completion links. `Build-InternalSetup.ps1` compiles a Windows GUI executable
+from the hash-verified packaged source and checks its embedded payload via
+`--verify`. No new third-party UI runtime was added. Bootstrap and installer
+scripts accept shortcut options; the installer creates a per-user Start menu
+entry. `Setup-Dependencies.ps1` reports stages and checks cancellation.
+
+Validation: all six wizard pages rendered; a navigation overlap found in the
+first rendering was fixed and re-rendered. `Test-InternalSetupWizard.ps1`
+exercised the real background process/output/UI handoff with harmless success
+and failure workers; both completion pages and saved logs passed. Existing
+download/signature/Steam fixtures passed under Windows PowerShell 5.1.
+The native Release configured and built directly in the primary source checkout
+(`Configure-RBDOOM-DX12.ps1 -RayTracing ON`, then `Build-RBDOOM.ps1
+-Configuration Release`); there were no renderer changes or GPU runs.
+Evidence is under `captures/neural/wizard-*`.
+
+Limits: progress reports actual stages with an indeterminate bar, not a guessed
+overall percentage. Cancellation waits for the current operation (including a
+large transfer) and preserves downloads; it does not roll back an installed
+Microsoft prerequisite. A real missing-runtime UAC flow and a user's end-to-end
+wizard installation remain acceptance tests. No game launches automatically.

@@ -23,13 +23,15 @@ try {
     }
 } finally { $zip.Dispose() }
 $hashFile = Join-Path $stage 'checksum.txt'
+$versionFile = Join-Path $stage 'version.txt'
+$manifest.commit.Substring(0, 8) | Set-Content -LiteralPath $versionFile -Encoding ASCII
 (Get-FileHash -LiteralPath $PackagePath).Hash | Set-Content -LiteralPath $hashFile -Encoding ASCII
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
 if (-not (Test-Path -LiteralPath $compiler)) { throw 'Windows .NET Framework C# compiler is missing.' }
-& $compiler /nologo /target:exe /platform:x64 /optimize+ ("/out:" + $OutputPath) ("/resource:" + $PackagePath + ',Payload') ("/resource:" + (Join-Path $stage 'Bootstrap-InternalSetup.ps1') + ',Bootstrap') ("/resource:" + $hashFile + ',Checksum') (Join-Path $stage 'InternalSetup.cs')
+& $compiler /nologo /target:winexe /platform:x64 /optimize+ /reference:System.Windows.Forms.dll /reference:System.Drawing.dll ("/out:" + $OutputPath) ("/resource:" + $PackagePath + ',Payload') ("/resource:" + (Join-Path $stage 'Bootstrap-InternalSetup.ps1') + ',Bootstrap') ("/resource:" + $hashFile + ',Checksum') ("/resource:" + $versionFile + ',Version') (Join-Path $stage 'InternalSetup.cs')
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $OutputPath)) { throw 'Setup bootstrap compilation failed.' }
-& $OutputPath --verify
-if ($LASTEXITCODE -ne 0) { throw 'Setup payload self-verification failed.' }
+$verification = Start-Process -FilePath $OutputPath -ArgumentList '--verify' -WindowStyle Hidden -Wait -PassThru
+if ($verification.ExitCode -ne 0) { throw 'Setup payload self-verification failed.' }
 $setupHash = (Get-FileHash -LiteralPath $OutputPath).Hash
 "$setupHash  $(Split-Path -Leaf $OutputPath)" | Set-Content -LiteralPath "$OutputPath.sha256" -Encoding ASCII
 Write-Host "PASS: single-file setup created: $OutputPath ($setupHash)"

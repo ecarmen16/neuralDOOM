@@ -5,6 +5,7 @@ param(
     [string]$LightingPackPath,
     [switch]$VerifyOnly,
     [switch]$SkipShortcut,
+    [switch]$SkipStartMenu,
     [switch]$NonInteractive
 )
 Set-StrictMode -Version Latest
@@ -35,6 +36,7 @@ if (-not $exe.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -or -no
 Write-Host "PASS: package hashes and corresponding source ($($package.commit))."
 if ($VerifyOnly) { return }
 . (Join-Path $PSScriptRoot 'Setup-Dependencies.ps1')
+Write-SetupStatus 'Checking your Doom 3 BFG installation...'
 if (-not $GamePath) { $GamePath = Find-SetupBFG }
 if (-not $GamePath -and -not $NonInteractive) {
     Add-Type -AssemblyName System.Windows.Forms
@@ -48,8 +50,10 @@ if (-not $GamePath -or -not (Test-Path -LiteralPath (Join-Path $GamePath 'base/m
     throw 'Doom 3 BFG Edition was not found. Rerun setup and select its installation folder, or pass -GamePath.'
 }
 Write-Host "Using owned BFG installation: $GamePath"
+Write-SetupStatus 'Checking Microsoft prerequisites...'
 Install-SetupVCRuntime -RepoRoot $RepoRoot
 if (-not $LightingPackPath) { $LightingPackPath = Get-SetupLightingPack -RepoRoot $RepoRoot }
+Write-SetupStatus 'Copying game data and preparing your installation...'
 # Convert portable identity to the existing launcher's local exact-build format.
 $package.executable = $exe
 $package.PSObject.Properties.Remove('files')
@@ -57,8 +61,20 @@ $package | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $RepoRo
 $exe | Set-Content -LiteralPath (Join-Path $RepoRoot 'build-rt/neuraldoom-artifact-Release.txt') -Encoding UTF8
 & (Join-Path $PSScriptRoot 'Setup-NeuralDoom.ps1') -RepoRoot $RepoRoot -GamePath $GamePath -LightingPackPath $LightingPackPath -Profile Native -Configuration Release -SkipD3HDP -SkipNRRuntime -NonInteractive:$NonInteractive
 if (-not $SkipShortcut) {
+Write-SetupStatus 'Creating your desktop shortcut...'
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'neuralDoom Internal Test.lnk'))
+$shortcut.TargetPath = Join-Path $RepoRoot 'Play-InternalTest.cmd'
+$shortcut.WorkingDirectory = $RepoRoot
+$shortcut.IconLocation = "$exe,0"
+$shortcut.Save()
+}
+if (-not $SkipStartMenu) {
+Write-SetupStatus 'Adding neuralDoom to your Start menu...'
+$startFolder = Join-Path ([Environment]::GetFolderPath('Programs')) 'neuralDoom'
+New-Item -ItemType Directory -Path $startFolder -Force | Out-Null
+$shell = New-Object -ComObject WScript.Shell
+$shortcut = $shell.CreateShortcut((Join-Path $startFolder 'neuralDoom Internal Test.lnk'))
 $shortcut.TargetPath = Join-Path $RepoRoot 'Play-InternalTest.cmd'
 $shortcut.WorkingDirectory = $RepoRoot
 $shortcut.IconLocation = "$exe,0"

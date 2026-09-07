@@ -4,11 +4,16 @@ param(
     [Parameter(Mandatory)][ValidatePattern('^[0-9A-Fa-f]{64}$')][string]$Sha256,
     [string]$Destination,
     [string]$GamePath,
+    [switch]$SkipShortcut,
+    [switch]$SkipStartMenu,
     [switch]$NonInteractive,
     [switch]$ExtractOnly
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+if ($env:NEURALDOOM_SETUP_CANCEL_FILE -and (Test-Path -LiteralPath $env:NEURALDOOM_SETUP_CANCEL_FILE)) { throw 'Setup cancelled.' }
+Write-Host '@@SETUP|Verifying setup files...'
 if ((Get-FileHash -LiteralPath $PackagePath).Hash -ne $Sha256) { throw 'Setup payload checksum failed. Download setup again.' }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $PackagePath).Path)
@@ -44,6 +49,7 @@ if ((Test-Path -LiteralPath $Destination) -and @(Get-ChildItem -LiteralPath $Des
     }
 }
 Write-Host "Installing neuralDoom to $Destination"
+Write-Host '@@SETUP|Extracting neuralDoom...'
 Expand-Archive -LiteralPath $PackagePath -DestinationPath $Destination -Force
 if ($ExtractOnly) { return }
-& (Join-Path $Destination 'tools/neural-rendering/Install-InternalTest.ps1') -RepoRoot $Destination -GamePath $GamePath -NonInteractive:$NonInteractive
+& (Join-Path $Destination 'tools/neural-rendering/Install-InternalTest.ps1') -RepoRoot $Destination -GamePath $GamePath -NonInteractive:$NonInteractive -SkipShortcut:$SkipShortcut -SkipStartMenu:$SkipStartMenu

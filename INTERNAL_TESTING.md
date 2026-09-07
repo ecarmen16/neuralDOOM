@@ -2,10 +2,12 @@
 
 ## Install once
 
-1. Run **neuralDoom-Setup-<version>.exe**. Choose or create an empty installation folder in the folder picker. Setup verifies and extracts our package there; choose your destination separately from your owned BFG game folder.
-2. Setup detects a Steam BFG installation. If it cannot find one, select your owned **Doom 3 BFG Edition** folder. No manual lighting download or extraction is needed.
+1. Run **neuralDoom-Setup-<version>.exe**. The dark Windows wizard guides you through Welcome, Install Location, Ready to Install, Installation, and Complete. Click Next to use the suggested versioned location or browse to a separate empty folder.
+2. On Install Location, confirm the detected Steam BFG folder or browse to your owned **Doom 3 BFG Edition** folder. Choose whether to create a desktop shortcut. No manual lighting download or extraction is needed.
 3. Setup installs Microsoft's runtime if missing (Windows may ask for administrator approval), downloads the official RBDOOM lighting archive and a pinned standalone extraction tool, verifies their hashes, and extracts only the required lighting pack. The lighting download is approximately 1.65 GB; verified cached downloads are reused on retry.
-4. Setup copies missing owned game data and validates the installed Release build. Start the game from the **neuralDoom Internal Test** desktop shortcut. The game is not launched automatically.
+4. Setup copies missing owned game data and validates the installed Release build. Its progress page stays responsive, with optional details. Finish offers your installation folder, setup log, and test controls. Start the game from the **neuralDoom Internal Test** Start menu entry or optional desktop shortcut. The game is not launched automatically.
+
+Cancel during installation requests a stop after the current operation; it does not kill a prerequisite installer or interrupt a file copy. Verified downloads remain available for Retry. Failures stay in the wizard, with a View Setup Log button; logs are saved under local application data in `neuralDoom/SetupLogs`. Progress indicates the current operation without estimating a misleading overall percentage. Windows prerequisite permission prompts can still appear separately.
 
 No compiler, Git, Python, preinstalled 7-Zip, or separately collected supporting files are required. Keep roughly 15 GB free for the installation and download cache. The first setup requires internet; choosing the destination, Windows security/prerequisite approval and locating an undetected owned game are the manual steps. Saves/settings are in the installed folder's `captures/dogfood` directory. Choose a new empty folder for a later version to preserve the previous installation and its saves. Noninteractive bootstrap calls without an explicit destination use a versioned folder under local application data.
 

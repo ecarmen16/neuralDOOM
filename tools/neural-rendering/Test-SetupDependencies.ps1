@@ -3,6 +3,17 @@ param()
 . (Join-Path $PSScriptRoot 'Setup-Dependencies.ps1')
 $root = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) ('captures/neural/setup-fixture-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $root -Force | Out-Null
+$previousCancel = $env:NEURALDOOM_SETUP_CANCEL_FILE
+try {
+    $env:NEURALDOOM_SETUP_CANCEL_FILE = Join-Path $root 'cancel'
+    'cancel' | Set-Content -LiteralPath $env:NEURALDOOM_SETUP_CANCEL_FILE
+    $cancelled = $false
+    try { Write-SetupStatus 'Must not continue' } catch { $cancelled = $_.Exception.Message -match 'Setup cancelled' }
+    if (-not $cancelled) { throw 'Cancellation was ignored at the stage boundary.' }
+    Remove-Item -LiteralPath $env:NEURALDOOM_SETUP_CANCEL_FILE
+    Write-SetupStatus 'Retry can continue'
+} finally { $env:NEURALDOOM_SETUP_CANCEL_FILE = $previousCancel }
+Write-Host 'PASS: cooperative cancellation and retry at a setup stage boundary.'
 $payload = Join-Path $root 'expected.txt'
 'verified payload' | Set-Content -LiteralPath $payload
 $hash = (Get-FileHash -LiteralPath $payload).Hash

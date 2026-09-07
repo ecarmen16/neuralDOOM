@@ -2,6 +2,12 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Write-SetupStatus {
+    param([string]$Message)
+    if ($env:NEURALDOOM_SETUP_CANCEL_FILE -and (Test-Path -LiteralPath $env:NEURALDOOM_SETUP_CANCEL_FILE)) { throw 'Setup cancelled. Verified downloads are retained for retry.' }
+    Write-Host "@@SETUP|$Message"
+}
+
 function Get-SetupDownload {
     param([string]$Uri, [string]$Destination, [string]$Sha256, [long]$Bytes = 0)
     if ([uri]::new($Uri).Scheme -ne 'https') { throw 'Setup downloads require HTTPS.' }
@@ -15,6 +21,7 @@ function Get-SetupDownload {
     $partial = "$Destination.partial"
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     for ($attempt = 1; $attempt -le 3; $attempt++) {
+        Write-SetupStatus "Downloading supporting files (attempt $attempt of 3)..."
         try {
             Write-Host "Downloading $(Split-Path -Leaf $Destination) (attempt $attempt/3)..."
             if (Test-Path -LiteralPath $partial) { Remove-Item -LiteralPath $partial -Force }
@@ -42,10 +49,12 @@ function Get-SetupLightingPack {
         }
     }
     Write-Host 'Preparing RBDOOM lighting data: approximately 1.65 GB download from the official release.'
+    Write-SetupStatus 'Downloading lighting data...'
     $archive = Get-SetupDownload -Uri 'https://github.com/RobertBeckebans/RBDOOM-3-BFG/releases/download/v1.6.0/RBDOOM-3-BFG-1.6.0.22-full-win64-20250510-git-ba39ba6.7z' -Destination (Join-Path $cache 'rbdoom-1.6.0.7z') -Bytes 1647091125 -Sha256 'F1B9A325CEDE2A281ECE7D10A1A8BC48CE760D12AE23E37C62308631A886ABAE'
     $extractor = Get-SetupDownload -Uri 'https://github.com/ip7z/7zip/releases/download/26.03/7zr.exe' -Destination (Join-Path $cache '7zr-26.03.exe') -Bytes 602624 -Sha256 'AD4C82FADCBDF93C03B4FC440F300509C7D60C5C2F4D183E35D9D70D6957037D'
     $destination = Join-Path $cache 'lighting'
     Write-Host 'Extracting and verifying the lighting pack...'
+    Write-SetupStatus 'Extracting and verifying lighting data...'
     # Extract exactly one known member, never the upstream EXE/shaders or full archive.
     & $extractor x -y "-o$destination" $archive 'base/_rbdoom_global_illumination_data.pk4' | Out-Host
     if ($LASTEXITCODE -ne 0) { throw 'Lighting extraction failed. Rerun setup to retry the cached archive.' }
@@ -76,6 +85,7 @@ function Install-SetupVCRuntime {
         throw 'Microsoft runtime installer signature could not be verified; it was not executed.'
     }
     Write-Host 'Installing Microsoft VC++ runtime. Accept the Windows administrator prompt if it appears.'
+    Write-SetupStatus 'Installing Microsoft prerequisites. Check for a Windows permission prompt.'
     $process = Start-Process -FilePath $installer -ArgumentList '/install', '/passive', '/norestart' -WindowStyle Hidden -Wait -PassThru
     if ($process.ExitCode -notin @(0, 1638, 3010)) { throw "Microsoft runtime installer failed: $($process.ExitCode). Rerun setup after resolving the Windows prompt." }
     if ($process.ExitCode -eq 3010) { Write-Host 'Windows requests a restart before playing. Setup will finish without restarting your PC.' }

@@ -15,7 +15,7 @@ absolute paths. Do not launch or build from those stale caches; configure a fres
 build in the source checkout for future development. Keep the archive until any
 desired saves and locally managed components have been accounted for.
 
-The installer asks for an empty destination independently of the owned BFG data
-source. It performs supporting downloads and extraction, then creates the play
-shortcut. It does not launch the game. See `INTERNAL_TESTING.md` at the repository
+The graphical installer wizard offers a versioned destination independently of
+the owned BFG data source. It performs supporting downloads and extraction, then
+creates a Start menu entry and optional desktop shortcut. It does not launch the game. See `INTERNAL_TESTING.md` at the repository
 root for the controls and acceptance checklist.
