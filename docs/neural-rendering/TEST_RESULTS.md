@@ -1,3 +1,25 @@
+## 2026-09-06 - Review fixes, clean builds and CPU-only handoff
+
+Final code checkpoint: `7a5ecc6a89536b2507e4ed8fcc64e9e91e2acf44` on `codex/rt-foundation`. Both source and game checkouts were synchronized and clean before build-manifest refresh. This later results-only documentation commit does not change the tested code or shader artifacts.
+
+| Configuration | Result | EXE SHA-256 | Manifest shaders |
+|---|---|---|---:|
+| Native DX12, RT ON, SDK OFF (`build-rt`) | BUILD PASS | `C0248D63A498AE05F43D6C9E81BA5F109350CCCA00A5EB14AD5138CD1CCE38DD` | 148 |
+| DX12 DLAA, RT ON, SDK ON (`build-streamline`) | BUILD PASS | `AEDCFE0B22B6D2346FBABD6CA2D6ED8AB8169348019B3741B42F09185A849819` | 148 |
+| DX12 baseline, RT OFF, SDK OFF (`build`) | BUILD PASS | `CCD9EC7609AFEF6DEF984B917D7CDA91B70B2AA46305B7FED166650C3F4C7CF9` | 141 |
+
+All use `Build-RBDOOM.ps1 -RepoRoot <game-checkout> -BuildDirectory <tree> -Configuration RelWithDebInfo`. The existing configured CMake trees and pinned dependencies were retained. Final schema-2 manifests record the clean code commit above, `dirty=false`, matching executable SHA-256 and matching compiled shader bundles. In particular, the shared raw RT shaders and rigid/skinned shader variants match both rebuilt RT executables. Build logs: source-workspace `captures/neural/review-build-rt-final.log`, `review-build-streamline-final.log`, `review-build-final.log`; clean incremental confirmation logs end in `-clean.log`. Compiler warnings were the Windows SDK C4005 `StrCmp*` redefinitions; no compiler errors.
+
+`Test-NeuralBuildIdentity.ps1` and `Test-NeuralSetup.ps1` passed. These exercise exact CMake target selection, stale output and missing configuration, invalidation of a previous success manifest when the output is absent, all PowerShell parsers, missing/changed EXE, empty/nonempty replacement shader, old manifest, missing lighting data, and read-only setup behavior. Cleanup fixtures reject source/repository/asset/outside targets and accept only a matching dedicated CMake build directory; they do not delete anything.
+
+Both real `Setup-NeuralDoom.ps1 -Profile Native -ValidateOnly` and `-Profile DLAA -ValidateOnly` passed after the final builds. All three manifests were independently compared against current executable and shader bytes. `git diff --check`, the staged public-source audit (2,479 files) and focused review passed. NVRHI and ShaderMake pins are unchanged. No retail files, SDK binaries, captures, credentials or machine paths were staged.
+
+The renderer fixes are automatic neural-backend joint history, object-motion raster/depth agreement with unjittered output vectors, and automatic history invalidation after RTX cvar edits. The smoke helper now checks lighting-change resets without supplying manual resets for GI/contact toggles, but that updated GPU scenario has not been run.
+
+**No game was launched during this review.** The user first lifted the GPU pause, then requested that visual comparisons be left to them and work finish with review/fixes/rebuilds. These results prove compilation and local setup integrity, not final GPU stability or image quality. Live character/weapon motion, RTX cvar transitions, albedo mode 4, map/save reload, new material-shader fallback, and the combined 5120x1440 DLAA/HDR/RTX path remain pending on these exact binaries. RT-OFF compilation passed; its latest runtime regression check is also pending. Prior gameplay results below apply to their own recorded artifacts.
+
+See [the review and three-check playtest](REVIEW_2026-09-06.md). No new graphical feature was added during review; full render resolution is retained. GitHub push remains pending the user's login.
+
 # Test results
 
 ## 2026-09-06 — RTX material lighting, GPU pause checkpoint
