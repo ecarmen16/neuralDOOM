@@ -1029,3 +1029,16 @@ No gameplay, GPU capture or visual comparison performed. The user owns visual ch
 User reported an access violation while in settings, on the DLAA launch route. Windows Application Error 1000 identifies engine fault RVA `0x5363c3`; resolving against the matching RelWithDebInfo executable/PDB through DbgHelp gives `idSWFScriptObject::GetVariable(const char*, bool) + 0x63`, `neo/swf/SWF_ScriptObject.cpp:526`. The log includes `slSetConstants: eErrorDuplicatedConstants` with native TAA fallback earlier; causality is not established. No crash dump was found in the inspected locations. A symbol address without a call stack does not establish the underlying menu/object-lifetime defect. No speculative renderer or SWF fix applied.
 
 At the user's request, backed up and removed active shared `D3BFGConfig.cfg` and generated `neural_dogfood.cfg`; no migration marker existed. Reset the local NR tuning section to addon defaults with enable/full-resolution safeguards retained. Saved games, logs, prior backups and runtime components are preserved. Existing launchers share this preference directory. All game preferences, including HDR calibration and key bindings, will regenerate; automatic contrast migration remains pending for next normal launch. No game launched. Next investigation needs the exact settings action or a captured crash stack; preference reset alone is not evidence that the crash is fixed.
+
+
+## 2026-09-07 — Menu hover lifetime regression
+
+`Test-SWFHoverLifetime.py` compiled the actual `idSWF::HandleEvent` mouse-hover block with MSVC against reference-count fixtures: PASS for removed next target, repeated same target, empty space, reentrant roll-out and balanced references. The identical test against pre-fix `SWF_Events.cpp` fails with `retain after free`, establishing a real regression rather than a source-text assertion. Matching-binary disassembly confirms the reported fault is the initial object dereference, not the later hash-chain bounds workaround; that unrelated workaround was not modified.
+
+`Configure-RBDOOM-DX12.ps1` then `Build-RBDOOM.ps1 -Configuration RelWithDebInfo` passed for all three existing trees. Focused diff review and `git diff --check` passed. No renderer settings, shaders, SDKs or formats changed. No game launched; exact reproduction of the user's menu crash remains pending because no stack/dump or exact input sequence was available.
+
+| Tree | Executable SHA-256 |
+|---|---|
+| build-rt | `DB66CB4B1DAEF929088E554268445CB38739D9AE61ACA8815A6F43220F220F68` |
+| build-streamline | `A46EDE1280006F4E158CFCAA1CF8EE757DD486B1AB432FCB5A5CD485662BE148` |
+| build | `7ADECFF9B9AA71C32E65518E0FAAB95687D9D8FFD242BBCD3263D310D4BABC1C` |

@@ -485,6 +485,9 @@ bool idSWF::HandleEvent( const sysEvent_t* event )
 		bool retVal = false;
 
 		idSWFScriptObject* hitObject = HitTest( mainspriteInstance, swfRenderState_t(), mouseX, mouseY, NULL );
+		// onRollOut can rebuild the display list and release the next hit object.
+		// Keep it alive across callbacks, including the subsequent onRollOver.
+		const idSWFScriptVar hitReference( hitObject );
 		if( hitObject != NULL )
 		{
 			hasHitObject = true;
@@ -499,18 +502,23 @@ bool idSWF::HandleEvent( const sysEvent_t* event )
 			// First check to see if we should call onRollOut on our previous hoverObject
 			if( hoverObject != NULL )
 			{
-				idSWFScriptVar var = hoverObject->Get( "onRollOut" );
-				if( var.IsFunction() )
-				{
-					var.GetFunction()->Call( hoverObject, idSWFParmList() );
-					retVal = true;
-				}
+				const idSWFScriptVar previousHover( hoverObject );
 				hoverObject->Release();
 				hoverObject = NULL;
+				idSWFScriptVar var = previousHover.GetObject()->Get( "onRollOut" );
+				if( var.IsFunction() )
+				{
+					var.GetFunction()->Call( previousHover.GetObject(), idSWFParmList() );
+					retVal = true;
+				}
 			}
 			// Then call onRollOver on our hitObject
 			if( hitObject != NULL )
 			{
+				if( hoverObject != NULL )
+				{
+					hoverObject->Release();
+				}
 				hoverObject = hitObject;
 				hoverObject->AddRef();
 				idSWFScriptVar var = hitObject->Get( "onRollOver" );
