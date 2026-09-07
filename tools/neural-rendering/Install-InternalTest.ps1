@@ -4,6 +4,7 @@ param(
     [string]$GamePath,
     [string]$LightingPackPath,
     [switch]$VerifyOnly,
+    [switch]$SkipShortcut,
     [switch]$NonInteractive
 )
 Set-StrictMode -Version Latest
@@ -33,24 +34,34 @@ if (-not $exe.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -or -no
     (Get-Content -LiteralPath (Join-Path $RepoRoot 'SOURCE_REVISION.txt') -First 1) -ne $package.commit) { throw 'Invalid package executable/source identity.' }
 Write-Host "PASS: package hashes and corresponding source ($($package.commit))."
 if ($VerifyOnly) { return }
-foreach ($dll in @('vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll')) {
-    if (-not (Test-Path -LiteralPath (Join-Path $env:WINDIR "System32/$dll"))) {
-        throw 'Install the Microsoft Visual C++ 2015-2022 x64 Redistributable from https://aka.ms/vs/17/release/vc_redist.x64.exe, then rerun Install-InternalTest.cmd.'
-    }
-}
-if (-not $LightingPackPath -and -not $NonInteractive) {
+. (Join-Path $PSScriptRoot 'Setup-Dependencies.ps1')
+if (-not $GamePath) { $GamePath = Find-SetupBFG }
+if (-not $GamePath -and -not $NonInteractive) {
     Add-Type -AssemblyName System.Windows.Forms
-    $picker = New-Object System.Windows.Forms.OpenFileDialog
-    $picker.Title = 'Select _rbdoom_global_illumination_data.pk4 from your extracted RBDOOM 1.6.0 release'
-    $picker.Filter = 'RBDOOM lighting pack|_rbdoom_global_illumination_data.pk4'
-    if ($picker.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $LightingPackPath = $picker.FileName }
+    $picker = New-Object System.Windows.Forms.FolderBrowserDialog
+    $picker.Description = 'Select your owned Doom 3 BFG Edition installation (containing base)'
+    $picker.ShowNewFolderButton = $false
+    if ($picker.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { $GamePath = $picker.SelectedPath }
     $picker.Dispose()
 }
-if (-not $LightingPackPath) { throw 'Select the official RBDOOM lighting pack to test the intended lighting. See INTERNAL_TESTING.md.' }
+if (-not $GamePath -or -not (Test-Path -LiteralPath (Join-Path $GamePath 'base/maps/mars_city2.resources'))) {
+    throw 'Doom 3 BFG Edition was not found. Rerun setup and select its installation folder, or pass -GamePath.'
+}
+Write-Host "Using owned BFG installation: $GamePath"
+Install-SetupVCRuntime -RepoRoot $RepoRoot
+if (-not $LightingPackPath) { $LightingPackPath = Get-SetupLightingPack -RepoRoot $RepoRoot }
 # Convert portable identity to the existing launcher's local exact-build format.
 $package.executable = $exe
 $package.PSObject.Properties.Remove('files')
 $package | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $RepoRoot 'build-rt/neuraldoom-build-Release.json') -Encoding UTF8
 $exe | Set-Content -LiteralPath (Join-Path $RepoRoot 'build-rt/neuraldoom-artifact-Release.txt') -Encoding UTF8
 & (Join-Path $PSScriptRoot 'Setup-NeuralDoom.ps1') -RepoRoot $RepoRoot -GamePath $GamePath -LightingPackPath $LightingPackPath -Profile Native -Configuration Release -SkipD3HDP -SkipNRRuntime -NonInteractive:$NonInteractive
-Write-Host 'READY: double-click Play-InternalTest.cmd. Controls and comparisons: INTERNAL_TESTING.md.'
+if (-not $SkipShortcut) {
+$shell = New-Object -ComObject WScript.Shell
+$shortcut = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'neuralDoom Internal Test.lnk'))
+$shortcut.TargetPath = Join-Path $RepoRoot 'Play-InternalTest.cmd'
+$shortcut.WorkingDirectory = $RepoRoot
+$shortcut.IconLocation = "$exe,0"
+$shortcut.Save()
+}
+Write-Host 'READY: use the neuralDoom Internal Test desktop shortcut. Controls: INTERNAL_TESTING.md.'

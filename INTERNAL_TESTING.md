@@ -2,11 +2,14 @@
 
 ## Install once
 
-1. Extract the entire internal-test ZIP into a new writable folder (not your retail game folder). Keep the included source and notices with the build when sharing it.
-2. Install the [Microsoft Visual C++ x64 Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe) if needed. Windows 10/11 x64 and a DX12 ray-query-capable GPU are required for RTX effects.
-3. From the [official RBDOOM 1.6.0 full release](https://github.com/RobertBeckebans/RBDOOM-3-BFG/releases/tag/v1.6.0), extract `base/_rbdoom_global_illumination_data.pk4`. You also need your own Doom 3 **BFG Edition** installation.
-4. Double-click **Install-InternalTest.cmd**. Select the lighting pack and your BFG folder. Setup verifies the package, copies missing local game data, and checks the exact Release EXE and shaders. It does not start the game.
-5. Double-click **Play-InternalTest.cmd**. Choose your resolution and HDR settings in System Options. All ray effects start enabled on first use; later choices persist. Saves/settings live in `captures/dogfood` inside this extracted folder.
+1. Run **neuralDoom-Setup-<version>.exe**. It verifies and extracts our package automatically into a versioned folder under your local application data directory.
+2. Setup detects a Steam BFG installation. If it cannot find one, select your owned **Doom 3 BFG Edition** folder. No manual lighting download or extraction is needed.
+3. Setup installs Microsoft's runtime if missing (Windows may ask for administrator approval), downloads the official RBDOOM lighting archive and a pinned standalone extraction tool, verifies their hashes, and extracts only the required lighting pack. The lighting download is approximately 1.65 GB; verified cached downloads are reused on retry.
+4. Setup copies missing owned game data and validates the installed Release build. Start the game from the **neuralDoom Internal Test** desktop shortcut. The game is not launched automatically.
+
+No compiler, Git, Python, preinstalled 7-Zip, or separately collected supporting files are required. Keep roughly 15 GB free for the installation and download cache. The first setup requires internet; Windows security/prerequisite approval and locating an undetected owned game are the only manual exceptions. Saves/settings are in the installed folder's `captures/dogfood` directory. A later version installs alongside the previous version, preserving it and its saves.
+
+The ZIP remains available as an alternative: extract it and run Install-InternalTest.cmd. The same automatic downloads run there. Advanced/offline setup can pass `-GamePath` and `-LightingPackPath` explicitly. `-VerifyOnly` performs no downloads or installation.
 
 The internal ZIP is native RTX/TAA. It contains no retail data, lighting pack, mods, DLAA SDK binaries, ReShade, RenoDX or NR runtime. DLAA/NR remain separate local development profiles; selecting a menu option cannot install them. No Python, Git, compiler or Visual Studio is needed to install/play this ZIP.
 
@@ -54,3 +57,11 @@ The packager requires clean matching commits, initialized pinned submodules, a R
 Source rebuild instructions and license notices remain in README.md, LICENSE.md, LICENSE_EXCEPTIONS.md, COPYING.txt where present, and dependency source directories. Optional upstream prebuilt tools omitted from the ZIP are not required by the documented DX12/FFMPEG-off/XAudio build. The included source has expanded submodules; a Git clone should use `--recursive` instead.
 
 When rebuilding directly from the exported source without Git metadata, use the documented CMake configure options and `cmake --build build-rt --config Release`. The Build-RBDOOM manifest helper requires a Git checkout; the raw CMake build does not create launcher identity files.
+
+To wrap the verified ZIP as the single-file setup:
+
+```powershell
+.\tools\neural-rendering\Build-InternalSetup.ps1 -PackagePath <package.zip> -OutputPath <new-setup.exe>
+```
+
+This uses the Windows .NET Framework compiler and embeds the ZIP plus its matching bootstrap source. `setup.exe --verify` validates/extracts the embedded payload in a temporary folder without installing, downloading or launching the game. The EXE also has a SHA-256 sidecar. Publisher sources: [RBDOOM release](https://github.com/RobertBeckebans/RBDOOM-3-BFG/releases/tag/v1.6.0), [7-Zip downloads](https://www.7-zip.org/download.html), [Microsoft runtime](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist).

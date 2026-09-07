@@ -8,7 +8,7 @@ The new [material reflection pass](docs/neural-rendering/RAY_TRACED_REFLECTIONS.
 
 **Start here:** [RTX lighting and keybinds](docs/neural-rendering/RTX_LIGHTING.md), [quick playtest](docs/neural-rendering/DOGFOOD_CHECKLIST.md), [build instructions](docs/neural-rendering/WINDOWS_SETUP.md).
 
-For friends testing the native RTX Release ZIP, use **Install-InternalTest.cmd** then **Play-InternalTest.cmd**. See [internal installation and exact keys](INTERNAL_TESTING.md). The package contains matching source and no game data or vendor runtimes.
+For friends, run the **neuralDoom Setup EXE**. It extracts our package, detects BFG, installs missing prerequisites, downloads/verifies/extracts the lighting pack and creates a desktop shortcut. The ZIP/Install-InternalTest.cmd route remains an alternative with the same automatic downloads. See [internal installation and exact keys](INTERNAL_TESTING.md). The package contains matching source and no game data or vendor runtimes.
 
 There are two supported local development launchers: `Launch-NeuralDoom.cmd` preserves saved settings; `Launch-NeuralDoom-RTX.cmd` seeds all four ray-traced lighting effects on first use and preserves subsequent lighting/HDR choices. Both honor Next Launch Profile from System Options, or offer Native, DLAA, or NR when no preference is saved, and select the manifest-verified build. The NR option uses the already-installed engine-loaded compatibility stack without a DXGI proxy; F6 toggles NR and F4 toggles bounce. Its output remains the existing SDR compatibility path. The older NR/mod launchers are in [tools/neural-rendering/legacy](tools/neural-rendering/legacy/README.md). Existing playtest saves and display preferences remain in the same folder.
 

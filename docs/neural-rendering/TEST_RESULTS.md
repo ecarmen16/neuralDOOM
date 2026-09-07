@@ -1087,3 +1087,12 @@ Ran `Install-InternalTest.ps1 -NonInteractive` in a newly extracted folder with 
 Ran `Test-NeuralDoom-Smoke.ps1 -Configuration Release -Profile Native -RayTracingDiagnostics Synthetic -RayTracedAO -RayTracedContactShadows -RayTracedGI -RayTracedReflections -ResizeWidth 1920 -ResizeHeight 1080` against the extracted installed EXE and its own data/shaders, with validation enabled: PASS, exit 0, all named lighting toggles/reset epochs valid, dynamic GPU test passed, full-resolution reflection output and zero sampled invalid lighting values. Evidence: `captures/neural/internal-install-test.log`, `internal-package-tests.log`, and `internal-installed-smoke.log`. This verifies relocation on the development machine, not a different GPU/driver or untouched Windows installation.
 
 The final package refresh includes this record and the package regression script; engine/shader bytes are unchanged from the tested Release. Local Native, DLAA and NR launch validation is repeated after final manifest refresh. No package was uploaded or sent, and no private runtime or retail data entered the ZIP. Friends' menu/visual tests and fresh-machine acceptance remain the next step.
+
+
+## 2026-09-07 - Automatic dependency acquisition and setup bootstrap
+
+`Get-SetupLightingPack` successfully downloaded the actual 1,647,091,125-byte official RBDOOM release and pinned 7zr 26.03 executable into an isolated cache, extracted only `base/_rbdoom_global_illumination_data.pk4`, and verified its recorded SHA-256/size. No game ran and no archive content was bundled into our package. Evidence: `captures/neural/setup-live-download.log`.
+
+`Test-SetupDependencies.ps1` passes under Windows PowerShell 5.1 for BITS-to-web fallback, transient retries, valid cache reuse, HTTP rejection, corrupt hash rejection, non-Microsoft signer rejection before execution, and restart-required handling with a mocked process. The Microsoft installer was not executed because the development machine already has the runtime. Runtime detection checks the minimum 14.43 version as well as DLL presence.
+
+`Bootstrap-InternalSetup.ps1 -ExtractOnly` successfully verifies and expands a real package under Windows PowerShell 5.1. A trial one-file .NET bootstrap compiled and passed `--verify` (temporary extraction plus payload SHA verification, no installation). The source-matching final EXE and integrated installation are checked at the following checkpoint. No renderer/shader modifications or GPU tests are required for these setup-only changes.
