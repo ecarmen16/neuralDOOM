@@ -585,3 +585,12 @@ Reviewed accumulated changes against upstream `ea29c006`. Corrected frontend joi
 - Runtime validation: none for this addition, as requested. The user reported the preceding material-lighting build looked substantially better, with excessive bounce brightness. Reflection correctness, noise/trails, offscreen transitions, native/DLAA ultrawide performance and map/resize behavior remain unverified. Static geometry and current-view lights limit reflected objects/occlusion; no full-path-tracing claim or new SDK dependency.
 
 Next: the three-check reflection playtest, then rigid dynamic ray instances for doors/props.
+
+
+## 2026-09-06 - Overnight NR toggle checkpoint
+
+`Start-NeuralDoom-Dogfood.ps1` adds NR as launcher option 3, selects the current manifest-verified Streamline/RT build, and sets the existing engine compatibility startup flag. New `EmbeddedNR.ps1` validates the existing local stack, refuses a DXGI proxy, checks Streamline DLL identity, and stages only the engine EXE beside the already-installed components. It enables the existing NR toggle and disables NR upscaling while preserving other tuning, with local engine/config backups. `-PrepareOnly` creates no game process; `-ValidateOnly` changes no settings. No proprietary runtime is obtained or copied.
+
+`base/neural_rtx_keys.cfg` reserves F6 for the existing add-on hotkey and moves bounce to F4. NR startup explicitly unbinds the old engine F6 action and supplies F4. The smoke binding expectation and current README/control docs follow that mapping. Native/DLAA retain native HDR; the existing engine already bypasses scRGB presentation when compatibility startup is active, so NR comparisons use its SDR path.
+
+`Test-NeuralEmbeddedNR.ps1` passed using text-only fixtures: read-only validation; rejected proxy, absent runtime, SDK mismatch and duplicate settings; exact current engine staging; full-resolution configuration; preservation of unrelated tuning/runtime files; F6/F4 separation; and a process-launch trap. Log: `captures/neural/nr-launch-fixtures.log`. No renderer C++/shader change and no rebuild required. Real-install preparation and combined NR/RTX gameplay remain pending at the user's requested overnight stop. Resume with readiness/preparation, then a manual F6 comparison.

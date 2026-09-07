@@ -12,14 +12,15 @@ Open the console and run `exec neural_rtx_keys.cfg` to install the example bindi
 
 | Key | Action |
 |---|---|
-| F6 | Toggle material bounce lighting |
+| F4 | Toggle material bounce lighting |
+| F6 | Toggle NR in the NR launcher profile (handled by the installed add-on) |
 | F7 | Toggle ray-traced AO |
 | F8 | Toggle contact shadows |
 | F9 | Toggle material reflections |
 | F10 | Cycle scene, AO, contacts, bounce, albedo, reflections and reflection roughness |
 | F11 | Toggle all four RTX effects together |
 
-Each binding resets temporal history. For example: `bind F6 "toggle r_rayTracedGI; neuralHistoryReset"`. `rayTracingToggle` and `rayTracingDebugCycle` are also directly bindable commands.
+Each binding resets temporal history. For example: `bind F4 "toggle r_rayTracedGI; neuralHistoryReset"`. `rayTracingToggle` and `rayTracingDebugCycle` are also directly bindable commands.
 
 | Cvar | Default | Range / purpose |
 |---|---:|---|
@@ -42,7 +43,7 @@ Each binding resets temporal history. For example: `bind F6 "toggle r_rayTracedG
 | `r_rayTracedAORadius` | 64 | 1–256 world units |
 | `r_rayTracingDebug` | 0 | 0 scene; 1 AO; 2 contacts; 3 bounce lighting only; 4 diffuse albedo; 5 reflections; 6 reflection roughness |
 
-Use F9 near glossy metal panels or a polished floor, then F10 to isolate reflections. Use F6 to judge diffuse bounce separately. The lower GI default preserves more of Doom 3's dark-room contrast. Existing saved profiles retain their intensity unless changed; use `r_rayTracedGIStrength 1.125` to adopt the new default.
+Use F9 near glossy metal panels or a polished floor, then F10 to isolate reflections. Use F4 to judge diffuse bounce separately. The lower GI default preserves more of Doom 3's dark-room contrast. Existing saved profiles retain their intensity unless changed; use `r_rayTracedGIStrength 1.125` to adopt the new default.
 
 ## Implementation and limits
 
@@ -61,7 +62,7 @@ Bounce, radiance snapshot and HDR composition use linear `RGBA16_FLOAT`. Rays an
 ## Short playtest
 
 1. Launch RTX, select Native or DLAA, and load a save near colored lighting or a lit wall/corner. Install the example bindings once.
-2. Toggle F9 near reflective metal, then F6 to isolate diffuse bounce. Use F10 for reflection/roughness views; return it to scene mode for normal play.
+2. Toggle F9 near reflective metal, then F4 to isolate diffuse bounce. Use F10 for reflection/roughness views; return it to scene mode for normal play.
 3. Walk past a doorway, rotate, fire, and resize or use 5120×1440 borderless. Check for trails, light leaks and stable HUD/FOV. F11 provides immediate rollback.
 
 Diagnostics: `rayTracingReflectionStatus`, `rayTracingGIStatus`, `rayTracingContactStatus`, `rayTracingAOStatus`, `hdrStatus`. GPU coverage counters prove actual work, not subjective visual quality or hardware-independent performance. Build/runtime evidence is in `TEST_RESULTS.md`.

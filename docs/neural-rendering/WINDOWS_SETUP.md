@@ -103,7 +103,7 @@ This configures native DX12 ray tracing in `build-rt` and builds RelWithDebInfo.
 
 DLAA requires a separately configured official Streamline SDK build in `build-streamline`. Supplying `nvngx_dlssnr.dll` does not supply that SDK or its DLAA components.
 
-`Setup-NeuralDoom.ps1` accepts either `-NRRuntimePath '<local DLL>'` or `-NRRuntimeUrl '<HTTPS URL>'` to stage a user-provided NR runtime. That step does not configure or verify the complete ReShade/RenoDX compatibility chain. Those components remain separate local inputs, and the supported native launchers disable the compatibility bridge. The earlier compatibility launchers are in `tools/neural-rendering/legacy`; they expect a separately staged root executable and runtime files. A single DLL path/URL is therefore not a turnkey installation of the legacy neural-rendering setup.
+`Setup-NeuralDoom.ps1` accepts either `-NRRuntimePath '<local DLL>'` or `-NRRuntimeUrl '<HTTPS URL>'` to stage a user-provided NR runtime. That step does not configure or verify the complete ReShade/RenoDX compatibility chain. Those components remain separate local inputs, and the Native/DLAA launcher profiles disable the compatibility bridge. The NR profile uses an already-installed engine-loaded stack, reserves F6 for NR, and stages only the current verified engine executable beside the existing local components. It does not install or copy NR runtimes. The earlier compatibility launchers are in `tools/neural-rendering/legacy`; they expect a separately staged root executable and runtime files. A single DLL path/URL is therefore not a turnkey installation of the legacy neural-rendering setup.
 
 ## Optional capture tools
 

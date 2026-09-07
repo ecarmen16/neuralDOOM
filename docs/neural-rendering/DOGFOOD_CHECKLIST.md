@@ -8,14 +8,14 @@ with **DLAA** for comparison. The launcher verifies the exact build and opens th
 main menu. Start a game, or press **~** and enter `devmap game/mars_city2` to visit
 the automated test map quickly.
 
-Both profiles share persistent test settings and saves in `captures/dogfood`.
+All profiles share persistent test settings and saves in `captures/dogfood`.
 The first launch starts in a 2560x720 window. Resolution and HUD choices persist.
 The RTX launcher requests native HDR (Auto), using Windows HDR when enabled and
 SDR fallback otherwise. The ordinary dogfood launcher preserves saved HDR
-settings. This playtest uses the native renderer with the bridge disabled.
+settings. Native/DLAA keep the bridge disabled. Choose option 3 (NR) for the engine-loaded local compatibility stack: F6 toggles NR, F4 toggles bounce. NR uses the existing SDR compatibility output and full-resolution DLAA passthrough when disabled.
 
 - [ ] **Material lighting:** Run `exec neural_rtx_keys.cfg` once for the optional
-  bindings. F6 toggles full-resolution material bounce, F8 toggles contact shadows,
+  bindings. F4 toggles full-resolution material bounce, F8 toggles contact shadows,
   and F9 toggles reflections,
   F10 cycles comparison views, and F11 toggles all RTX effects. Check colored
   lighting near a wall/corner; the new bounce default is `r_rayTracedGIStrength 1.125`.

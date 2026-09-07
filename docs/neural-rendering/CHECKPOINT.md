@@ -1,5 +1,14 @@
 # Pre-playtest checkpoint - 2026-09-06
 
+## Overnight stop — NR controls
+
+The user requested a quick stop for the night. Launcher option 3 / `-Profile NR` now selects the current Streamline build, validates the already-installed embedded compatibility stack, and reserves F6 for its existing NR hotkey. Bounce moves to F4. `-ValidateOnly` is read-only; `-PrepareOnly` stages only the verified engine executable and prepares the local settings without starting the game. No runtime binaries are obtained or copied. Native/DLAA remain independent; NR retains the existing SDR compatibility output.
+
+Offline NR fixtures passed: exact engine staging, proxy/missing component/SDK mismatch/duplicate setting rejection, full-resolution setting, preservation of other NR tuning, F6/F4 separation and no process launch. The NR preparation path has not yet been exercised against the real installation, and no combined NR + RTX gameplay validation was performed. No renderer C++ or shaders changed in this checkpoint, so the preceding tested binaries remain current.
+
+Next session: check real NR readiness/preparation, then launch RTX option 3 manually and verify F6 changes only NR while F4 changes bounce. Confirm full-resolution input and compare against DLAA. The latest reflection pass also still needs the user's visual checks.
+
+
 The user reported a strong visual improvement with the preceding material-lighting/review build. The next addition is [full-resolution material reflections](RAY_TRACED_REFLECTIONS.md), with the diffuse bounce default reduced 25%. No game was launched for this addition; reflection visual validation remains pending.
 
 ## Current state
