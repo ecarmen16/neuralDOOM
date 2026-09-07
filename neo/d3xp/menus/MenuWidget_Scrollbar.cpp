@@ -214,7 +214,7 @@ void idMenuWidget_ScrollBar::CalculatePosition( float x, float y )
 				int newFocus = viewIndex - newOffset;
 				if( newFocus >= 0 )
 				{
-					list->SetFocusIndex( newFocus );
+					list->SetFocusIndex( dynamic_cast<idMenuWidget_SystemOptionsList*>( list ) != NULL ? viewIndex : newFocus );
 				}
 				list->Update();
 			}

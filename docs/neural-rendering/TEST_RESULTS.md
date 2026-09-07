@@ -1042,3 +1042,26 @@ At the user's request, backed up and removed active shared `D3BFGConfig.cfg` and
 | build-rt | `DB66CB4B1DAEF929088E554268445CB38739D9AE61ACA8815A6F43220F220F68` |
 | build-streamline | `A46EDE1280006F4E158CFCAA1CF8EE757DD486B1AB432FCB5A5CD485662BE148` |
 | build | `7ADECFF9B9AA71C32E65518E0FAAB95687D9D8FFD242BBCD3263D310D4BABC1C` |
+
+
+## 2026-09-07 - Graphics controls and dynamic ray geometry
+
+Configured and built RelWithDebInfo for `build` (SDK/RT off), `build-rt` (RT on, SDK off) and `build-streamline` (RT/official SDK on) using `Configure-RBDOOM-DX12.ps1` and `Build-RBDOOM.ps1 -Configuration RelWithDebInfo`: PASS. Final incremental rebuild after review: PASS. No dependencies changed.
+
+- `Test-DynamicRayGeometry.py`: PASS actual CPU source fixtures for global vertex offsets, per-surface UV/material IDs, shadow policy, limits, invalid/empty/disabled geometry, rigid world transforms, current weighted skin pose, immutable copies and bad joint/index rejection.
+- `Test-SystemOptionsSelection.py`: PASS 264 scrolled selections plus empty/out-of-range commands. Mouse/controller visual navigation remains user validation.
+- `Test-NeuralEmbeddedNR.ps1`: PASS saved TAA/DLAA selection, NR DLAA input isolation, saved RTX off choices, missing-preference seeding and existing one-time migration/backup checks. No NR process launched.
+- `Test-ReflectionShaderContract.py`: PASS all 64 exact capture/baseline shader permutations and compute constant-buffer contracts.
+- Isolated DX12 validation-layer DLAA smoke at **5120x1440 borderless**, all four RTX effects enabled: PASS. `RT_DYNAMIC_TEST status=PASS phases=4 mismatches=0` proves insertion, motion, no-shadow filtering and removal via GPU ray queries. Gameplay included 39 dynamic surfaces / 3568 triangles / 5 skinned surfaces with zero backend budget skips. Reflection output remained 5120x1440 with `fullResolution=1`; contact/GI/reflection sampled invalid counts were zero. All eight off/on toggles advanced history with lighting-change reasons, and gameplay exited normally.
+- Isolated native SDK/RT-off smoke with 1280x720 to 1920x1080 resize: PASS, no gameplay ray dispatch, valid history reset and normal exit.
+- Focused source/diff review and `git diff --check`: PASS. Public-source audit passed; staged audit repeated for new files before commit.
+
+Evidence is kept locally under `captures/neural/final-dlaa-borderless-smoke.log`, `final-baseline-smoke.log`, `final-launcher-tests.log` and `checkpoint-*.log`. Early smoke assertions incorrectly expected renderer-thread Printf output in the Windows file log; tests now query actual history state. A windowed 5120x1440 request produced a 5120x1421 client area because of window chrome; the full-size borderless rerun passed. Neither issue was a renderer resolution reduction. The final telemetry-only review fix avoids briefly publishing Native while a DLAA evaluation is in progress; it was rebuilt after GPU runs and does not alter shading.
+
+| Final tree | Executable SHA-256 |
+|---|---|
+| build-streamline | `1F3B864C2B904AC095DDDE4DAAF8AFDD1834F0B01BCD77727FF1C2E5EC769513` |
+| build-rt | `5EE3E982F5FA3475A5DBD95D3DD5DCBC7490C2F3A53E67D204E7D88DEF32B8A2` |
+| build | `9192B68133D40D9C3E0DF1BA5D09ED579093C315D37C59664ED6914EB2F8D112` |
+
+No user preference/saved-game resets. Appearance, live menu TAA/DLAA switching and real door/character comparisons remain the user's dogfood checks. Known limitations: visible-only opaque dynamic geometry, bounded budgets and suspended reflection temporal accumulation while dynamic surfaces are present. Next task: use visual feedback to prioritize off-screen dynamic coverage and secondary-hit history, then profile BLAS cost.

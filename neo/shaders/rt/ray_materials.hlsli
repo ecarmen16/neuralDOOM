@@ -105,7 +105,7 @@ float3 Incident(float3 position, float3 normal)
             {
                 if (shadow.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE)
                 {
-                    uint vertex = Indices[shadow.CandidatePrimitiveIndex() * 3];
+                    uint vertex = Indices[(shadow.CandidateInstanceID() + shadow.CandidatePrimitiveIndex()) * 3];
                     if (Materials[(uint)UVMaterials[vertex].z].diffuseS.z > 0) shadow.CommitNonOpaqueTriangleHit();
                 }
             }

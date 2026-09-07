@@ -70,7 +70,12 @@ if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot 'base/maps/mars_city2.reso
 $saveRoot = Join-Path $RepoRoot 'captures/dogfood'
 $saveBase = Join-Path $saveRoot 'base'
 $firstRun = -not (Test-Path -LiteralPath (Join-Path $saveBase 'D3BFGConfig.cfg'))
+[string]$savedConfig = if ($firstRun) { '' } else { Get-Content -LiteralPath (Join-Path $saveBase 'D3BFGConfig.cfg') -Raw }
 $backend = if ($Profile -ne 'Native') { 2 } else { 0 }
+# Keep the user's TAA/DLAA choice in this profile; NR always needs DLAA input.
+if ($Profile -eq 'DLAA' -and -not $firstRun) {
+    if ($savedConfig -match '(?m)^set\s+r_neuralReconstructionMode\s+"?0"?\s*$') { $backend = 0 }
+}
 $sdk = if ($Profile -ne 'Native') { 1 } else { 0 }
 $launchArgs = @(
     '+set', 'fs_basepath', ('"' + $RepoRoot + '"'), '+set', 'fs_savepath', ('"' + $saveRoot + '"'),
@@ -80,12 +85,18 @@ $launchArgs = @(
     '+set', 'logFileName', "dogfood-$Profile.log", '+set', 'logFile', '2',
     '+exec', 'neural_dogfood.cfg'
 )
-if ($RayTracedAO) {
-    $launchArgs += @('+set', 'r_rayTracedAO', '1', '+set', 'r_useSSAO', '1', '+set', 'r_useNewSSAOPass', '1')
+# Profile switches seed missing preferences; menu choices survive later launches.
+foreach ($feature in @(
+    @{ requested = $RayTracedAO; cvar = 'r_rayTracedAO' },
+    @{ requested = $RayTracedContactShadows; cvar = 'r_rayTracedContactShadows' },
+    @{ requested = $RayTracedGI; cvar = 'r_rayTracedGI' },
+    @{ requested = $RayTracedReflections; cvar = 'r_rayTracedReflections' }
+)) {
+    if ($feature.requested -and $savedConfig -notmatch ('(?m)^set\s+' + $feature.cvar + '\s+')) {
+        $launchArgs += @('+set', $feature.cvar, '1')
+        if ($feature.cvar -eq 'r_rayTracedAO') { $launchArgs += @('+set', 'r_useSSAO', '1', '+set', 'r_useNewSSAOPass', '1') }
+    }
 }
-if ($RayTracedContactShadows) { $launchArgs += @('+set', 'r_rayTracedContactShadows', '1') }
-if ($RayTracedGI) { $launchArgs += @('+set', 'r_rayTracedGI', '1') }
-if ($RayTracedReflections) { $launchArgs += @('+set', 'r_rayTracedReflections', '1') }
 # Seed display settings once. Later HUD, resolution and HDR edits must survive relaunch.
 if ($firstRun) {
     $launchArgs += @('+set', 'r_fullscreen', '0', '+set', 'r_windowWidth', '2560',
@@ -98,10 +109,11 @@ if ([Text.Encoding]::UTF8.GetByteCount(($launchArgs -join ' ')) -ge 1024) {
     throw 'Launch arguments exceed the engine limit; use a shorter checkout path.'
 }
 Write-Host "Profile:    $Profile"
-if ($RayTracedAO) { Write-Host 'RTX AO:     Enabled (static world). Toggle live with r_rayTracedAO 0 / 1.' }
-if ($RayTracedContactShadows) { Write-Host 'RTX contact shadows: Enabled. Toggle with r_rayTracedContactShadows 0 / 1.' }
-if ($RayTracedReflections) { Write-Host 'RTX reflections: Enabled at full resolution. Toggle with r_rayTracedReflections 0 / 1.' }
-if ($RayTracedGI) { Write-Host 'RTX material bounce: Enabled. Toggle with r_rayTracedGI 0 / 1; strength: r_rayTracedGIStrength.' }
+Write-Host "Reconstruction: $(if ($backend -eq 2) { 'DLAA' } else { 'Native TAA' })"
+if ($RayTracedAO) { Write-Host 'RTX AO:     Saved preference (enabled on first use; world and supported dynamic geometry). Toggle live with r_rayTracedAO 0 / 1.' }
+if ($RayTracedContactShadows) { Write-Host 'RTX contact shadows: Saved preference (enabled on first use). Toggle with r_rayTracedContactShadows 0 / 1.' }
+if ($RayTracedReflections) { Write-Host 'RTX reflections: Saved preference, full resolution. Toggle with r_rayTracedReflections 0 / 1.' }
+if ($RayTracedGI) { Write-Host 'RTX material bounce: Saved preference (enabled on first use). Toggle with r_rayTracedGI 0 / 1; strength: r_rayTracedGIStrength.' }
 Write-Host 'Optional keybinds: exec neural_rtx_keys.cfg (F4 GI, F6 NR, F7 AO, F8 contacts, F9 reflections, F10 views, F11 all).'
 if ($Profile -eq 'NR') {
     Write-Host 'NR: F6 toggles the installed add-on; F4 toggles bounce. Full-resolution DLAA passthrough when NR is off.'

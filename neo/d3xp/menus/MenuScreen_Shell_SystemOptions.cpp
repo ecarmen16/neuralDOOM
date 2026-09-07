@@ -30,7 +30,26 @@ If you have questions concerning this license or the applicable additional terms
 #pragma hdrstop
 #include "../Game_local.h"
 
+#include "../../renderer/StreamlineIntegration.h"
+#include "../../renderer/NeuralTemporal.h"
+
 const static int NUM_SYSTEM_OPTIONS_OPTIONS = 8;
+
+static idCVar r_neuralReconstructionMode( "r_neuralReconstructionMode", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "saved reconstruction preference in the DLAA launch profile: 0 TAA, 1 DLAA", 0, 1 );
+struct neuralMenuSetting_t { const char* label; const char* name; float step, maximum; };
+static const neuralMenuSetting_t neuralMenuSettings[] = {
+	{ "RTX Reflections", "r_rayTracedReflections", 1, 1 },
+	{ "Reflection Strength", "r_rayTracedReflectionStrength", 0.05f, 1 },
+	{ "RTX Bounce", "r_rayTracedGI", 1, 1 },
+	{ "Bounce Strength", "r_rayTracedGIStrength", 0.05f, 4 },
+	{ "Emissive Bounce", "r_rayTracedGIEmissive", 0.1f, 8 },
+	{ "RTX AO", "r_rayTracedAO", 1, 1 },
+	{ "RTX Contacts", "r_rayTracedContactShadows", 1, 1 },
+	{ "Moving Ray Geometry", "r_rayTracingDynamicGeometry", 1, 1 },
+	{ "Animated Ray Geometry", "r_rayTracingSkinnedGeometry", 1, 1 }
+};
+compile_time_assert( sizeof( neuralMenuSettings ) / sizeof( neuralMenuSettings[0] ) == 9 );
+static const char* neuralSampleSettings[] = { "r_rayTracedReflectionSamples", "r_rayTracedGISamples", "r_rayTracedAOSamples" };
 
 extern idCVar r_graphicsAPI;
 extern idCVar r_antiAliasing;
@@ -253,6 +272,23 @@ void idMenuScreen_Shell_SystemOptions::Initialize( idMenuHandler* data )
 	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, idMenuDataSource_SystemSettings::SYSTEM_FIELD_VOLUME );
 	options->AddChild( control );
 
+	// These rows follow their enum order; the existing list handles scrolling.
+	for( int field = idMenuDataSource_SystemSettings::SYSTEM_FIELD_RECONSTRUCTION; field < idMenuDataSource_SystemSettings::MAX_SYSTEM_FIELDS; field++ )
+	{
+		control = new( TAG_SWF ) idMenuWidget_ControlButton();
+		control->SetOptionType( OPTION_SLIDER_TEXT );
+		const int rayIndex = field - idMenuDataSource_SystemSettings::SYSTEM_FIELD_RT_FIRST;
+		if( rayIndex >= 0 && rayIndex < 9 ) { control->SetLabel( neuralMenuSettings[rayIndex].label ); }
+		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RECONSTRUCTION ) { control->SetLabel( "Reconstruction" ); control->SetDescription( "Native resolution TAA or DLAA. DLAA requires the DLAA launch profile; NR keeps DLAA as its input." ); }
+		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RENDER_STATUS ) { control->SetLabel( "Rendering Status" ); }
+		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RT_QUALITY ) { control->SetLabel( "Ray Quality" ); control->SetDescription( "Changes ray samples, not rendering resolution or lighting strength." ); }
+		else { control->SetLabel( "Doom Lighting Defaults" ); control->SetDescription( "Restore contrast and lighting strengths; preserve HDR calibration, feature toggles and resolution." ); }
+		control->SetDataSource( &systemData, field );
+		control->SetupEvents( DEFAULT_REPEAT_TIME, options->GetChildren().Num() );
+		control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, field );
+		options->AddChild( control );
+	}
+
 	options->AddEventAction( WIDGET_EVENT_SCROLL_DOWN ).Set( new( TAG_SWF ) idWidgetActionHandler( options, WIDGET_ACTION_EVENT_SCROLL_DOWN_START_REPEATER, WIDGET_EVENT_SCROLL_DOWN ) );
 	options->AddEventAction( WIDGET_EVENT_SCROLL_UP ).Set( new( TAG_SWF ) idWidgetActionHandler( options, WIDGET_ACTION_EVENT_SCROLL_UP_START_REPEATER, WIDGET_EVENT_SCROLL_UP ) );
 	options->AddEventAction( WIDGET_EVENT_SCROLL_DOWN_RELEASE ).Set( new( TAG_SWF ) idWidgetActionHandler( options, WIDGET_ACTION_EVENT_STOP_REPEATER, WIDGET_EVENT_SCROLL_DOWN_RELEASE ) );
@@ -425,15 +461,17 @@ bool idMenuScreen_Shell_SystemOptions::HandleAction( idWidgetAction& action, con
 				return true;
 			}
 
+			if( parms.Num() == 0 ) { return true; }
 			int selectionIndex = options->GetFocusIndex();
 			if( parms.Num() > 0 )
 			{
 				selectionIndex = parms[0].ToInteger();
 			}
 
+			if( selectionIndex < 0 || selectionIndex >= options->GetTotalNumberOfOptions() ) { return true; }
 			if( options && selectionIndex != options->GetFocusIndex() )
 			{
-				options->SetViewIndex( options->GetViewOffset() + selectionIndex );
+				options->SetViewIndex( selectionIndex );
 				options->SetFocusIndex( selectionIndex );
 			}
 
@@ -497,6 +535,9 @@ idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::LoadData
 */
 void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::LoadData()
 {
+	for( int i = 0; i < 9; i++ ) { originalRaySettings[i] = cvarSystem->GetCVarFloat( neuralMenuSettings[i].name ); }
+	for( int i = 0; i < 3; i++ ) { originalRaySamples[i] = cvarSystem->GetCVarInteger( neuralSampleSettings[i] ); }
+	originalReconstruction = r_neuralReconstructionMode.GetInteger();
 	originalRenderAPI = r_graphicsAPI.GetString();
 	originalFramerate = com_engineHz.GetInteger();
 	originalAntialias = r_antiAliasing.GetInteger();
@@ -611,6 +652,41 @@ idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustField
 */
 void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustField( const int fieldIndex, const int adjustAmount )
 {
+	const int rayIndex = fieldIndex - SYSTEM_FIELD_RT_FIRST;
+	if( rayIndex >= 0 && rayIndex < 9 )
+	{
+#if defined( USE_RAYTRACING )
+		const neuralMenuSetting_t& setting = neuralMenuSettings[rayIndex];
+		const float value = cvarSystem->GetCVarFloat( setting.name );
+		cvarSystem->SetCVarFloat( setting.name, setting.step == 1 ? ( value == 0 ? 1 : 0 ) : idMath::ClampFloat( 0, setting.maximum, value + adjustAmount * setting.step ) );
+#endif
+		return;
+	}
+	if( fieldIndex == SYSTEM_FIELD_RECONSTRUCTION )
+	{
+		if( !cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) && R_StreamlineIsDLSSSupported() )
+		{
+			r_neuralReconstructionMode.SetInteger( 1 - r_neuralReconstructionMode.GetInteger() );
+			cvarSystem->SetCVarInteger( "r_neuralBackend", r_neuralReconstructionMode.GetInteger() ? 2 : 0 );
+			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "neuralHistoryReset\n" );
+		}
+		return;
+	}
+	if( fieldIndex == SYSTEM_FIELD_RT_QUALITY )
+	{
+#if defined( USE_RAYTRACING )
+		const int current = cvarSystem->GetCVarInteger( neuralSampleSettings[0] );
+		const int levels[] = { 2, 4, 8, 16 };
+		int index = 0;
+		while( index < 3 && levels[index] < current ) { index++; }
+		index = ( index + ( adjustAmount > 0 ? 1 : 3 ) ) % 4;
+		for( int i = 0; i < 3; i++ ) { cvarSystem->SetCVarInteger( neuralSampleSettings[i], levels[index] * ( i == 2 ? 2 : 1 ) ); }
+#endif
+		return;
+	}
+	if( fieldIndex == SYSTEM_FIELD_DOOM_DEFAULTS ) { cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "exec neural_rtx_contrast.cfg\n" ); return; }
+	if( fieldIndex == SYSTEM_FIELD_RENDER_STATUS ) { return; }
+
 	switch( fieldIndex )
 	{
 #ifdef _WIN32
@@ -801,6 +877,43 @@ idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::GetField
 */
 idSWFScriptVar idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::GetField( const int fieldIndex ) const
 {
+	const int rayIndex = fieldIndex - SYSTEM_FIELD_RT_FIRST;
+	if( rayIndex >= 0 && rayIndex < 9 )
+	{
+#if defined( USE_RAYTRACING )
+		const neuralMenuSetting_t& setting = neuralMenuSettings[rayIndex];
+		const float value = cvarSystem->GetCVarFloat( setting.name );
+		return setting.step == 1 ? ( value != 0 ? "On" : "Off" ) : va( "%.2f", value );
+#else
+		return "Unavailable in this build";
+#endif
+	}
+	if( fieldIndex == SYSTEM_FIELD_RECONSTRUCTION )
+	{
+		if( cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) ) { return "DLAA (NR input)"; }
+		if( !R_StreamlineIsDLSSSupported() ) { return "TAA (DLAA unavailable)"; }
+		return cvarSystem->GetCVarInteger( "r_neuralBackend" ) == 2 ? "DLAA" : "Native TAA";
+	}
+	if( fieldIndex == SYSTEM_FIELD_RENDER_STATUS )
+	{
+		int mode, rw, rh, ow, oh;
+		R_GetNeuralPresentationStatus( mode, rw, rh, ow, oh );
+		if( rw == 0 ) { return "Load a map for live status"; }
+		const char* backend = mode == 2 ? "DLAA" : ( mode == 3 ? "DLSS" : "Native" );
+		return rw == ow && rh == oh ? va( "%s %dx%d", backend, rw, rh ) : va( "%dx%d > %dx%d", rw, rh, ow, oh );
+	}
+	if( fieldIndex == SYSTEM_FIELD_RT_QUALITY )
+	{
+#if defined( USE_RAYTRACING )
+		const int samples = cvarSystem->GetCVarInteger( neuralSampleSettings[0] );
+		if( cvarSystem->GetCVarInteger( neuralSampleSettings[1] ) != samples || cvarSystem->GetCVarInteger( neuralSampleSettings[2] ) != samples * 2 ) { return "Custom"; }
+		return va( "%d rays (AO %d)", samples, samples * 2 );
+#else
+		return "Unavailable in this build";
+#endif
+	}
+	if( fieldIndex == SYSTEM_FIELD_DOOM_DEFAULTS ) { return "Apply"; }
+
 	switch( fieldIndex )
 	{
 #ifdef _WIN32
@@ -1013,6 +1126,10 @@ idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsDataChanged
 */
 bool idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsDataChanged() const
 {
+	for( int i = 0; i < 9; i++ ) { if( originalRaySettings[i] != cvarSystem->GetCVarFloat( neuralMenuSettings[i].name ) ) { return true; } }
+	for( int i = 0; i < 3; i++ ) { if( originalRaySamples[i] != cvarSystem->GetCVarInteger( neuralSampleSettings[i] ) ) { return true; } }
+	if( originalReconstruction != r_neuralReconstructionMode.GetInteger() ) { return true; }
+
 	if( idStr::Icmp( r_graphicsAPI.GetString(), originalRenderAPI ) != 0 )
 	{
 		return true;
@@ -1140,7 +1257,7 @@ void idMenuWidget_SystemOptionsList::Update()
 
 			child.Update();
 
-			if( optionIndex == focusIndex )
+			if( childIndex == focusIndex )
 			{
 				child.SetState( WIDGET_STATE_SELECTING );
 			}
@@ -1207,3 +1324,13 @@ void idMenuWidget_SystemOptionsList::Scroll( const int scrollAmount, const bool 
 }
 // RB end
 
+
+// This list binds actual children to recycled SWF rows, so focus is absolute.
+void idMenuWidget_SystemOptionsList::ScrollOffset( const int scrollIndexAmount )
+{
+	if( GetTotalNumberOfOptions() == 0 ) { return; }
+	int newIndex, newOffset;
+	CalculatePositionFromOffsetDelta( newIndex, newOffset, GetViewIndex(), GetViewOffset(), GetNumVisibleOptions(), GetTotalNumberOfOptions(), scrollIndexAmount );
+	if( newOffset != GetViewOffset() ) { SetViewOffset( newOffset ); Update(); }
+	if( newIndex != GetViewIndex() ) { SetViewIndex( newIndex ); SetFocusIndex( newIndex ); }
+}

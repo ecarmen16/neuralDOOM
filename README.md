@@ -1,5 +1,7 @@
 # neuralDoom
 
+Latest development update: [graphics controls and moving ray geometry](docs/neural-rendering/GRAPHICS_AND_DYNAMIC_RAYS.md), with a [short playtest checklist](docs/neural-rendering/DOGFOOD_CHECKLIST.md).
+
 neuralDoom modernizes Doom 3 BFG on the RBDOOM-3-BFG source port. It adds full-resolution ray-traced material reflections, diffuse bounce, contact shadows and AO, native DX12 HDR, optional native DLAA, and ultrawide HUD/FOV controls. Active development is on `codex/rt-foundation`; the downstream remote is `ecarmen16/neuralDoom`.
 
 The new [material reflection pass](docs/neural-rendering/RAY_TRACED_REFLECTIONS.md) adds normal-mapped, rough reflections and reduces the default diffuse bounce intensity by 25%. The earlier [review](docs/neural-rendering/REVIEW_2026-09-06.md) records the preceding fixes. See the [current checkpoint](docs/neural-rendering/CHECKPOINT.md) for validation limits.

@@ -401,8 +401,25 @@ struct viewLight_t
 // a viewEntity contains everything that the back end needs out of a idRenderEntityLocal,
 // which the front end may be modifying simultaneously if running in SMP mode.
 // A single entityDef can generate multiple viewEntity_t in a single frame, as when seen in a mirror
+// Immutable frame-owned copies; the backend must never read frontend model geometry.
+struct rayDynamicSurface_t
+{
+	rayDynamicSurface_t* next;
+	idVec3* positions;
+	idVec2* texcoords;
+	triIndex_t* indices;
+	int numVerts, numIndexes;
+	const idMaterial* material;
+	const float* shaderRegisters;
+	bool castsShadow, skinned;
+};
+bool R_WantDynamicRayGeometry();
+extern idCVar r_rayTracingSkinnedGeometry;
+
 struct viewEntity_t
 {
+	rayDynamicSurface_t* raySurfaces;
+	int rayVertexCount;
 	viewEntity_t* 			next;
 
 	// back end should NOT reference the entityDef, because it can change when running SMP

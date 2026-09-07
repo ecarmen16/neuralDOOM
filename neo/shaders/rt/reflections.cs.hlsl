@@ -51,7 +51,7 @@ void main(uint3 tid : SV_DispatchThreadID)
     if (surface.CommittedStatus() != COMMITTED_TRIANGLE_HIT ||
         abs(surface.CommittedRayT() - distance) > max(0.5, distance * 0.001)) return;
     float3 geometricNormal, unusedAlbedo, unusedEmission;
-    if (!Surface(surface.CommittedPrimitiveIndex(), surface.CommittedTriangleBarycentrics(), primary.Direction,
+    if (!Surface(surface.CommittedInstanceID() + surface.CommittedPrimitiveIndex(), surface.CommittedTriangleBarycentrics(), primary.Direction,
         geometricNormal, unusedAlbedo, unusedEmission)) return;
     if (dot(mappedNormal.xyz, mappedNormal.xyz) < 1e-6) return;
     float3 normal = normalize(mappedNormal.xyz);
@@ -90,7 +90,7 @@ void main(uint3 tid : SV_DispatchThreadID)
         if (sampled) InterlockedAdd(Stats[2], 1);
         if (reflected.CommittedStatus() != COMMITTED_TRIANGLE_HIT) continue;
         float3 hitNormal, hitAlbedo, emission;
-        if (!Surface(reflected.CommittedPrimitiveIndex(), reflected.CommittedTriangleBarycentrics(), direction, hitNormal, hitAlbedo, emission)) continue;
+        if (!Surface(reflected.CommittedInstanceID() + reflected.CommittedPrimitiveIndex(), reflected.CommittedTriangleBarycentrics(), direction, hitNormal, hitAlbedo, emission)) continue;
         float3 hit = ray.Origin + direction * reflected.CommittedRayT();
         float3 cached;
         float cacheWeight = CachedRadiance(hit, cached);

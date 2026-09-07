@@ -1280,6 +1280,7 @@ class idMenuWidget_SystemOptionsList : public idMenuWidget_DynamicList
 public:
 	virtual void				Update() override;
 	virtual void				Scroll( const int scrollAmount, const bool wrapAround = false ) override;
+	virtual void ScrollOffset( const int scrollIndexAmount ) override;
 };
 // RB end
 

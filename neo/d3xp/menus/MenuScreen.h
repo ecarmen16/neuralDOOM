@@ -1385,6 +1385,12 @@ public:
 			// RB end
 			SYSTEM_FIELD_BRIGHTNESS,
 			SYSTEM_FIELD_VOLUME,
+			SYSTEM_FIELD_RECONSTRUCTION,
+			SYSTEM_FIELD_RENDER_STATUS,
+			SYSTEM_FIELD_RT_FIRST,
+			SYSTEM_FIELD_RT_LAST = SYSTEM_FIELD_RT_FIRST + 8,
+			SYSTEM_FIELD_RT_QUALITY,
+			SYSTEM_FIELD_DOOM_DEFAULTS,
 			MAX_SYSTEM_FIELDS
 		};
 
@@ -1420,6 +1426,9 @@ public:
 		float originalHDRPaperWhite;
 		float originalHDRPeak;
 		float originalHDRUIWhite;
+		float originalRaySettings[9];
+		int originalReconstruction;
+		int originalRaySamples[3];
 		// RB begin
 		//int originalShadowMapping; // TODO use for quality of shadowmaps?
 		int originalRenderMode;

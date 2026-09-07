@@ -1,10 +1,17 @@
 # neuralDoom RTX playtest: about 5 minutes
 
-Start with the [three reflection checks](RAY_TRACED_REFLECTIONS.md#three-check-playtest). This addition has compile and offline contract checks; visual validation remains assigned to the user.
+Latest changes: [graphics controls and moving ray geometry](GRAPHICS_AND_DYNAMIC_RAYS.md).
+
+For this build, use **option 2 (DLAA)** and check these first:
+
+- [ ] **Settings:** Scroll to Reconstruction. Switch TAA/DLAA, adjust Reflection Strength and Bounce Strength independently, and change Ray Quality. Confirm Rendering Status stays at your full resolution. Try both mouse scrolling and the scrollbar.
+- [ ] **Motion:** Watch a door open and a character move near a reflective floor or lit wall. Toggle Moving Ray Geometry, then Animated Ray Geometry. Look for stuck silhouettes, trails, missing materials or unusual noise.
+- [ ] **Persistence/contrast:** Quit normally and relaunch; your reconstruction and RTX choices should remain. Doom Lighting Defaults restores conservative contrast without changing HDR calibration, ray quality or resolution.
+
+Visual acceptance remains yours; automated checks do not judge appearance.
 
 In the game installation's `RBDOOM-3-BFG` folder, double-click
-`Launch-NeuralDoom-RTX.cmd`. Choose **Native** first, then quit and relaunch
-with **DLAA** for comparison. The launcher verifies the exact build and opens the
+`Launch-NeuralDoom-RTX.cmd`. Choose **DLAA** for the new controls; **Native** provides the SDK-free comparison. The launcher verifies the exact build and opens the
 main menu. Start a game, or press **~** and enter `devmap game/mars_city2` to visit
 the automated test map quickly.
 
@@ -23,8 +30,8 @@ settings. Native/DLAA keep the bridge disabled. Choose option 3 (NR) for the eng
 - [ ] **RTX AO comparison:** In a room with corners and nearby surfaces, enter
   `r_rayTracedAO 0`, then `r_rayTracedAO 1`. Look for changes in ambient contact
   shading. Walk, turn and watch a door/character. Report flicker, seams, excessive
-  darkness or stutter. This first pass traces static opaque map geometry;
-  moving objects retain raster shading and do not yet cast ray occlusion.
+  darkness or stutter. The ray scene now includes supported visible opaque moving geometry.
+  Off-screen dynamic objects, glass, particles and the first-person weapon remain excluded.
 - [ ] **Ultrawide HUD:** Settings > System > System Options: choose **HUD Layout =
   Auto (16:9)** and a comfortable **HUD Size**. Resize the window and switch to
   your usual fullscreen resolution. Health/ammo should stay centered and readable;

@@ -9,10 +9,13 @@
 #include <cmath>
 #include <algorithm>
 #include <vector>
+#include <atomic>
 
 extern DeviceManager* deviceManager;
 extern idCVar r_useNewSsaoPass;
 
+idCVar r_rayTracingDynamicGeometry( "r_rayTracingDynamicGeometry", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "include frame-visible opaque moving entities in ray lighting" );
+idCVar r_rayTracingSkinnedGeometry( "r_rayTracingSkinnedGeometry", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "include current skinned poses in dynamic ray geometry" );
 idCVar r_rayTracedAO( "r_rayTracedAO", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Experimental native ray-traced AO for static opaque world surfaces; requires USE_RAYTRACING and new SSAO" );
 static idCVar r_rayTracedAORadius( "r_rayTracedAORadius", "64", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Ray-traced AO radius in Doom world units", 1, 256 );
 static idCVar r_rayTracedAOStrength( "r_rayTracedAOStrength", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Ray-traced AO darkening strength", 0, 2 );
@@ -36,11 +39,20 @@ static idCVar r_rayTracedReflectionDistance( "r_rayTracedReflectionDistance", "2
 void RB_GetShaderTextureMatrix( const float* shaderRegisters, const textureStage_t* texture, float matrix[16] );
 void RB_BakeTextureMatrixIntoTexgen( idPlane lightProject[3], const float* textureMatrix );
 
+bool R_WantDynamicRayGeometry()
+{
+#if defined( USE_RAYTRACING )
+	return r_rayTracingDynamicGeometry.GetBool() && ( r_rayTracedAO.GetBool() || r_rayTracedGI.GetBool() || r_rayTracedReflections.GetBool() || r_rayTracedContactShadows.GetBool() );
+#else
+	return false;
+#endif
+}
+
 bool R_RayTracingSettingsChanged()
 {
 	bool changed = false;
 #if defined( USE_RAYTRACING )
-	idCVar* settings[] = { &r_rayTracedAO, &r_rayTracedAORadius, &r_rayTracedAOStrength, &r_rayTracedAOSamples,
+	idCVar* settings[] = { &r_rayTracingDynamicGeometry, &r_rayTracingSkinnedGeometry, &r_rayTracedAO, &r_rayTracedAORadius, &r_rayTracedAOStrength, &r_rayTracedAOSamples,
 		&r_rayTracedContactShadows, &r_rayTracedContactDistance, &r_rayTracedContactStrength,
 		&r_rayTracedGI, &r_rayTracedGIStrength, &r_rayTracedGIRadius, &r_rayTracedGISamples, &r_rayTracedGIEmissive, &r_rayTracingDebug, &r_rayTracedReflections, &r_rayTracedReflectionStrength,
 		&r_rayTracedReflectionSamples, &r_rayTracedReflectionRoughness, &r_rayTracedReflectionDistance };
@@ -57,6 +69,10 @@ bool R_RayTracingSettingsChanged()
 
 namespace
 {
+static const uint32 RT_DYNAMIC_VERTICES = 131072;
+static const uint32 RT_DYNAMIC_INDICES = 393216;
+static const uint32 RT_DYNAMIC_SURFACES = 128;
+static std::atomic<uint32> dynamicSurfaceCount( 0 ), dynamicTriangleCount( 0 ), dynamicSkinnedCount( 0 ), dynamicSkippedCount( 0 );
 struct rtRay_t
 {
 	idVec3 origin;
@@ -113,8 +129,10 @@ public:
 	explicit RayQueryDiagnostic( nvrhi::IDevice* value ) : device( value ) {}
 
 	bool Initialize( const std::vector<idVec3>& positions, const std::vector<uint32>& indices,
-		std::vector<nvrhi::rt::InstanceDesc>& instances )
+		std::vector<nvrhi::rt::InstanceDesc>& instances, bool gameplay = false )
 	{
+		staticVertexCount = positions.size(); staticIndexCount = indices.size();
+		dynamicEnabled = gameplay;
 		void* shaderBytes = nullptr;
 		int shaderSize = fileSystem->ReadFile( "renderprogs2/dxil/rt/ray_query.cs.dxil", &shaderBytes );
 		if( shaderSize <= 0 || !shaderBytes )
@@ -130,7 +148,7 @@ public:
 		if( !shader ) { return false; }
 
 		nvrhi::BufferDesc vertexDesc;
-		vertexDesc.byteSize = positions.size() * sizeof( idVec3 );
+		vertexDesc.byteSize = ( positions.size() + ( gameplay ? RT_DYNAMIC_VERTICES : 0 ) ) * sizeof( idVec3 );
 		vertexDesc.isAccelStructBuildInput = true;
 		vertexDesc.structStride = sizeof( idVec3 );
 		vertexDesc.initialState = nvrhi::ResourceStates::CopyDest;
@@ -138,7 +156,7 @@ public:
 		vertexDesc.debugName = "RT diagnostic positions";
 		vertices = device->createBuffer( vertexDesc );
 		nvrhi::BufferDesc indexDesc = vertexDesc;
-		indexDesc.byteSize = indices.size() * sizeof( uint32 );
+		indexDesc.byteSize = ( indices.size() + ( gameplay ? RT_DYNAMIC_INDICES : 0 ) ) * sizeof( uint32 );
 		indexDesc.structStride = sizeof( uint32 );
 		indexDesc.debugName = "RT diagnostic indices";
 		indexBuffer = device->createBuffer( indexDesc );
@@ -159,7 +177,7 @@ public:
 		blasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastTrace;
 		blas = device->createAccelStruct( blasDesc );
 		nvrhi::rt::AccelStructDesc tlasDesc;
-		tlasDesc.setTopLevelMaxInstances( instances.size() ).setDebugName( "RT diagnostic TLAS" );
+		tlasDesc.setTopLevelMaxInstances( gameplay ? 2 : instances.size() ).setDebugName( "RT diagnostic TLAS" );
 		tlasDesc.buildFlags = nvrhi::rt::AccelStructBuildFlags::AllowUpdate;
 		tlas = device->createAccelStruct( tlasDesc );
 		if( !blas || !tlas ) { return false; }
@@ -187,8 +205,8 @@ public:
 		nvrhi::TimerQueryHandle timer = device->createTimerQuery();
 		if( !list || !timer ) { return false; }
 		list->open();
-		list->writeBuffer( vertices, positions.data(), vertexDesc.byteSize );
-		list->writeBuffer( indexBuffer, indices.data(), indexDesc.byteSize );
+		list->writeBuffer( vertices, positions.data(), positions.size() * sizeof( idVec3 ) );
+		list->writeBuffer( indexBuffer, indices.data(), indices.size() * sizeof( uint32 ) );
 		list->beginTimerQuery( timer );
 		list->buildBottomLevelAccelStruct( blas, &geometry, 1, blasDesc.buildFlags );
 		list->buildTopLevelAccelStruct( tlas, instances.data(), instances.size(), tlasDesc.buildFlags );
@@ -217,6 +235,69 @@ public:
 		device->executeCommandList( list );
 		return device->waitForIdle();
 	}
+
+	bool UpdateDynamic( nvrhi::ICommandList* list, const viewDef_t* view, bool shadowsOnly,
+		std::vector<idVec4>* uv = nullptr, std::vector<const rayDynamicSurface_t*>* accepted = nullptr, uint32 firstMaterial = 0 )
+	{
+		if( !dynamicEnabled ) { return true; }
+		std::vector<idVec3> points;
+		std::vector<uint32> elements;
+		uint32 count = 0, skinned = 0, skipped = 0;
+		if( uv ) { uv->clear(); }
+		if( accepted ) { accepted->clear(); }
+		if( r_rayTracingDynamicGeometry.GetBool() )
+		{
+			for( const viewEntity_t* entity = view->viewEntitys; entity; entity = entity->next )
+			{
+				for( const rayDynamicSurface_t* surface = entity->raySurfaces; surface; surface = surface->next )
+				{
+					if( ( shadowsOnly && !surface->castsShadow ) || ( surface->skinned && !r_rayTracingSkinnedGeometry.GetBool() ) ) { continue; }
+					if( count >= RT_DYNAMIC_SURFACES || points.size() + surface->numVerts > RT_DYNAMIC_VERTICES || elements.size() + surface->numIndexes > RT_DYNAMIC_INDICES ) { skipped++; continue; }
+					bool valid = true;
+					for( int v = 0; v < surface->numVerts; v++ ) { for( int c = 0; c < 3; c++ ) { valid &= std::isfinite( surface->positions[v][c] ); } }
+					if( !valid ) { skipped++; continue; }
+					const uint32 offset = staticVertexCount + points.size();
+					points.insert( points.end(), surface->positions, surface->positions + surface->numVerts );
+					for( int i = 0; i < surface->numIndexes; i++ ) { elements.push_back( offset + surface->indices[i] ); }
+					if( uv ) { for( int v = 0; v < surface->numVerts; v++ ) { const idVec2& st = surface->texcoords[v]; uv->push_back( idVec4( st.x, st.y, firstMaterial + count, 0 ) ); } }
+					if( accepted ) { accepted->push_back( surface ); }
+					skinned += surface->skinned ? 1 : 0; count++;
+				}
+			}
+		}
+		dynamicSurfaceCount = count; dynamicTriangleCount = elements.size() / 3; dynamicSkinnedCount = skinned; dynamicSkippedCount = skipped;
+		if( elements.empty() && !hadDynamic ) { return true; }
+		std::vector<nvrhi::rt::InstanceDesc> instances( elements.empty() ? 1 : 2 );
+		instances[0].setBLAS( blas ).setInstanceID( 0 ).setInstanceMask( 255 ).setFlags( nvrhi::rt::InstanceFlags::TriangleCullDisable );
+		if( !elements.empty() )
+		{
+			nvrhi::rt::GeometryTriangles triangles;
+			triangles.vertexBuffer = vertices; triangles.vertexFormat = nvrhi::Format::RGB32_FLOAT;
+			triangles.vertexStride = sizeof( idVec3 ); triangles.vertexCount = staticVertexCount + RT_DYNAMIC_VERTICES;
+			triangles.indexBuffer = indexBuffer; triangles.indexFormat = nvrhi::Format::R32_UINT;
+			triangles.indexOffset = staticIndexCount * sizeof( uint32 ); triangles.indexCount = RT_DYNAMIC_INDICES;
+			nvrhi::rt::GeometryDesc geometry;
+			geometry.setTriangles( triangles ).setFlags( nvrhi::rt::GeometryFlags::Opaque );
+			if( !dynamicBLAS )
+			{
+				nvrhi::rt::AccelStructDesc desc;
+				desc.addBottomLevelGeometry( geometry ).setDebugName( "Frame-visible dynamic ray geometry" );
+				desc.buildFlags = nvrhi::rt::AccelStructBuildFlags::PreferFastBuild;
+				dynamicBLAS = device->createAccelStruct( desc );
+				if( !dynamicBLAS ) { return false; }
+			}
+			triangles.vertexCount = staticVertexCount + points.size(); triangles.indexCount = elements.size();
+			geometry.setTriangles( triangles );
+			list->writeBuffer( vertices, points.data(), points.size() * sizeof( idVec3 ), staticVertexCount * sizeof( idVec3 ) );
+			list->writeBuffer( indexBuffer, elements.data(), elements.size() * sizeof( uint32 ), staticIndexCount * sizeof( uint32 ) );
+			list->buildBottomLevelAccelStruct( dynamicBLAS, &geometry, 1, nvrhi::rt::AccelStructBuildFlags::PreferFastBuild );
+			instances[1].setBLAS( dynamicBLAS ).setInstanceID( staticIndexCount / 3 ).setInstanceMask( 255 ).setFlags( nvrhi::rt::InstanceFlags::TriangleCullDisable );
+		}
+		list->buildTopLevelAccelStruct( tlas, instances.data(), instances.size(), nvrhi::rt::AccelStructBuildFlags::AllowUpdate );
+		hadDynamic = !elements.empty();
+		return true;
+	}
+	uint32 StaticVertexCount() const { return staticVertexCount; }
 
 	bool Trace( const std::vector<rtRay_t>& rays, std::vector<rtHit_t>& hits )
 	{
@@ -284,7 +365,9 @@ public:
 private:
 	nvrhi::IDevice* device;
 	nvrhi::BufferHandle vertices, indexBuffer;
-	nvrhi::rt::AccelStructHandle blas, tlas;
+	nvrhi::rt::AccelStructHandle blas, tlas, dynamicBLAS;
+	uint32 staticVertexCount = 0, staticIndexCount = 0;
+	bool dynamicEnabled = false, hadDynamic = false;
 	nvrhi::ShaderHandle shader;
 	nvrhi::BindingLayoutHandle layout;
 	nvrhi::ComputePipelineHandle pipeline;
@@ -457,6 +540,41 @@ static bool GatherStaticWorld( const idRenderWorldLocal* world, std::vector<idVe
 	return true;
 }
 
+static void TestDynamicScene()
+{
+	nvrhi::IDevice* device = DiagnosticDevice( "RT_DYNAMIC_TEST" );
+	if( !device || !r_rayTracingDynamicGeometry.GetBool() ) { return; }
+	RayQueryDiagnostic scene( device );
+	std::vector<idVec3> points = { idVec3( -1, -1, 8 ), idVec3( 1, -1, 8 ), idVec3( 0, 1, 8 ) };
+	std::vector<uint32> indices = { 0, 1, 2 };
+	std::vector<nvrhi::rt::InstanceDesc> instances( 1 );
+	instances[0].setInstanceID( 0 ).setInstanceMask( 255 ).setFlags( nvrhi::rt::InstanceFlags::TriangleCullDisable );
+	if( !scene.Initialize( points, indices, instances, true ) ) { common->Printf( "RT_DYNAMIC_TEST status=FAIL initialize\n" ); return; }
+	idVec3 moving[3] = { idVec3( -1, -1, 2 ), idVec3( 1, -1, 2 ), idVec3( 0, 1, 2 ) };
+	triIndex_t movingIndices[3] = { 0, 1, 2 };
+	rayDynamicSurface_t surface = {};
+	surface.positions = moving; surface.indices = movingIndices; surface.numVerts = 3; surface.numIndexes = 3; surface.castsShadow = true;
+	viewEntity_t entity = {}; entity.raySurfaces = &surface;
+	viewDef_t view = {}; view.viewEntitys = &entity;
+	std::vector<rtRay_t> rays( 1 );
+	rays[0].origin = idVec3( 0, 0, 0 ); rays[0].direction = idVec3( 0, 0, 1 ); rays[0].tMin = 0.01f; rays[0].tMax = 20; rays[0].mask = 255;
+	int mismatches = 0;
+	for( int phase = 0; phase < 4; phase++ )
+	{
+		if( phase == 1 ) { for( idVec3& p : moving ) { p.z = 4; } }
+		if( phase == 2 ) { surface.castsShadow = false; }
+		if( phase == 3 ) { view.viewEntitys = nullptr; }
+		nvrhi::CommandListParameters params; params.enableImmediateExecution = false;
+		nvrhi::CommandListHandle list = device->createCommandList( params );
+		list->open();
+		const bool built = scene.UpdateDynamic( list, &view, phase == 2 );
+		list->close(); device->executeCommandList( list );
+		std::vector<rtHit_t> hits;
+		if( !built || !device->waitForIdle() || !scene.Trace( rays, hits ) || !CheckHit( hits[0], phase < 2 ? 1 : 0, phase == 0 ? 2 : ( phase == 1 ? 4 : 8 ), 0.001f ) ) { mismatches++; }
+	}
+	common->Printf( "RT_DYNAMIC_TEST status=%s phases=4 mismatches=%d\n", mismatches == 0 ? "PASS" : "FAIL", mismatches );
+}
+
 static void TestStaticWorld()
 {
 	nvrhi::IDevice* device = DiagnosticDevice( "RT_SCENE" );
@@ -547,8 +665,8 @@ public:
 		int models = 0, surfaces = 0, excluded = 0;
 		if( !GatherStaticWorld( world, positions, indices, models, surfaces, excluded ) ) { return false; }
 		std::vector<nvrhi::rt::InstanceDesc> instances( 1 );
-		instances[0].setInstanceID( 7 ).setInstanceMask( 255 ).setFlags( nvrhi::rt::InstanceFlags::TriangleCullDisable );
-		if( !scene.Initialize( positions, indices, instances ) ) { return false; }
+		instances[0].setInstanceID( 0 ).setInstanceMask( 255 ).setFlags( nvrhi::rt::InstanceFlags::TriangleCullDisable );
+		if( !scene.Initialize( positions, indices, instances, true ) ) { return false; }
 		void* bytes = nullptr;
 		int size = fileSystem->ReadFile( "renderprogs2/dxil/rt/ambient_occlusion.cs.dxil", &bytes );
 		if( size <= 0 || !bytes )
@@ -591,6 +709,7 @@ public:
 
 	bool Render( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* output )
 	{
+		if( !scene.UpdateDynamic( list, view, false ) ) { return false; }
 		if( !bindingSet || boundDepth != depth || boundOutput != output )
 		{
 			nvrhi::BindingSetDesc desc;
@@ -674,8 +793,8 @@ public:
 		int models = 0, surfaces = 0, excluded = 0;
 		if( !GatherStaticWorld( world, positions, indices, models, surfaces, excluded, true ) ) { return false; }
 		std::vector<nvrhi::rt::InstanceDesc> instances( 1 );
-		instances[0].setInstanceID( 7 ).setInstanceMask( 255 ).setFlags( nvrhi::rt::InstanceFlags::TriangleCullDisable );
-		if( !scene.Initialize( positions, indices, instances ) ) { return false; }
+		instances[0].setInstanceID( 0 ).setInstanceMask( 255 ).setFlags( nvrhi::rt::InstanceFlags::TriangleCullDisable );
+		if( !scene.Initialize( positions, indices, instances, true ) ) { return false; }
 		void* bytes = nullptr;
 		int size = fileSystem->ReadFile( "renderprogs2/dxil/rt/contact_shadows.cs.dxil", &bytes );
 		if( size <= 0 || !bytes )
@@ -717,8 +836,9 @@ public:
 		return pipeline && constants && stats;
 	}
 
-	bool BeginView( nvrhi::ICommandList* list, nvrhi::ITexture* depth, nvrhi::ITexture* color )
+	bool BeginView( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color )
 	{
+		if( !scene.UpdateDynamic( list, view, true ) ) { return false; }
 		if( boundDepth != depth || boundColor != color || !bindingSet )
 		{
 			const auto& source = color->getDesc();
@@ -867,10 +987,12 @@ public:
 		std::vector<idVec4> uvMaterials;
 		int models = 0, surfaces = 0, excluded = 0;
 		if( !GatherStaticWorld( world, positions, indices, models, surfaces, excluded, false, &uvMaterials, &materials ) || materials.size() > 512 ) { return false; }
+		staticMaterialCount = materials.size();
+		materials.resize( staticMaterialCount + RT_DYNAMIC_SURFACES, nullptr );
 		std::vector<nvrhi::rt::InstanceDesc> instances( 1 );
-		instances[0].setInstanceID( 7 ).setInstanceMask( 255 ).setFlags( nvrhi::rt::InstanceFlags::TriangleCullDisable );
-		if( !scene.Initialize( positions, indices, instances ) ) { return false; }
-		uvBuffer = StructuredBuffer( uvMaterials.size() * sizeof( idVec4 ), sizeof( idVec4 ), "Bounce UV and material indices" );
+		instances[0].setInstanceID( 0 ).setInstanceMask( 255 ).setFlags( nvrhi::rt::InstanceFlags::TriangleCullDisable );
+		if( !scene.Initialize( positions, indices, instances, true ) ) { return false; }
+		uvBuffer = StructuredBuffer( ( uvMaterials.size() + RT_DYNAMIC_VERTICES ) * sizeof( idVec4 ), sizeof( idVec4 ), "Bounce UV and material indices" );
 		materialBuffer = StructuredBuffer( materials.size() * sizeof( rtBounceMaterial_t ), sizeof( rtBounceMaterial_t ), "Bounce materials" );
 		lightBuffer = StructuredBuffer( MAX_LIGHTS * sizeof( rtBounceLight_t ), sizeof( rtBounceLight_t ), "Bounce lights" );
 		stats = StructuredBuffer( 32, 4, "Bounce sampled counters", true );
@@ -915,18 +1037,11 @@ public:
 		atlasBindings.resize( atlasDesc.arraySize );
 		materialStages.resize( materials.size() * 2, nullptr );
 		int diffuseCount = 0, emissiveCount = 0;
-		for( size_t m = 0; m < materials.size(); m++ )
+		for( size_t m = 0; m < staticMaterialCount; m++ )
 		{
-			for( int s = 0; s < materials[m]->GetNumStages(); s++ )
-			{
-				const shaderStage_t* stage = materials[m]->GetStage( s );
-				if( !stage->texture.image || stage->texture.cinematic || stage->texture.texgen != TG_EXPLICIT ||
-					stage->newStage || stage->vertexColor != SVC_IGNORE ) { continue; }
-				if( stage->lighting == SL_DIFFUSE && !materialStages[m * 2] ) { materialStages[m * 2] = stage; diffuseCount++; }
-				if( stage->lighting == SL_AMBIENT && !materials[m]->HasGui() && !materialStages[m * 2 + 1] &&
-					( stage->drawStateBits & GLS_SRCBLEND_BITS ) == GLS_SRCBLEND_ONE &&
-					( stage->drawStateBits & GLS_DSTBLEND_BITS ) == GLS_DSTBLEND_ONE ) { materialStages[m * 2 + 1] = stage; emissiveCount++; }
-			}
+			SelectMaterialStages( m );
+			diffuseCount += materialStages[m * 2] ? 1 : 0;
+			emissiveCount += materialStages[m * 2 + 1] ? 1 : 0;
 		}
 		common->Printf( "RTGI_READY materials=%u diffuse=%d emissive=%d textureSize=%d fullResolution=1\n", static_cast<uint32>( materials.size() ), diffuseCount, emissiveCount, TILE_SIZE );
 		return true;
@@ -1007,6 +1122,17 @@ public:
 
 	bool Render( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color )
 	{
+		std::vector<idVec4> dynamicUV;
+		std::vector<const rayDynamicSurface_t*> dynamicSurfaces;
+		if( !scene.UpdateDynamic( list, view, false, &dynamicUV, &dynamicSurfaces, staticMaterialCount ) ) { return false; }
+		if( !dynamicUV.empty() ) { list->writeBuffer( uvBuffer, dynamicUV.data(), dynamicUV.size() * sizeof( idVec4 ), scene.StaticVertexCount() * sizeof( idVec4 ) ); }
+		for( size_t m = staticMaterialCount; m < materials.size(); m++ )
+		{
+			const size_t index = m - staticMaterialCount;
+			materials[m] = index < dynamicSurfaces.size() ? dynamicSurfaces[index]->material : nullptr;
+			SelectMaterialStages( m );
+		}
+
 		const int width = view->viewport.GetWidth(), height = view->viewport.GetHeight();
 		if( boundDepth != depth || boundColor != color || !bounce || bounce->getDesc().width != width || bounce->getDesc().height != height )
 		{
@@ -1045,9 +1171,11 @@ public:
 		float localParms[MAX_ENTITY_SHADER_PARMS] = { 1, 1, 1, 1 };
 		for( size_t m = 0; m < materials.size(); m++ )
 		{
-			// Static BSP entities use these world defaults; never read mutable entityDefs.
+			if( !materials[m] ) { continue; }
+			// Dynamic registers are immutable frontend copies for this surface/pose.
+			const rayDynamicSurface_t* dynamic = m >= staticMaterialCount ? dynamicSurfaces[m - staticMaterialCount] : nullptr;
 			std::vector<float> evaluated;
-			const float* regs = materials[m]->ConstantRegisters();
+			const float* regs = dynamic ? dynamic->shaderRegisters : materials[m]->ConstantRegisters();
 			if( !regs )
 			{
 				evaluated.resize( materials[m]->GetNumRegisters() );
@@ -1057,7 +1185,7 @@ public:
 			PrepareStage( list, materialStages[m * 2], regs, m * 2, 1, data[m].diffuse, data[m].diffuseS, data[m].diffuseT );
 			PrepareStage( list, materialStages[m * 2 + 1], regs, m * 2 + 1, 2, data[m].emissive, data[m].emissiveS, data[m].emissiveT );
 			// UV's third component is zero, leaving this component free for shadow policy.
-			data[m].diffuseS.z = materials[m]->SurfaceCastsShadow() && !materials[m]->TestMaterialFlag( MF_NOSELFSHADOW ) ? 1.0f : 0.0f;
+			data[m].diffuseS.z = ( dynamic ? dynamic->castsShadow : ( materials[m]->SurfaceCastsShadow() && !materials[m]->TestMaterialFlag( MF_NOSELFSHADOW ) ) ) ? 1.0f : 0.0f;
 		}
 		list->writeBuffer( materialBuffer, data.data(), data.size() * sizeof( rtBounceMaterial_t ) );
 		PrepareLights( list, view );
@@ -1199,7 +1327,7 @@ private:
 			}
 		}
 		rtReflectionConstants_t reflectionCB = {};
-		const bool historyValid = lastReflectionFrame >= 0 && view->taaFrameCount == lastReflectionFrame + 1 &&
+		const bool historyValid = dynamicSurfaceCount == 0 && lastReflectionFrame >= 0 && view->taaFrameCount == lastReflectionFrame + 1 &&
 			reflectionEpoch == view->temporalHistoryEpoch && reflectionViewport == cb.viewport;
 		reflectionCB.previousWorldToClip = historyValid ? previousReflectionMatrix : cb.worldToClip;
 		reflectionCB.previousCamera = historyValid ? previousReflectionCamera : cb.cameraRadius;
@@ -1296,6 +1424,19 @@ private:
 		atlasSources[slice] = texture;
 		return true;
 	}
+	void SelectMaterialStages( size_t m )
+	{
+		materialStages[m * 2] = materialStages[m * 2 + 1] = nullptr;
+		if( !materials[m] ) { return; }
+		for( int s = 0; s < materials[m]->GetNumStages(); s++ )
+		{
+			const shaderStage_t* stage = materials[m]->GetStage( s );
+			if( !stage->texture.image || stage->texture.cinematic || stage->texture.texgen != TG_EXPLICIT || stage->newStage || stage->vertexColor != SVC_IGNORE ) { continue; }
+			if( stage->lighting == SL_DIFFUSE && !materialStages[m * 2] ) { materialStages[m * 2] = stage; }
+			if( stage->lighting == SL_AMBIENT && !materials[m]->HasGui() && !materialStages[m * 2 + 1] &&
+				( stage->drawStateBits & GLS_SRCBLEND_BITS ) == GLS_SRCBLEND_ONE && ( stage->drawStateBits & GLS_DSTBLEND_BITS ) == GLS_DSTBLEND_ONE ) { materialStages[m * 2 + 1] = stage; }
+		}
+	}
 	void PrepareStage( nvrhi::ICommandList* list, const shaderStage_t* stage, const float* regs, uint32 slice, int decode, idVec4& tint, idVec4& s, idVec4& t )
 	{
 		tint = idVec4( 0, 0, 0, slice );
@@ -1359,6 +1500,7 @@ private:
 	RayQueryDiagnostic scene;
 	nvrhi::IDevice* device;
 	std::vector<const idMaterial*> materials;
+	uint32 staticMaterialCount = 0;
 	std::vector<const shaderStage_t*> materialStages;
 	std::vector<nvrhi::TextureHandle> atlasSources;
 	std::vector<nvrhi::BindingSetHandle> atlasBindings;
@@ -1534,7 +1676,7 @@ void R_BeginRayTracedContacts( nvrhi::ICommandList* list, const viewDef_t* view,
 		}
 		common->Printf( "RTCONTACT_READY staticShadowCasters=1 distance=%.1f strength=%.2f\n", r_rayTracedContactDistance.GetFloat(), r_rayTracedContactStrength.GetFloat() );
 	}
-	if( rayTracedContacts->BeginView( list, depth, color ) ) { contactView = view; }
+	if( rayTracedContacts->BeginView( list, view, depth, color ) ) { contactView = view; }
 #endif
 }
 
@@ -1691,5 +1833,23 @@ CONSOLE_COMMAND_SHIP( rayTracingScene, "Capture and validate static opaque world
 	TestStaticWorld();
 #else
 	common->Printf( "RT_SCENE status=SKIP reason=build-disabled\n" );
+#endif
+}
+
+CONSOLE_COMMAND_SHIP( rayTracingDynamicStatus, "Report the last ray scene dynamic geometry counts", NULL )
+{
+#if defined( USE_RAYTRACING )
+	common->Printf( "RTDYNAMIC_STATUS surfaces=%u triangles=%u skinnedSurfaces=%u budgetSkipped=%u fullResolution=1 visibleOnly=1\n", dynamicSurfaceCount.load(), dynamicTriangleCount.load(), dynamicSkinnedCount.load(), dynamicSkippedCount.load() );
+#else
+	common->Printf( "RTDYNAMIC_STATUS compiled=0\n" );
+#endif
+}
+
+CONSOLE_COMMAND_SHIP( rayTracingDynamicTest, "Test dynamic ray insertion, movement, shadow exclusion and removal", NULL )
+{
+#if defined( USE_RAYTRACING )
+	TestDynamicScene();
+#else
+	common->Printf( "RT_DYNAMIC_TEST status=SKIP reason=build-disabled\n" );
 #endif
 }

@@ -33,7 +33,7 @@ void main(uint3 tid : SV_DispatchThreadID)
     if (surface.CommittedStatus() != COMMITTED_TRIANGLE_HIT ||
         abs(surface.CommittedRayT() - distance) > max(0.5, distance * 0.001)) return;
     float3 normal, receiverAlbedo, ignoredEmission;
-    if (!Surface(surface.CommittedPrimitiveIndex(), surface.CommittedTriangleBarycentrics(), primary.Direction, normal, receiverAlbedo, ignoredEmission)) return;
+    if (!Surface(surface.CommittedInstanceID() + surface.CommittedPrimitiveIndex(), surface.CommittedTriangleBarycentrics(), primary.Direction, normal, receiverAlbedo, ignoredEmission)) return;
     if (sampled) InterlockedAdd(Stats[1], 1);
     float3 tangent = normalize(cross(abs(normal.z) < 0.9 ? float3(0, 0, 1) : float3(0, 1, 0), normal));
     float3 bitangent = cross(normal, tangent);
@@ -54,7 +54,7 @@ void main(uint3 tid : SV_DispatchThreadID)
         if (bounce.CommittedStatus() != COMMITTED_TRIANGLE_HIT) continue;
         if (sampled) InterlockedAdd(Stats[2], 1);
         float3 hitNormal, hitAlbedo, emission;
-        if (!Surface(bounce.CommittedPrimitiveIndex(), bounce.CommittedTriangleBarycentrics(), ray.Direction, hitNormal, hitAlbedo, emission)) continue;
+        if (!Surface(bounce.CommittedInstanceID() + bounce.CommittedPrimitiveIndex(), bounce.CommittedTriangleBarycentrics(), ray.Direction, hitNormal, hitAlbedo, emission)) continue;
         float3 hit = ray.Origin + ray.Direction * bounce.CommittedRayT();
         float3 radiance = hitAlbedo * Incident(hit, hitNormal) + emission * Options.z;
         float3 cached;

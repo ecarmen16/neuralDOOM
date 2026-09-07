@@ -143,8 +143,8 @@ try {
         $scriptLines += 'rayTracingTest'
         if ($RayTracingDiagnostics -ne 'MissingShader') { $scriptLines += 'rayTracingScene' }
     }
-    $scriptLines += @('devmap game/mars_city2', "wait $WarmupFrames")
-    if ($RayTracingDiagnostics -in @('Synthetic', 'Scene')) { $scriptLines += 'rayTracingTest' }
+    $scriptLines += @('devmap game/mars_city2', "wait $WarmupFrames", 'set r_neuralHistoryDebug 1', 'r_neuralHistoryDebug')
+    if ($RayTracingDiagnostics -in @('Synthetic', 'Scene')) { $scriptLines += @('rayTracingTest', 'rayTracingDynamicTest', 'rayTracingDynamicStatus') }
     if ($RayTracingDiagnostics -eq 'Scene') { $scriptLines += @('rayTracingScene', 'rayTracingTest') }
     $scriptLines += @('rayTracingAOStatus', 'hdrStatus', 'neuralHistoryStatus', 'neuralBackendStatus', 'probeLightingStatus', 'screenshot screenshots/before.png')
     $scriptLines += @('rayTracingContactStatus', 'rayTracingGIStatus', 'rayTracingReflectionStatus')
@@ -160,20 +160,20 @@ try {
     )
     # Capture live rollback before resizing, retaining comparable image dimensions.
     if ($RayTracedAO) {
-        $scriptLines += @('rayTracingAOStatus', 'set r_rayTracedAO 0', 'wait 30', 'rayTracingAOStatus',
-            'screenshot screenshots/rt_off.png', 'set r_rayTracedAO 1', 'wait 30')
+        $scriptLines += @('rayTracingAOStatus', 'set r_rayTracedAO 0', 'wait 30', 'echo RT_HISTORY_r_rayTracedAO_0', 'neuralHistoryStatus', 'rayTracingAOStatus',
+            'screenshot screenshots/rt_off.png', 'set r_rayTracedAO 1', 'wait 30', 'echo RT_HISTORY_r_rayTracedAO_1', 'neuralHistoryStatus')
     }
     if ($RayTracedContactShadows) {
-        $scriptLines += @('rayTracingContactStatus', 'set r_rayTracedContactShadows 0', 'wait 30', 'rayTracingContactStatus',
-            'screenshot screenshots/contacts_off.png', 'set r_rayTracedContactShadows 1', 'wait 30')
+        $scriptLines += @('rayTracingContactStatus', 'set r_rayTracedContactShadows 0', 'wait 30', 'echo RT_HISTORY_r_rayTracedContactShadows_0', 'neuralHistoryStatus', 'rayTracingContactStatus',
+            'screenshot screenshots/contacts_off.png', 'set r_rayTracedContactShadows 1', 'wait 30', 'echo RT_HISTORY_r_rayTracedContactShadows_1', 'neuralHistoryStatus')
     }
     if ($RayTracedGI) {
-        $scriptLines += @('rayTracingGIStatus', 'set r_rayTracedGI 0', 'wait 30', 'rayTracingGIStatus',
-            'screenshot screenshots/gi_off.png', 'set r_rayTracedGI 1', 'wait 30')
+        $scriptLines += @('rayTracingGIStatus', 'set r_rayTracedGI 0', 'wait 30', 'echo RT_HISTORY_r_rayTracedGI_0', 'neuralHistoryStatus', 'rayTracingGIStatus',
+            'screenshot screenshots/gi_off.png', 'set r_rayTracedGI 1', 'wait 30', 'echo RT_HISTORY_r_rayTracedGI_1', 'neuralHistoryStatus')
     }
     if ($RayTracedReflections) {
-        $scriptLines += @('rayTracingReflectionStatus', 'set r_rayTracedReflections 0', 'wait 30', 'rayTracingReflectionStatus',
-            'screenshot screenshots/reflections_off.png', 'set r_rayTracedReflections 1', 'wait 30')
+        $scriptLines += @('rayTracingReflectionStatus', 'set r_rayTracedReflections 0', 'wait 30', 'echo RT_HISTORY_r_rayTracedReflections_0', 'neuralHistoryStatus', 'rayTracingReflectionStatus',
+            'screenshot screenshots/reflections_off.png', 'set r_rayTracedReflections 1', 'wait 30', 'echo RT_HISTORY_r_rayTracedReflections_1', 'neuralHistoryStatus')
     }
     if ($RayTracingDebugViews) {
         $scriptLines += @('exec neural_rtx_keys.cfg', 'rayTracingDebugCycle', 'wait 30', 'screenshot screenshots/ao_visibility.png',
@@ -186,7 +186,7 @@ try {
     if ($ResizeWidth -gt 0) {
         $scriptLines += @("set r_windowWidth $ResizeWidth", "set r_windowHeight $ResizeHeight", 'vid_restart', 'wait 90', 'hdrStatus', 'neuralHistoryStatus', 'screenshot screenshots/resized.png')
     }
-    $scriptLines += @('rayTracingAOStatus', 'rayTracingContactStatus', 'rayTracingGIStatus', 'rayTracingReflectionStatus', 'echo NEURAL_SMOKE_COMPLETE', 'quit')
+    $scriptLines += @('rayTracingAOStatus', 'rayTracingContactStatus', 'rayTracingGIStatus', 'rayTracingReflectionStatus', 'rayTracingDynamicStatus', 'echo NEURAL_SMOKE_COMPLETE', 'quit')
     $scriptLines | Set-Content -LiteralPath (Join-Path $saveBase.FullName 'neural_smoke.cfg') -Encoding ASCII
     # Values are scalar/validated; quote filesystem paths explicitly for Windows argv.
     # Win32 stores the command line in MAX_STRING_CHARS (1024 bytes).
@@ -214,10 +214,20 @@ try {
     $log = Get-Content -LiteralPath (Join-Path $saveBase.FullName 'smoke.log') -Raw
     if ($log -notmatch 'NEURAL_SMOKE_COMPLETE') { throw 'Gameplay script did not complete.' }
     if ($log -match '(?im)FATAL ERROR|D3D12 device removed|Unknown command') { throw 'Engine log contains fatal/device/command errors.' }
-    $lightingResets = [regex]::Matches($log, 'Neural temporal history reset: [^\r\n]*lighting-change').Count
+    # Frontend-thread Printf goes to OutputDebugString on Windows, not the file log.
+    # Query the actual epoch from the main-thread console after each lighting edit.
+    $resetStates = [regex]::Matches($log, 'RT_HISTORY_r_rayTraced\w+_[01][ \t]*\r?\nNeural temporal history: epoch (\d+), pending none, lastReset ([^\r\n]+)')
     $expectedLightingResets = 2 * ([int][bool]$RayTracedAO + [int][bool]$RayTracedContactShadows + [int][bool]$RayTracedGI + [int][bool]$RayTracedReflections)
-    if ($lightingResets -lt $expectedLightingResets) { throw 'Direct RTX cvar changes failed to reset temporal history.' }
-    $result.lightingHistoryResets = $lightingResets
+    if ($resetStates.Count -ne $expectedLightingResets) { throw 'Missing per-toggle history state.' }
+    $previousEpoch = -1L
+    foreach ($state in $resetStates) {
+        $epoch = [long]$state.Groups[1].Value
+        if ($epoch -le $previousEpoch -or $state.Groups[2].Value -notmatch 'lighting-change') {
+            throw 'Direct RTX cvar change failed to advance lighting history.'
+        }
+        $previousEpoch = $epoch
+    }
+    $result.lightingHistoryResets = $resetStates.Count
     $aoSamples = [regex]::Matches($log, 'RTAO_STATUS active=([01]) frames=(\d+) samples=(\d+) matched=(\d+) occluded=(\d+)')
     $result.rayTracedAOStatus = @($aoSamples | ForEach-Object {
         [pscustomobject]@{ active = $_.Groups[1].Value -eq '1'; frames = [int]$_.Groups[2].Value;
@@ -240,6 +250,7 @@ try {
         if ($log -notmatch 'RT_DIAGNOSTIC_ERROR reason=missing-shader' -or $log -notmatch 'RT_TEST status=FAIL reason=initialization-or-trace' -or $log -match 'RT_BUILD|RT_TRACE') { throw 'Missing RT shader did not fail safely before GPU work.' }
     } elseif ($RayTracingDiagnostics -in @('Synthetic', 'Scene')) {
         $expectedTests = if ($RayTracingDiagnostics -eq 'Scene') { 3 } else { 2 }
+        if ($log -notmatch 'RT_DYNAMIC_TEST status=PASS phases=4 mismatches=0') { throw 'Dynamic ray insertion/movement/removal diagnostic failed.' }
         if ([regex]::Matches($log, 'RT_TEST status=PASS phases=2 rays=24 mismatches=0').Count -ne $expectedTests -or $log -match 'RT_\w+ status=FAIL|RT_DIAGNOSTIC_ERROR') { throw 'Ray intersection or instance-update checks failed.' }
         if ($log -notmatch 'RT_SCENE status=SKIP reason=no-world') { throw 'Missing safe no-world RT diagnostic result.' }
         if ($RayTracingDiagnostics -eq 'Scene') {
@@ -368,7 +379,7 @@ try {
         if ($log -match 'transport=scRGB-FP16 windowsHDR=0' -and [double]::Parse($sample.Groups[3].Value, [Globalization.CultureInfo]::InvariantCulture) -gt 1.001) { throw 'SDR presentation exceeded normalized white.' }
     }
     if ($DisplayOutput -eq 'AutoHDR' -and $log -match 'transport=scRGB-FP16' -and $presented.Count -lt 2) { throw 'Missing scRGB presentation readback.' }
-    if ($ResizeWidth -gt 0 -and ($history.Count -lt 4 -or [long]$history[3].Groups[1].Value -le [long]$history[2].Groups[1].Value)) { throw 'Resize did not advance history epoch.' }
+    if ($ResizeWidth -gt 0 -and ($history.Count -lt 4 -or [long]$history[$history.Count - 1].Groups[1].Value -le [long]$history[$history.Count - 2].Groups[1].Value)) { throw 'Resize did not advance history epoch.' }
     $names = @('before', 'after')
     if ($RayTracedAO) { $names += 'rt_off' }
     if ($RayTracedContactShadows) { $names += 'contacts_off' }

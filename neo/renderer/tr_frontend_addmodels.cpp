@@ -274,9 +274,49 @@ void R_SetupDrawSurfShader( drawSurf_t* drawSurf, const idMaterial* shader, cons
 
 /*
 ===================
-R_SetupDrawSurfJoints
+R_SnapshotDynamicRaySurface
 ===================
 */
+static void R_SnapshotDynamicRaySurface( viewEntity_t* entity, const srfTriangles_t* tri, const idMaterial* material, const float* registers, bool noShadow, bool skinnedModel )
+{
+	if( !R_WantDynamicRayGeometry() || entity->weaponDepthHack || entity->modelDepthHack != 0 || entity->isGuiSurface ||
+		!tri || !tri->verts || !tri->indexes || !material->ReceivesLighting() || material->Coverage() != MC_OPAQUE ||
+		material->Deform() != DFRM_NONE || material->HasSubview() || material->IsPortalSky() || tri->numVerts <= 0 || tri->numIndexes <= 0 ||
+		tri->numIndexes % 3 != 0 || tri->numIndexes > 98304 || entity->rayVertexCount + tri->numVerts > 32768 ) { return; }
+	const idRenderModelStatic* joints = r_useGPUSkinning.GetBool() ? tri->staticModelWithJoints : NULL;
+	if( ( skinnedModel && !r_rayTracingSkinnedGeometry.GetBool() ) || ( joints && !joints->jointsInverted ) ) { return; }
+	for( int i = 0; i < tri->numIndexes; i++ ) { if( ( unsigned int )tri->indexes[i] >= ( unsigned int )tri->numVerts ) { return; } }
+	if( joints )
+	{
+		for( int v = 0; v < tri->numVerts; v++ ) { for( int j = 0; j < 4; j++ ) { if( tri->verts[v].color[j] >= joints->numInvertedJoints ) { return; } } }
+	}
+	rayDynamicSurface_t* surface = ( rayDynamicSurface_t* )R_FrameAlloc( sizeof( rayDynamicSurface_t ), FRAME_ALLOC_DRAW_SURFACE );
+	surface->positions = ( idVec3* )R_FrameAlloc( tri->numVerts * sizeof( idVec3 ), FRAME_ALLOC_DRAW_SURFACE );
+	surface->texcoords = ( idVec2* )R_FrameAlloc( tri->numVerts * sizeof( idVec2 ), FRAME_ALLOC_DRAW_SURFACE );
+	surface->indices = ( triIndex_t* )R_FrameAlloc( tri->numIndexes * sizeof( triIndex_t ), FRAME_ALLOC_DRAW_SURFACE );
+	for( int v = 0; v < tri->numVerts; v++ )
+	{
+		const idDrawVert& vertex = tri->verts[v];
+		idVec3 point = vertex.xyz;
+		if( joints )
+		{
+			idJointMat blend;
+			idJointMat::Mul( blend, joints->jointsInverted[vertex.color[0]], vertex.color2[0] * ( 1.0f / 255.0f ) );
+			for( int j = 1; j < 4; j++ ) { idJointMat::Mad( blend, joints->jointsInverted[vertex.color[j]], vertex.color2[j] * ( 1.0f / 255.0f ) ); }
+			point = blend * idVec4( point.x, point.y, point.z, 1 );
+		}
+		R_LocalPointToGlobal( entity->modelMatrix, point, surface->positions[v] );
+		surface->texcoords[v] = vertex.GetTexCoord();
+	}
+	memcpy( surface->indices, tri->indexes, tri->numIndexes * sizeof( triIndex_t ) );
+	surface->numVerts = tri->numVerts; surface->numIndexes = tri->numIndexes;
+	surface->material = material; surface->shaderRegisters = registers;
+	surface->castsShadow = !noShadow && material->SurfaceCastsShadow() && !material->TestMaterialFlag( MF_NOSELFSHADOW );
+	surface->skinned = skinnedModel;
+	surface->next = entity->raySurfaces; entity->raySurfaces = surface;
+	entity->rayVertexCount += tri->numVerts;
+}
+
 void R_SetupDrawSurfJoints( drawSurf_t* drawSurf, const srfTriangles_t* tri, const idMaterial* shader, nvrhi::ICommandList* commandList )
 {
 	// RB: added check wether GPU skinning is available at all
@@ -848,6 +888,8 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 			R_SetupDrawSurfShader( baseDrawSurf, shader, renderEntity );
 
 			shaderRegisters = baseDrawSurf->shaderRegisters;
+			if( !model->IsStaticWorldModel() ) { R_SnapshotDynamicRaySurface( vEntity, tri, shader, shaderRegisters, renderEntity->noShadow, renderEntity->numJoints > 0 ); }
+
 
 			// Check for deformations (eyeballs, flares, etc)
 			const deform_t shaderDeform = shader->Deform();

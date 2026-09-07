@@ -32,6 +32,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "precompiled.h"
 #pragma hdrstop
+#include <atomic>
 
 #include "framework/Common_local.h"
 #include "RenderCommon.h"
@@ -53,6 +54,17 @@ idCVar r_neuralRigidMotionVectors( "r_neuralRigidMotionVectors", "0", CVAR_RENDE
 idCVar r_neuralSkinnedMotionVectors( "r_neuralSkinnedMotionVectors", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "generate skinned-object motion vectors; forced on by r_neuralDebug 2" );
 idCVar r_neuralViewmodelMotionVectors( "r_neuralViewmodelMotionVectors", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "include first-person viewmodel motion vectors; experimental and not forced by diagnostic modes" );
 idCVar r_neuralTemporalMasks( "r_neuralTemporalMasks", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "generate reactive and transparency masks; forced on by r_neuralDebug 3 or 4" );
+// One packed extent snapshot avoids torn width/height reads from menu/frontend.
+static std::atomic<uint64> neuralPresentationExtent( 0 );
+static std::atomic<int> neuralPresentationMode( 0 );
+void R_GetNeuralPresentationStatus( int& mode, int& rw, int& rh, int& ow, int& oh )
+{
+	const uint64 extent = neuralPresentationExtent.load();
+	rw = ( extent >> 48 ) & 0xffff; rh = ( extent >> 32 ) & 0xffff;
+	ow = ( extent >> 16 ) & 0xffff; oh = extent & 0xffff;
+	mode = neuralPresentationMode.load();
+}
+
 idCVar r_neuralBackend( "r_neuralBackend", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_NEW, "neutral temporal backend: 0 = disabled, 1 = validate frame contract, 2 = Streamline DLAA, 3 = Streamline DLSS Quality", 0, 3, idCmdSystem::ArgCompletion_Integer<0, 3> );
 idCVar r_forceZPassStencilShadows( "r_forceZPassStencilShadows", "0", CVAR_RENDERER | CVAR_BOOL, "force Z-pass rendering for performance testing" );
 idCVar r_useStencilShadowPreload( "r_useStencilShadowPreload", "0", CVAR_RENDERER | CVAR_BOOL, "use stencil shadow preload algorithm instead of Z-fail" );
@@ -5313,8 +5325,15 @@ void idRenderBackend::DrawMotionVectors()
 
 bool idRenderBackend::EvaluateNeuralTemporalBackend( const viewDef_t* _viewDef, int stereoEye )
 {
+	if( _viewDef->viewEntitys && !_viewDef->isSubview )
+	{
+		const uint64 rw = _viewDef->viewport.GetWidth(), rh = _viewDef->viewport.GetHeight();
+		neuralPresentationExtent.store( ( rw << 48 ) | ( rh << 32 ) | ( uint64( renderSystem->GetWidth() ) << 16 ) | uint64( renderSystem->GetHeight() ) );
+	}
+
 	if( !r_neuralBackend.GetBool() || neuralTemporalBackend == NULL || _viewDef->viewEntitys == NULL || _viewDef->isSubview || ( _viewDef->renderView.rdflags & ( RDF_IRRADIANCE | RDF_NO_TEMPORAL_HISTORY ) ) )
 	{
+		if( _viewDef->viewEntitys && !_viewDef->isSubview ) { neuralPresentationMode.store( 0 ); }
 		return false;
 	}
 
@@ -5367,6 +5386,7 @@ bool idRenderBackend::EvaluateNeuralTemporalBackend( const viewDef_t* _viewDef, 
 
 	renderLog.OpenBlock( "Neural_TemporalBackend", colorGreen );
 	const bool presented = neuralTemporalBackend->Evaluate( frame );
+	neuralPresentationMode.store( presented ? r_neuralBackend.GetInteger() : 0 );
 	renderLog.CloseBlock();
 	return presented;
 }

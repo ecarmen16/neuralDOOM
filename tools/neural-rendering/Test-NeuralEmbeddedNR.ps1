@@ -100,3 +100,32 @@ $next = Get-Content -LiteralPath (Join-Path $fixture 'captures/dogfood/base/neur
 if ($next -match 'set r_forceAmbient|set r_hdrAutoExposure|set r_rayTracedReflectionStrength') { throw 'Completed migration overwrote later tuning.' }
 if ([IO.File]::ReadAllText($playerConfig) -ne $playerText) { throw 'Preparation edited the saved config.' }
 Write-Host 'PASS: automatic contrast migration, preparation retry, exact config backup, and preservation of later tuning.'
+
+# Saved reconstruction is honored in DLAA, while NR always retains its DLAA input.
+[IO.File]::WriteAllText($playerConfig, 'set r_neuralReconstructionMode "0"' + "`r`n")
+$preparedTAA = (& $launcher -RepoRoot $fixture -Profile DLAA -PrepareOnly 6>&1 | Out-String)
+if ($preparedTAA -notmatch 'Reconstruction: Native TAA') { throw 'DLAA profile ignored saved TAA preference.' }
+$preparedNR = (& $launcher -RepoRoot $fixture -Profile NR -PrepareOnly 6>&1 | Out-String)
+if ($preparedNR -notmatch 'Reconstruction: DLAA') { throw 'NR no longer has DLAA input.' }
+[IO.File]::WriteAllText($playerConfig, 'set r_neuralReconstructionMode "1"' + "`r`n")
+$preparedDLAA = (& $launcher -RepoRoot $fixture -Profile DLAA -PrepareOnly 6>&1 | Out-String)
+if ($preparedDLAA -notmatch 'Reconstruction: DLAA') { throw 'DLAA preference was not restored.' }
+Write-Host 'PASS: saved TAA/DLAA selection, NR input isolation, and no process launch.'
+
+# Inspect the actual prepared argv without starting a process.
+$disabledRays = "set r_rayTracedAO 0`nset r_rayTracedContactShadows 0`nset r_rayTracedGI 0`nset r_rayTracedReflections 0`n"
+[IO.File]::WriteAllText($playerConfig, $disabledRays)
+$savedRayArgs = & {
+    . $launcher -RepoRoot $fixture -Profile DLAA -RayTracedAO -RayTracedContactShadows -RayTracedGI -RayTracedReflections -PrepareOnly 6>$null
+    $launchArgs -join ' '
+}
+if ($savedRayArgs -match '\+set r_rayTraced(?:AO|ContactShadows|GI|Reflections) 1') { throw 'Launcher overrode saved RTX disable preferences.' }
+[IO.File]::WriteAllText($playerConfig, '')
+$seedRayArgs = & {
+    . $launcher -RepoRoot $fixture -Profile DLAA -RayTracedAO -RayTracedContactShadows -RayTracedGI -RayTracedReflections -PrepareOnly 6>$null
+    $launchArgs -join ' '
+}
+foreach ($ray in @('AO', 'ContactShadows', 'GI', 'Reflections')) {
+    if ($seedRayArgs -notmatch ( '\+set r_rayTraced' + $ray + ' 1' )) { throw "Missing first-use RTX seed: $ray" }
+}
+Write-Host 'PASS: saved RTX off choices survive relaunch; missing preferences are seeded.'
