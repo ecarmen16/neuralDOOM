@@ -77,6 +77,8 @@ private:
 	void ComputeExposure( nvrhi::ICommandList* commandList, const ToneMappingParameters& params );
 
 	bool                            isLoaded;
+	int                             lastExposureTime = -1;
+	float                           exposureDeltaTime = 0.0f;
 	idImage*                        colorLut;
 	int                             colorLutSize;
 	CommonRenderPasses*             commonPasses;

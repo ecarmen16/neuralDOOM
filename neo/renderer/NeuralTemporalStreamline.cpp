@@ -27,7 +27,7 @@ apply to this source tree.
 class idStreamlineNeuralTemporalBackend : public idNeuralTemporalBackend
 {
 public:
-	idStreamlineNeuralTemporalBackend() : initialized( false ), optionsDirty( true ), resetPending( true ), evaluatedFrames( 0 ), presentedFrames( 0 ), rejectedFrames( 0 ), lastEpoch( 0 ), lastFrameIndex( 0 ), configuredMode( 0 ), renderWidth( 0 ), renderHeight( 0 ), outputWidth( 0 ), outputHeight( 0 ), lastResult( "not attempted" ) {}
+	idStreamlineNeuralTemporalBackend() : initialized( false ), optionsDirty( true ), resetPending( true ), evaluatedFrames( 0 ), presentedFrames( 0 ), rejectedFrames( 0 ), lastEpoch( 0 ), lastFrameIndex( 0 ), configuredMode( 0 ), configuredExposureScale( -1.0f ), renderWidth( 0 ), renderHeight( 0 ), outputWidth( 0 ), outputHeight( 0 ), lastResult( "not attempted" ) {}
 
 	virtual bool Initialize( nvrhi::IDevice* device ) override
 	{
@@ -100,7 +100,8 @@ public:
 			resetPending = true;
 		}
 
-		if( optionsDirty )
+		// Brightness can change in the menu without a resize or backend switch.
+		if( optionsDirty || configuredExposureScale != frame.exposureScale )
 		{
 			sl::DLSSOptions options = {};
 			options.mode = nativeDLAA ? sl::DLSSMode::eDLAA : sl::DLSSMode::eMaxQuality;
@@ -120,6 +121,7 @@ public:
 			}
 			optionsDirty = false;
 			configuredMode = requestedMode;
+			configuredExposureScale = frame.exposureScale;
 		}
 		renderWidth = frame.renderWidth;
 		renderHeight = frame.renderHeight;
@@ -286,6 +288,7 @@ private:
 	uint64		lastEpoch;
 	uint32		lastFrameIndex;
 	int			configuredMode;
+	float		configuredExposureScale;
 	int			renderWidth;
 	int			renderHeight;
 	int			outputWidth;

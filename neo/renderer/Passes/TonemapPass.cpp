@@ -31,6 +31,8 @@
 #include <sys/DeviceManager.h>
 extern DeviceManager* deviceManager;
 
+static idCVar r_hdrFixedLuminance( "r_hdrFixedLuminance", "0.5", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "fixed tone-mapping luminance reference when auto exposure is off; higher is darker", 0.02f, 1.0f );
+
 TonemapPass::TonemapPass()
 	: isLoaded( false )
 	, colorLut( nullptr )
@@ -46,6 +48,7 @@ void TonemapPass::Init( nvrhi::DeviceHandle _device, CommonRenderPasses* _common
 {
 	assert( _params.histogramBins <= 256 );
 
+	lastExposureTime = -1;
 	device = _device;
 	commonPasses = _commonPasses;
 
@@ -338,9 +341,25 @@ void TonemapPass::Render(
 void TonemapPass::SimpleRender( nvrhi::ICommandList* commandList, const ToneMappingParameters& params, const viewDef_t* viewDef, nvrhi::ITexture* sourceTexture, nvrhi::FramebufferHandle _fbHandle )
 {
 	commandList->beginMarker( "ToneMapping" );
-	ResetHistogram( commandList );
-	AddFrameToHistogram( commandList, viewDef, sourceTexture );
-	ComputeExposure( commandList, params );
+	const int now = Sys_Milliseconds();
+	// A fresh pass starts from a defined reference, never uninitialized GPU memory.
+	if( lastExposureTime < 0 )
+	{
+		ResetExposure( commandList, r_hdrFixedLuminance.GetFloat() );
+	}
+	exposureDeltaTime = lastExposureTime < 0 ? 0.0f : idMath::ClampFloat( 0.0f, 0.25f, ( now - lastExposureTime ) * 0.001f );
+	lastExposureTime = now;
+	if( r_hdrAutoExposure.GetBool() )
+	{
+		ResetHistogram( commandList );
+		AddFrameToHistogram( commandList, viewDef, sourceTexture );
+		ComputeExposure( commandList, params );
+	}
+	else
+	{
+		// Match the former bright-scene reference without lifting dark rooms.
+		ResetExposure( commandList, r_hdrFixedLuminance.GetFloat() );
+	}
 	Render( commandList, params, viewDef, sourceTexture, _fbHandle );
 	commandList->endMarker();
 }
@@ -451,7 +470,7 @@ void TonemapPass::ComputeExposure( nvrhi::ICommandList* commandList, const ToneM
 	toneMappingConstants.eyeAdaptationSpeedDown = r_hdrAdaptionRate.GetFloat() / 2.f;
 	toneMappingConstants.minAdaptedLuminance = r_hdrMinLuminance.GetFloat();
 	toneMappingConstants.maxAdaptedLuminance = r_hdrMaxLuminance.GetFloat();
-	toneMappingConstants.frameTime = Sys_Milliseconds() / 1000.0f;
+	toneMappingConstants.frameTime = exposureDeltaTime;
 
 	if( !pcEnabledExposure )
 	{

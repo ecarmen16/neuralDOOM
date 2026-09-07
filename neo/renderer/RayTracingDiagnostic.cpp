@@ -28,7 +28,7 @@ static idCVar r_rayTracedGISamples( "r_rayTracedGISamples", "4", CVAR_RENDERER |
 static idCVar r_rayTracedGIEmissive( "r_rayTracedGIEmissive", "2", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Emissive material contribution to indirect lighting", 0, 8 );
 
 static idCVar r_rayTracedReflections( "r_rayTracedReflections", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Full-resolution static-world reflections using native material roughness and normal maps" );
-static idCVar r_rayTracedReflectionStrength( "r_rayTracedReflectionStrength", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Blend from native probe specular to traced reflections", 0, 1 );
+static idCVar r_rayTracedReflectionStrength( "r_rayTracedReflectionStrength", "0.65", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Blend from native probe specular to traced reflections", 0, 1 );
 static idCVar r_rayTracedReflectionSamples( "r_rayTracedReflectionSamples", "4", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "Reflection rays per full-resolution eligible pixel", 1, 16 );
 static idCVar r_rayTracedReflectionRoughness( "r_rayTracedReflectionRoughness", "0.7", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Maximum reflection roughness, with a 0.15 fade into native probes", 0.1, 1 );
 static idCVar r_rayTracedReflectionDistance( "r_rayTracedReflectionDistance", "2048", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Maximum reflection ray distance in Doom world units", 16, 8192 );

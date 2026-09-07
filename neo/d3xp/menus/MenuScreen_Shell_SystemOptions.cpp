@@ -189,7 +189,7 @@ void idMenuScreen_Shell_SystemOptions::Initialize( idMenuHandler* data )
 	control = new( TAG_SWF ) idMenuWidget_ControlButton();
 	control->SetOptionType( OPTION_SLIDER_BAR );
 	control->SetLabel( "Ambient Lighting" );
-	control->SetDescription( "Sets the amount of indirect lighting. Needed for modern PBR reflections" );
+	control->SetDescription( "Scales ambient probe lighting and material reflections. Lower values preserve darker rooms." );
 	control->SetDataSource( &systemData, idMenuDataSource_SystemSettings::SYSTEM_FIELD_AMBIENT_BRIGHTNESS );
 	control->SetupEvents( 2, options->GetChildren().Num() );
 	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, idMenuDataSource_SystemSettings::SYSTEM_FIELD_AMBIENT_BRIGHTNESS );
@@ -205,7 +205,8 @@ void idMenuScreen_Shell_SystemOptions::Initialize( idMenuHandler* data )
 
 	control = new( TAG_SWF ) idMenuWidget_ControlButton();
 	control->SetOptionType( OPTION_SLIDER_TEXT );
-	control->SetLabel( "Blood Reflections" );
+	control->SetLabel( "Material SSR" );
+	control->SetDescription( "Screen-space reflections on authored materials, including blood. Separate from RTX reflections." );
 	control->SetDataSource( &systemData, idMenuDataSource_SystemSettings::SYSTEM_FIELD_BLOOD_REFLECTIONS );
 	control->SetupEvents( DEFAULT_REPEAT_TIME, options->GetChildren().Num() );
 	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, idMenuDataSource_SystemSettings::SYSTEM_FIELD_BLOOD_REFLECTIONS );

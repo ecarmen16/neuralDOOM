@@ -264,7 +264,7 @@ idCVar r_shadowMapRegularDepthBiasScale( "r_shadowMapRegularDepthBiasScale", "0.
 idCVar r_shadowMapSunDepthBiasScale( "r_shadowMapSunDepthBiasScale", "0.999", CVAR_RENDERER | CVAR_FLOAT | CVAR_NEW, "shadowmap bias to fight shadow acne for cascaded shadow mapping with parallel lights" );
 
 // RB: HDR parameters
-idCVar r_hdrAutoExposure( "r_hdrAutoExposure", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_NEW, "EXPENSIVE: enables adapative HDR tone mapping otherwise the exposure is derived by r_exposure" );
+idCVar r_hdrAutoExposure( "r_hdrAutoExposure", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL | CVAR_NEW, "enable scene-adaptive tone mapping; off preserves fixed exposure and dark-room contrast" );
 idCVar r_hdrAdaptionRate( "r_hdrAdaptionRate", "1", CVAR_RENDERER | CVAR_FLOAT | CVAR_NEW, "The rate of adapting the hdr exposure value`. Defaulted to a second." );
 idCVar r_hdrMinLuminance( "r_hdrMinLuminance", "0.02", CVAR_RENDERER | CVAR_FLOAT | CVAR_NEW, "" );
 idCVar r_hdrMaxLuminance( "r_hdrMaxLuminance", "0.5", CVAR_RENDERER | CVAR_FLOAT | CVAR_NEW, "" );
@@ -280,7 +280,7 @@ idCVar r_ldrContrastOffset( "r_ldrContrastOffset", "3", CVAR_RENDERER | CVAR_FLO
 
 idCVar r_useFilmicPostFX( "r_useFilmicPostFX", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL | CVAR_NEW, "filmic look with chromatic abberation and film grain" );
 
-idCVar r_forceAmbient( "r_forceAmbient", "0.5", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT | CVAR_NEW, "render additional ambient pass to make the game less dark", 0.0f, 1.0f );
+idCVar r_forceAmbient( "r_forceAmbient", "0.375", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT | CVAR_NEW, "render additional ambient pass to make the game less dark", 0.0f, 1.0f );
 
 idCVar r_useSSAO( "r_useSSAO", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL | CVAR_NEW, "use screen space ambient occlusion to darken corners" );
 idCVar r_ssaoDebug( "r_ssaoDebug", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_NEW, "" );
@@ -295,7 +295,7 @@ idCVar r_useLightGrid( "r_useLightGrid", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_N
 
 idCVar r_exposure( "r_exposure", "0.5", CVAR_ARCHIVE | CVAR_RENDERER | CVAR_FLOAT | CVAR_NEW, "HDR exposure or LDR brightness [-4.0 .. 4.0]", -4.0f, 4.0f );
 
-idCVar r_useSSR( "r_useSSR", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL | CVAR_NEW, "" );
+idCVar r_useSSR( "r_useSSR", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL | CVAR_NEW, "screen-space reflections on authored reflective materials, including blood; separate from ray-traced reflections" );
 idCVar r_ssrJitter( "r_ssrJitter", "0", CVAR_RENDERER | CVAR_FLOAT | CVAR_NEW, "" );
 idCVar r_ssrMaxDistance( "r_ssrMaxDistance", "100", CVAR_RENDERER | CVAR_FLOAT | CVAR_NEW, "In meters" );
 idCVar r_ssrMaxSteps( "r_ssrMaxSteps", "100", CVAR_RENDERER | CVAR_FLOAT | CVAR_NEW, "" );

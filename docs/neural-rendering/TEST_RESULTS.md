@@ -1007,3 +1007,18 @@ The same parameters as the corresponding earlier rows were used. Ten additional
 PNGs passed CRC, decompression, dimensions and filter checks. Final manifests
 record clean code commit `a65128be`; this later results-only documentation update
 does not require rebuilding the already tested executables.
+
+
+## 2026-09-07 — Settings and exposure review
+
+Configured each existing tree using `Configure-RBDOOM-DX12.ps1 -RepoRoot <game> -BuildDirectory <tree>` and built with `Build-RBDOOM.ps1 -RepoRoot <game> -BuildDirectory <tree> -Configuration RelWithDebInfo`: PASS for native RT, official Streamline RT and SDK/RT-off baseline. No shaders or resource formats changed. Exact output hashes:
+
+| Tree | SHA-256 | Shader files |
+|---|---|---:|
+| build-rt | `321EE046B5B69B81D28A8DE68485AA4888730A05DD231E2950A8A7DB7E5D5EB3` | 151 |
+| build-streamline | `B9AA6ED309F638B20A32898F1CE3B2E2A9E29CE083FD3547BABCA458A7F1C7CE` | 151 |
+| build | `687B550A97528D5AF05E354997969416533765E109DBE05324A851A141D6228B` | 141 |
+
+`Test-NeuralBuildIdentity.ps1`: PASS (exact-target selection, stale-output rejection, configuration isolation, safe-clean and PowerShell syntax fixtures). `git diff --check`: PASS. Focused code review checked fixed/automatic branches, first-use exposure initialization, bounded elapsed-time adaptation, live DLSS exposure-option refresh, SDK-off compilation, archived-setting precedence and SSR material selection. Build logs are ignored local `captures/neural/settings-{configure,build}-<tree>.log` files.
+
+No gameplay, GPU capture or visual comparison performed. The user owns visual checks. Auto-exposure off now changes the formerly incorrect adaptive behavior; dark rooms can become considerably darker. DLAA/native luminance equivalence is not established. See SETTINGS_REVIEW.md for the one-time preset and focused checks. No SDK or private NR dependency was added.

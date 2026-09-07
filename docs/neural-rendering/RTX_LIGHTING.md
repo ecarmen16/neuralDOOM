@@ -6,7 +6,7 @@
 
 ## Subdued lighting preset
 
-For the 2026-09-07 brightness feedback, `exec neural_rtx_contrast.cfg` sets diffuse bounce strength to **1.125** and reflection blend to **0.65**. This is an optional tuning preset, not a shader change or new factory default. It leaves HDR, AO, contact shadows, ray samples and render resolution unchanged. The current local playtest settings were set to those values with a backup. Compare this first before changing HDR calibration; a 35% lower reflection blend does not imply a 35% darker image, because native probe specular remains the fallback.
+For the 2026-09-07 brightness feedback, `exec neural_rtx_contrast.cfg` applies fixed exposure, ambient **0.375**, diffuse bounce strength **1.125**, and reflection blend **0.65**. These now match the conservative factory starting values; existing archived settings need the one-time in-game preset to adopt them. It preserves HDR calibration, AO, contacts, ray samples and render resolution. Lower reflection blend restores more native probe specular, so it does not imply a uniform 35% darker image. The earlier offline config reset did not remain in the latest saved config; apply this inside the game and exit normally. See [SETTINGS_REVIEW.md](SETTINGS_REVIEW.md) for the exposure bug and full audit.
 
 The active local `reshade.ini` NR section was reset by removing its saved tuning overrides so the installed add-on supplies its own defaults. Only NR enabled and upscaling disabled remain explicit, retaining full-resolution rendering. Other ReShade sections and earlier backups were preserved. This is distinct from setting every tuning slider to 1, which would not necessarily match the add-on's defaults.
 
@@ -31,7 +31,7 @@ Each binding resets temporal history. For example: `bind F4 "toggle r_rayTracedG
 | Cvar | Default | Range / purpose |
 |---|---:|---|
 | `r_rayTracedReflections` | 0 | 0/1: full-resolution material reflections |
-| `r_rayTracedReflectionStrength` | 1 | 0-1: blend native probe specular toward ray hits |
+| `r_rayTracedReflectionStrength` | 0.65 | 0-1: blend native probe specular toward ray hits |
 | `r_rayTracedReflectionSamples` | 4 | 1-16 rays per eligible full-resolution pixel |
 | `r_rayTracedReflectionRoughness` | 0.7 | 0.1-1: upper roughness limit; fades over the final 0.15 |
 | `r_rayTracedReflectionDistance` | 2048 | 16-8192 world units |
@@ -72,3 +72,5 @@ Bounce, radiance snapshot and HDR composition use linear `RGBA16_FLOAT`. Rays an
 3. Walk past a doorway, rotate, fire, and resize or use 5120×1440 borderless. Check for trails, light leaks and stable HUD/FOV. F11 provides immediate rollback.
 
 Diagnostics: `rayTracingReflectionStatus`, `rayTracingGIStatus`, `rayTracingContactStatus`, `rayTracingAOStatus`, `hdrStatus`. GPU coverage counters prove actual work, not subjective visual quality or hardware-independent performance. Build/runtime evidence is in `TEST_RESULTS.md`.
+
+The contrast preset now also selects fixed exposure and ambient 0.375. See [SETTINGS_REVIEW.md](SETTINGS_REVIEW.md) for the exposure correction, saved-setting migration and Material SSR scope.
