@@ -39,7 +39,13 @@ Download the current Windows archive from the official ISPC releases page:
 https://github.com/ispc/ispc/releases
 ```
 
-Then run `02-INSTALL-ISPC.cmd`. The helper accepts an `ispc.exe` or ZIP and installs it at:
+From the repository root, run the existing helper with the downloaded archive or executable:
+
+```powershell
+.\tools\neural-rendering\Install-ISPC.ps1 -RepoRoot . -SourcePath '<ISPC archive or executable>'
+```
+
+It installs ISPC at:
 
 ```text
 <repo>\tools\ispc\bin\ispc.exe
@@ -78,7 +84,26 @@ Use a legally owned and updated Steam or GOG installation. Common Steam default:
 C:\Program Files (x86)\Steam\steamapps\common\DOOM 3 BFG Edition\base
 ```
 
-Steam libraries may be elsewhere. Run `03-COPY-GAME-DATA.cmd` and select the actual `base` directory.
+Steam libraries may be elsewhere. Run `Setup-NeuralDoom.cmd` and select the owned game installation, or use the PowerShell setup command below.
+
+## Native RTX source installation
+
+Use a recursive clone of `ecarmen16/neuralDoom` and the branch containing the desired checkpoint. In an existing clone, initialize the pinned dependencies with `git submodule update --init --recursive`. Install the prerequisites above first.
+
+Extract `base/_rbdoom_global_illumination_data.pk4` from the official RBDOOM 1.6.0 release; see [PROBE_LIGHTING.md](PROBE_LIGHTING.md). Then run:
+
+```powershell
+.\tools\neural-rendering\Setup-NeuralDoom.ps1 -RepoRoot . -GamePath '<owned BFG installation>' -LightingPackPath '<extracted lighting pack>' -BuildEngine -SkipD3HDP -NonInteractive
+.\tools\neural-rendering\Setup-NeuralDoom.ps1 -RepoRoot . -ValidateOnly
+```
+
+This configures native DX12 ray tracing in `build-rt` and builds RelWithDebInfo. It does not require an NR DLL. Setup checks executable identity, RT shader availability, game data and lighting candidates. Fresh-machine end-to-end installation remains a pending validation item; see [CHECKPOINT.md](CHECKPOINT.md).
+
+## Optional DLAA and legacy neural rendering
+
+DLAA requires a separately configured official Streamline SDK build in `build-streamline`. Supplying `nvngx_dlssnr.dll` does not supply that SDK or its DLAA components.
+
+`Setup-NeuralDoom.ps1` accepts either `-NRRuntimePath '<local DLL>'` or `-NRRuntimeUrl '<HTTPS URL>'` to stage a user-provided NR runtime. That step does not configure or verify the complete ReShade/RenoDX compatibility chain. Those components remain separate local inputs, and the supported native launchers disable the compatibility bridge. The earlier compatibility launchers are in `tools/neural-rendering/legacy`; they expect a separately staged root executable and runtime files. A single DLL path/URL is therefore not a turnkey installation of the legacy neural-rendering setup.
 
 ## Optional capture tools
 

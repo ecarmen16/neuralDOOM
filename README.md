@@ -31,6 +31,8 @@ A read-only readiness check, requiring no game launch, copying or downloads:
 
 D3HDP remains optional. Legacy runtime setup is only offered with `-IncludeLegacyNR` or explicit `-NRRuntimePath`/`-NRRuntimeUrl` parameters. Downloads, retail data, lighting/mod packs, ReShade/RenoDX components and NVIDIA runtimes remain local and ignored. Run `Audit-NeuralDoom-PublicSource.cmd` before pushing source; this does not approve redistribution of those binaries or assets. [CONTRIBUTING.md](CONTRIBUTING.md) documents the Git checks.
 
+**An NR DLL path or URL only stages that runtime.** It does not install the official Streamline SDK, configure DLAA, or assemble/validate the legacy ReShade/RenoDX chain. Native RTX and HDR need no NR runtime. See [Windows setup](docs/neural-rendering/WINDOWS_SETUP.md) for the separate installation paths; a fresh-machine end-to-end setup test remains pending.
+
 neuralDoom is not affiliated with or endorsed by id Software, Bethesda, NVIDIA, the RBDOOM-3-BFG project, ReShade, or RenoDX. Upstream authorship, license terms, and the original RBDOOM documentation are preserved below.
 
 ## Upstream RBDOOM-3-BFG documentation
