@@ -1076,3 +1076,14 @@ Native RTX `Release` and all three existing `RelWithDebInfo` configurations buil
 The native RTX Release GPU smoke passed with validation enabled, all four features, synthetic/dynamic ray tests, safe key startup and all eight transitions through the new named bindable lighting commands. Temporal epochs advanced correctly; sampled invalid lighting values were zero; exit 0. Evidence: `captures/neural/internal-release-smoke-final.log`. An initial run caught a semicolon inside a CFG comment being interpreted as a command separator; the comment was corrected and the complete smoke rerun passed. Renderer output formats/resolution are unchanged.
 
 Package relocation, installer and exported-game validation are recorded in the follow-up package checkpoint. Visual menu navigation and friends' fresh-machine acceptance remain pending.
+
+
+## 2026-09-07 - Exported installer and relocated Release validation
+
+Built the allowlisted source/native-Release ZIP from clean matching source/build commit `86e0dd07`. It contained 2841 files, approximately 28 MiB, with no DLLs, PDBs, retail resources or PK4s. Included shader entries cover both ShaderMake `.bin` permutation containers and standalone `.dxil` ray shaders. ZIP CRC checks, SHA-256 sidecar generation and full extracted-file verification passed.
+
+Ran `Install-InternalTest.ps1 -NonInteractive` in a newly extracted folder with locally owned BFG data and the verified lighting pack: PASS. The installer rebased the manifest/artifact paths and the existing exact-build/shader/lighting readiness checks passed without Git or a compiler in the installation folder. No game started during installation. `Test-InternalPackage.ps1` then verified shader tampering and path escape rejection, restoring the original bytes and re-verifying all files: PASS.
+
+Ran `Test-NeuralDoom-Smoke.ps1 -Configuration Release -Profile Native -RayTracingDiagnostics Synthetic -RayTracedAO -RayTracedContactShadows -RayTracedGI -RayTracedReflections -ResizeWidth 1920 -ResizeHeight 1080` against the extracted installed EXE and its own data/shaders, with validation enabled: PASS, exit 0, all named lighting toggles/reset epochs valid, dynamic GPU test passed, full-resolution reflection output and zero sampled invalid lighting values. Evidence: `captures/neural/internal-install-test.log`, `internal-package-tests.log`, and `internal-installed-smoke.log`. This verifies relocation on the development machine, not a different GPU/driver or untouched Windows installation.
+
+The final package refresh includes this record and the package regression script; engine/shader bytes are unchanged from the tested Release. Local Native, DLAA and NR launch validation is repeated after final manifest refresh. No package was uploaded or sent, and no private runtime or retail data entered the ZIP. Friends' menu/visual tests and fresh-machine acceptance remain the next step.

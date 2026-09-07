@@ -1,8 +1,8 @@
 # Pre-playtest checkpoint - 2026-09-06
 
-## Current: internal native RTX Release preparation
+## Current: internal native RTX Release ready for testing
 
-Graphics controls and visible dynamic geometry are implemented. The internal installer/package includes native RTX Release and matching source; DLAA/NR runtimes remain local only. Safe keys use F3 for reflections and preserve F5/F9/F12. See [INTERNAL_TESTING.md](../../INTERNAL_TESTING.md) for exact keys and installation, and TEST_RESULTS.md for current verification. Earlier entries below are historical.
+Graphics controls and visible dynamic geometry are implemented. The internal installer/package includes native RTX Release and matching source; DLAA/NR runtimes remain local only. Safe keys use F3 for reflections and preserve F5/F9/F12. See [INTERNAL_TESTING.md](../../INTERNAL_TESTING.md) for exact keys and installation, and TEST_RESULTS.md for current verification. The exported installer, package hash/tamper checks, relocated Release gameplay and resize passed on the development machine. Friends' fresh-machine and visual tests remain pending. Earlier entries below are historical.
 
 ## 2026-09-07 - User playtest feedback and brightness tuning
 
