@@ -130,6 +130,20 @@ $playtestCommands = @(
     'set com_fixedTic 0', 'set s_noSound 0', 'set r_hdrDiagnostic 0',
     'neuralBackendStatus', 'hdrStatus', 'rayTracingStatus'
 )
+# Versioned migration: apply in the game after its saved config has loaded.
+# Only acknowledge it after a successful session, so preparation/crashes retry.
+$settingsMigrationMarker = Join-Path $saveRoot 'settings-doom-contrast-v1.applied'
+$settingsMigrationPending = -not (Test-Path -LiteralPath $settingsMigrationMarker)
+if ($settingsMigrationPending) {
+    $oldConfig = Join-Path $saveBase 'D3BFGConfig.cfg'
+    $backup = Join-Path $saveRoot 'settings-before-doom-contrast-v1.cfg'
+    if ((Test-Path -LiteralPath $oldConfig) -and -not (Test-Path -LiteralPath $backup)) {
+        Copy-Item -LiteralPath $oldConfig -Destination $backup
+    }
+    $preset = Join-Path $PSScriptRoot '../../base/neural_rtx_contrast.cfg'
+    $playtestCommands += @(Get-Content -LiteralPath $preset -ErrorAction Stop)
+    Write-Host 'Applying updated Doom contrast defaults once; HDR calibration and rendering quality are preserved.'
+}
 if ($Profile -eq 'NR') {
     $exe = Initialize-NeuralEmbeddedNRLaunch -RepoRoot $RepoRoot -BuildExecutable $exe -ExpectedHash $manifest.sha256 -SaveBase $saveBase
     # The add-on reads F6 directly. Remove the previous engine bounce binding
@@ -147,3 +161,7 @@ $process = Start-Process -FilePath $exe -ArgumentList $launchArgs -WorkingDirect
 $process.WaitForExit()
 $process.Refresh()
 if ($process.ExitCode -ne 0) { throw "Game exited with code $($process.ExitCode). See $saveBase/dogfood-$Profile.log" }
+
+if ($settingsMigrationPending) {
+    'Applied after successful game exit.' | Set-Content -LiteralPath $settingsMigrationMarker -Encoding ASCII
+}

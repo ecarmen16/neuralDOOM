@@ -81,3 +81,22 @@ foreach ($name in $before.Keys | Where-Object { $_ -notin @('neuralDoom.exe', 'r
 }
 if ([IO.File]::ReadAllText((Join-Path $fixture 'captures/dogfood/nr-backup/reshade.ini')) -ne $config) { throw 'NR configuration backup differs.' }
 Write-Host 'PASS: NR read-only validation, proxy/missing/mismatched/duplicate rejection, exact engine staging, full resolution, tuning preservation and F6/F4 separation. No game or runtime loaded.'
+
+# Preparation must retain a pending migration until an actual successful session.
+$marker = Join-Path $fixture 'captures/dogfood/settings-doom-contrast-v1.applied'
+if (Test-Path -LiteralPath $marker) { throw 'Preparation acknowledged an unplayed settings migration.' }
+foreach ($line in @('set r_hdrAutoExposure 0', 'set r_hdrFixedLuminance 0.5', 'set r_forceAmbient 0.375', 'set r_rayTracedGIStrength 1.125', 'set r_rayTracedReflectionStrength 0.65')) {
+    if (-not $saved.Contains($line)) { throw "Missing automatic migration command: $line" }
+}
+$playerConfig = Join-Path $fixture 'captures/dogfood/base/D3BFGConfig.cfg'
+$playerText = "set r_hdrPeakNits 650`r`nset r_rayTracedReflectionStrength 0.42`r`n"
+[IO.File]::WriteAllText($playerConfig, $playerText)
+& $launcher -RepoRoot $fixture -Profile NR -PrepareOnly
+$backupPath = Join-Path $fixture 'captures/dogfood/settings-before-doom-contrast-v1.cfg'
+if ([IO.File]::ReadAllText($backupPath) -ne $playerText) { throw 'Migration backup did not preserve the saved config.' }
+'fixture completed session' | Set-Content -LiteralPath $marker
+& $launcher -RepoRoot $fixture -Profile NR -PrepareOnly
+$next = Get-Content -LiteralPath (Join-Path $fixture 'captures/dogfood/base/neural_dogfood.cfg') -Raw
+if ($next -match 'set r_forceAmbient|set r_hdrAutoExposure|set r_rayTracedReflectionStrength') { throw 'Completed migration overwrote later tuning.' }
+if ([IO.File]::ReadAllText($playerConfig) -ne $playerText) { throw 'Preparation edited the saved config.' }
+Write-Host 'PASS: automatic contrast migration, preparation retry, exact config backup, and preservation of later tuning.'

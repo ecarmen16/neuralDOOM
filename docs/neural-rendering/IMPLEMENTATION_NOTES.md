@@ -608,3 +608,8 @@ Validation: confirmed the game was closed; verified a unique active NR section, 
 ## 2026-09-07 — Doom contrast settings review
 
 See [SETTINGS_REVIEW.md](SETTINGS_REVIEW.md) for the complete rendering controls/defaults audit and pending visual checks. Changed `TonemapPass::{SimpleRender,ComputeExposure,Init}` and timing members to honor fixed exposure, initialize luminance and use elapsed adaptation time; `idStreamlineNeuralTemporalBackend::Evaluate` now refreshes changed exposure options. `RenderSystem_init.cpp` archives auto exposure, reduces ambient and describes SSR; `RayTracingDiagnostic.cpp` reduces reflection blend. System Options clarifies Material SSR and ambient coupling. `base/neural_rtx_contrast.cfg` applies the conservative values in-game without overriding HDR calibration or ray quality. Formats and coordinate conventions are unchanged. Build/verification results follow in TEST_RESULTS.md.
+
+
+## 2026-09-07 — Automatic contrast migration
+
+`Start-NeuralDoom-Dogfood.ps1` now injects the tracked contrast preset once after saved settings load for all three profiles. It backs up the old config, acknowledges migration only after a successful game exit, and preserves later tuning. ValidateOnly remains read-only and PrepareOnly does not acknowledge the migration. `Test-NeuralEmbeddedNR.ps1` covers preparation retry, backup fidelity and no repeat override. No renderer changes or rebuild required. No game launched.
