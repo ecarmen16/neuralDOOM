@@ -1,3 +1,30 @@
+## 2026-09-06 - Material reflection checkpoint and CPU-only validation
+
+Code checkpoint: `a8ddea9be2daeea15da5a04b6701df993b33c25f` on `codex/rt-foundation`. Both source and game checkouts were synchronized and clean before the final build-manifest refresh. This subsequent results-only documentation commit changes no renderer code or compiled artifacts.
+
+| Configuration | Result | EXE SHA-256 | Manifest shaders |
+|---|---|---|---:|
+| Native DX12, RT ON, SDK OFF (`build-rt`) | BUILD PASS | `05C0CAAC2893ADC00F4D68525D3C1E53E2C64ACEB11EB689D32487D7867F6B17` | 151 |
+| DX12 DLAA, RT ON, SDK ON (`build-streamline`) | BUILD PASS | `F73995599EE238C0367C318ED19865D3F140F62F4C40E05C5D1643032E83769B` | 151 |
+| DX12 baseline, RT OFF, SDK OFF (`build`) | BUILD PASS | `3A9EC7903CC819543C3E08E4A5B4AF79EDEE42D15555362DBC4BEBAEE94DECAB` | 141 |
+
+All three existing trees were configured with `Configure-RBDOOM-DX12.ps1 -RepoRoot <game-checkout> -BuildDirectory <tree> -RayTracing ON|OFF` and built with `Build-RBDOOM.ps1 -RepoRoot <game-checkout> -BuildDirectory <tree> -Configuration RelWithDebInfo`. The optional SDK setting and pinned dependencies were retained. Final schema-2 manifests record the code checkpoint above, `dirty=false`, the exact EXE hash and matching shader bytes. Every listed shader and executable was independently rehashed after all builds. RT configurations include ten raw ray shaders; the RT-OFF manifest excludes those shaders.
+
+Validation performed:
+
+- Native RT, optional DLAA and RT-OFF compilation passed, including all material capture permutations and SM 6.5 reflection stages. Build logs are `captures/neural/reflections-build-rt-final.log`, `reflections-build-streamline-final.log` and `reflections-build-final.log`; final clean identity confirmations use corresponding `-clean.log` names. Configure logs use `reflections-configure-<tree>.log`. Existing Windows SDK `StrCmp*` C4005 warnings remain; no compiler errors in the final builds.
+- `Test-ReflectionShaderContract.py --repo-root <game-checkout> --dxc <Windows-SDK-dxc>` passed **64 exact order-sensitive engine shader lookups**, baseline/capture MRT output signatures, all three reflection compute register layouts, 192/112-byte constant buffers and 8x8 dispatch sizes. A deliberate macro-order mutation failed with the expected missing engine permutation. The initial code review caught and fixed that startup risk before handoff. Output: `captures/neural/reflections-shader-contract.log`.
+- `Test-NeuralBuildIdentity.ps1` and `Test-NeuralSetup.ps1` passed their offline target/manifest/shader/read-only setup fixtures and PowerShell parser checks. An extra interactive parser invocation hit restricted PowerShell language mode; the existing parser test then passed in the approved full-language test run. Logs: `reflections-build-identity.log` and `reflections-setup-fixtures.log` under `captures/neural`.
+- Both real Native/DLAA `Setup-NeuralDoom.ps1 -ValidateOnly` checks passed after clean manifests were written. Both full RTX launcher command lines (all four effects and AutoHDR) also passed `Start-NeuralDoom-Dogfood.ps1 -ValidateOnly`, including the engine's command-line size limit. No game was launched. Logs: `reflections-setup-native.log`, `reflections-setup-dlaa.log`, `reflections-launch-ready-native.log`, `reflections-launch-ready-dlaa.log`.
+- Focused review checked native target-0 preservation, matching capture layer/response, skinned shader metadata, order-sensitive permutations, shared atlas/radiance lifetimes, optional framebuffer ownership, history/viewport reset and current-miss rejection, debug isolation, finite FP16 composition and all-off/compiled-out control flow. Material response was moved after filtering to avoid borrowing reflectivity from neighbors/history. GPU behavior is not established by this review.
+- `git diff --check` and the clean public-source audit passed (2,486 tracked files); NVRHI and ShaderMake remained clean at their existing pins. No assets, SDK binaries, runtime blobs, personal settings, captures or machine paths were staged. A pre-commit audit invocation without `-AllowDirty` reported the expected dirty-tree guard; the staged pre-commit check and subsequent clean audit passed.
+
+Runtime boundary: **no GPU/gameplay test was performed for the reflection addition**, per the user's request to handle visual comparisons. The user reported the preceding review/material-lighting build was a substantial improvement, but wanted less bounce brightness. The GI default and the existing local saved value were changed from 1.5 to 1.125, with a local configuration backup. This is configuration evidence, not measured reflection image quality.
+
+The opt-in smoke harness now checks reflection coverage, full-resolution dimensions, live off/on/resume, resize and all seven debug views; that scenario remains unrun. Reflection material response, noise/trails, dynamic-object omissions, screen-edge fallback, 5120x1440 performance and Native/DLAA/HDR visual quality require the [three-check playtest](RAY_TRACED_REFLECTIONS.md#three-check-playtest). Static BSP-only geometry, approximate hit shading and limited current-view light lists remain explicit limitations. Next bounded implementation task: rigid dynamic ray instances for doors and props.
+
+---
+
 ## 2026-09-06 - Review fixes, clean builds and CPU-only handoff
 
 Final code checkpoint: `7a5ecc6a89536b2507e4ed8fcc64e9e91e2acf44` on `codex/rt-foundation`. Both source and game checkouts were synchronized and clean before build-manifest refresh. This later results-only documentation commit does not change the tested code or shader artifacts.
