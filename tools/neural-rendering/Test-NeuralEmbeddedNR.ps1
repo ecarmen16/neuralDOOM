@@ -75,7 +75,7 @@ if ($prepared -ne $config.Replace('NeuralUplift=0', 'NeuralUplift=1').Replace('N
     throw 'NR configuration changed unrelated tuning or did not disable upscaling.'
 }
 $saved = Get-Content -LiteralPath (Join-Path $fixture 'captures/dogfood/base/neural_dogfood.cfg') -Raw
-if ($saved -notmatch '(?m)^unbind F6\r?$' -or $saved -notmatch '(?m)^bind F4 "toggle r_rayTracedGI; neuralHistoryReset"\r?$') { throw 'F6 conflicts with ray-lighting controls.' }
+if ($saved -notmatch '(?m)^neuralInstallKeys startup\r?$' -or $saved -match '(?m)^(?:un)?bind F[46]') { throw 'NR preparation bypassed safe binding migration.' }
 foreach ($name in $before.Keys | Where-Object { $_ -notin @('neuralDoom.exe', 'reshade.ini') }) {
     if ((Get-FileHash -LiteralPath (Join-Path $fixture $name)).Hash -ne $before[$name]) { throw "Preparation changed runtime component $name" }
 }
@@ -129,3 +129,8 @@ foreach ($ray in @('AO', 'ContactShadows', 'GI', 'Reflections')) {
     if ($seedRayArgs -notmatch ( '\+set r_rayTraced' + $ray + ' 1' )) { throw "Missing first-use RTX seed: $ray" }
 }
 Write-Host 'PASS: saved RTX off choices survive relaunch; missing preferences are seeded.'
+
+[IO.File]::WriteAllText($playerConfig, 'set r_neuralLaunchProfile "1"' + "`n")
+$menuProfile = (& $launcher -RepoRoot $fixture -PrepareOnly 6>&1 | Out-String)
+if ($menuProfile -notmatch 'Profile:    DLAA') { throw 'Menu launch preference was not honored.' }
+Write-Host 'PASS: menu-selected launch profile requires no launcher prompt.'

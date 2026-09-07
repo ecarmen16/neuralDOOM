@@ -18,6 +18,14 @@ param(
 . (Join-Path $PSScriptRoot 'EmbeddedNR.ps1')
 if ($ValidateOnly -and $PrepareOnly) { throw 'Choose either -ValidateOnly or -PrepareOnly.' }
 $RepoRoot = Resolve-NeuralRepoRoot $RepoRoot
+# Resolve the menu preference before offering startup-only profile choices.
+$profileConfig = Join-Path $RepoRoot 'captures/dogfood/base/D3BFGConfig.cfg'
+if (-not $Profile -and (Test-Path -LiteralPath $profileConfig)) {
+    $profileText = Get-Content -LiteralPath $profileConfig -Raw
+    if ($profileText -match '(?m)^set\s+r_neuralLaunchProfile\s+"?([012])"?\s*$') {
+        $Profile = @('Native', 'DLAA', 'NR')[[int]$Matches[1]]
+    }
+}
 if (-not $Profile) {
     if ($ValidateOnly) { throw '-ValidateOnly requires -Profile Native, DLAA or NR.' }
     Write-Host 'neuralDoom playtest'
@@ -114,7 +122,7 @@ if ($RayTracedAO) { Write-Host 'RTX AO:     Saved preference (enabled on first u
 if ($RayTracedContactShadows) { Write-Host 'RTX contact shadows: Saved preference (enabled on first use). Toggle with r_rayTracedContactShadows 0 / 1.' }
 if ($RayTracedReflections) { Write-Host 'RTX reflections: Saved preference, full resolution. Toggle with r_rayTracedReflections 0 / 1.' }
 if ($RayTracedGI) { Write-Host 'RTX material bounce: Saved preference (enabled on first use). Toggle with r_rayTracedGI 0 / 1; strength: r_rayTracedGIStrength.' }
-Write-Host 'Optional keybinds: exec neural_rtx_keys.cfg (F4 GI, F6 NR, F7 AO, F8 contacts, F9 reflections, F10 views, F11 all).'
+Write-Host 'Safe keys install automatically; remap in Keyboard Bindings (F4 GI, F6 NR, F7 AO, F8 contacts, F3 reflections, F10 views, F11 all).'
 if ($Profile -eq 'NR') {
     Write-Host 'NR: F6 toggles the installed add-on; F4 toggles bounce. Full-resolution DLAA passthrough when NR is off.'
     Write-Host 'NR uses engine-loaded compatibility components without a dxgi.dll proxy. Native HDR is bypassed in this profile.'
@@ -139,7 +147,7 @@ if ($null -ne $existingGame) {
 New-Item -ItemType Directory -Path $saveBase -Force | Out-Null
 $playtestCommands = @(
     'set r_screenFraction 100', 'set r_renderMode 0', 'set r_useTemporalAA 1', 'set r_antiAliasing 2',
-    'set com_fixedTic 0', 'set s_noSound 0', 'set r_hdrDiagnostic 0',
+    'neuralInstallKeys startup', 'set com_fixedTic 0', 'set s_noSound 0', 'set r_hdrDiagnostic 0',
     'neuralBackendStatus', 'hdrStatus', 'rayTracingStatus'
 )
 # Versioned migration: apply in the game after its saved config has loaded.
@@ -158,9 +166,8 @@ if ($settingsMigrationPending) {
 }
 if ($Profile -eq 'NR') {
     $exe = Initialize-NeuralEmbeddedNRLaunch -RepoRoot $RepoRoot -BuildExecutable $exe -ExpectedHash $manifest.sha256 -SaveBase $saveBase
-    # The add-on reads F6 directly. Remove the previous engine bounce binding
-    # so one key press cannot also change ray lighting during the comparison.
-    $playtestCommands += @('unbind F6', 'bind F4 "toggle r_rayTracedGI; neuralHistoryReset"', 'neuralCompatibilityStatus')
+    # The key migration removes only the old shipped F6 bounce binding.
+    $playtestCommands += 'neuralCompatibilityStatus'
 }
 $playtestCommands | Set-Content -LiteralPath (Join-Path $saveBase 'neural_dogfood.cfg') -Encoding ASCII
 $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $saveRoot "build-$Profile.json") -Encoding UTF8

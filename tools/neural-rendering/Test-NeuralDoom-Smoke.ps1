@@ -143,7 +143,7 @@ try {
         $scriptLines += 'rayTracingTest'
         if ($RayTracingDiagnostics -ne 'MissingShader') { $scriptLines += 'rayTracingScene' }
     }
-    $scriptLines += @('devmap game/mars_city2', "wait $WarmupFrames", 'set r_neuralHistoryDebug 1', 'r_neuralHistoryDebug')
+    $scriptLines += @('neuralInstallKeys startup', 'devmap game/mars_city2', "wait $WarmupFrames", 'set r_neuralHistoryDebug 1', 'r_neuralHistoryDebug')
     if ($RayTracingDiagnostics -in @('Synthetic', 'Scene')) { $scriptLines += @('rayTracingTest', 'rayTracingDynamicTest', 'rayTracingDynamicStatus') }
     if ($RayTracingDiagnostics -eq 'Scene') { $scriptLines += @('rayTracingScene', 'rayTracingTest') }
     $scriptLines += @('rayTracingAOStatus', 'hdrStatus', 'neuralHistoryStatus', 'neuralBackendStatus', 'probeLightingStatus', 'screenshot screenshots/before.png')
@@ -160,20 +160,20 @@ try {
     )
     # Capture live rollback before resizing, retaining comparable image dimensions.
     if ($RayTracedAO) {
-        $scriptLines += @('rayTracingAOStatus', 'set r_rayTracedAO 0', 'wait 30', 'echo RT_HISTORY_r_rayTracedAO_0', 'neuralHistoryStatus', 'rayTracingAOStatus',
-            'screenshot screenshots/rt_off.png', 'set r_rayTracedAO 1', 'wait 30', 'echo RT_HISTORY_r_rayTracedAO_1', 'neuralHistoryStatus')
+        $scriptLines += @('rayTracingAOStatus', 'rayTracingAOToggle', 'wait 30', 'echo RT_HISTORY_r_rayTracedAO_0', 'neuralHistoryStatus', 'rayTracingAOStatus',
+            'screenshot screenshots/rt_off.png', 'rayTracingAOToggle', 'wait 30', 'echo RT_HISTORY_r_rayTracedAO_1', 'neuralHistoryStatus')
     }
     if ($RayTracedContactShadows) {
-        $scriptLines += @('rayTracingContactStatus', 'set r_rayTracedContactShadows 0', 'wait 30', 'echo RT_HISTORY_r_rayTracedContactShadows_0', 'neuralHistoryStatus', 'rayTracingContactStatus',
-            'screenshot screenshots/contacts_off.png', 'set r_rayTracedContactShadows 1', 'wait 30', 'echo RT_HISTORY_r_rayTracedContactShadows_1', 'neuralHistoryStatus')
+        $scriptLines += @('rayTracingContactStatus', 'rayTracingContactToggle', 'wait 30', 'echo RT_HISTORY_r_rayTracedContactShadows_0', 'neuralHistoryStatus', 'rayTracingContactStatus',
+            'screenshot screenshots/contacts_off.png', 'rayTracingContactToggle', 'wait 30', 'echo RT_HISTORY_r_rayTracedContactShadows_1', 'neuralHistoryStatus')
     }
     if ($RayTracedGI) {
-        $scriptLines += @('rayTracingGIStatus', 'set r_rayTracedGI 0', 'wait 30', 'echo RT_HISTORY_r_rayTracedGI_0', 'neuralHistoryStatus', 'rayTracingGIStatus',
-            'screenshot screenshots/gi_off.png', 'set r_rayTracedGI 1', 'wait 30', 'echo RT_HISTORY_r_rayTracedGI_1', 'neuralHistoryStatus')
+        $scriptLines += @('rayTracingGIStatus', 'rayTracingBounceToggle', 'wait 30', 'echo RT_HISTORY_r_rayTracedGI_0', 'neuralHistoryStatus', 'rayTracingGIStatus',
+            'screenshot screenshots/gi_off.png', 'rayTracingBounceToggle', 'wait 30', 'echo RT_HISTORY_r_rayTracedGI_1', 'neuralHistoryStatus')
     }
     if ($RayTracedReflections) {
-        $scriptLines += @('rayTracingReflectionStatus', 'set r_rayTracedReflections 0', 'wait 30', 'echo RT_HISTORY_r_rayTracedReflections_0', 'neuralHistoryStatus', 'rayTracingReflectionStatus',
-            'screenshot screenshots/reflections_off.png', 'set r_rayTracedReflections 1', 'wait 30', 'echo RT_HISTORY_r_rayTracedReflections_1', 'neuralHistoryStatus')
+        $scriptLines += @('rayTracingReflectionStatus', 'rayTracingReflectionToggle', 'wait 30', 'echo RT_HISTORY_r_rayTracedReflections_0', 'neuralHistoryStatus', 'rayTracingReflectionStatus',
+            'screenshot screenshots/reflections_off.png', 'rayTracingReflectionToggle', 'wait 30', 'echo RT_HISTORY_r_rayTracedReflections_1', 'neuralHistoryStatus')
     }
     if ($RayTracingDebugViews) {
         $scriptLines += @('exec neural_rtx_keys.cfg', 'rayTracingDebugCycle', 'wait 30', 'screenshot screenshots/ao_visibility.png',

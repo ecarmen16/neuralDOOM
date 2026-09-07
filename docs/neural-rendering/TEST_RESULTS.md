@@ -1065,3 +1065,14 @@ Evidence is kept locally under `captures/neural/final-dlaa-borderless-smoke.log`
 | build | `9192B68133D40D9C3E0DF1BA5D09ED579093C315D37C59664ED6914EB2F8D112` |
 
 No user preference/saved-game resets. Appearance, live menu TAA/DLAA switching and real door/character comparisons remain the user's dogfood checks. Known limitations: visible-only opaque dynamic geometry, bounded budgets and suspended reflection temporal accumulation while dynamic surfaces are present. Next task: use visual feedback to prioritize off-screen dynamic coverage and secondary-hit history, then profile BLAS cost.
+
+
+## 2026-09-07 - Internal controls and Release readiness
+
+Native RTX `Release` and all three existing `RelWithDebInfo` configurations built successfully. Import inspection identified debug CRT dependencies in the development configuration; the new Release EXE imports the normal VC++ runtime and Windows DLLs, with no NVIDIA runtime imports. Release SHA-256: `5D8F50B52F8C3131E404A8480519DED075DF9DA90B9081FF027E9417BB4D3BD9`.
+
+`Test-InternalControls.py` executes the actual safe-key migration against custom bindings, legacy F6/F9 conflicts, first-use/idempotent startup and intentional unbinding: PASS. It also checks default-key commands exist and F5/F9/F12 remain unchanged. The menu selection fixture passes 264 scrolled selections. Launcher fixtures pass saved profile selection without prompts, preference preservation, safe NR key preparation and one-time contrast migration.
+
+The native RTX Release GPU smoke passed with validation enabled, all four features, synthetic/dynamic ray tests, safe key startup and all eight transitions through the new named bindable lighting commands. Temporal epochs advanced correctly; sampled invalid lighting values were zero; exit 0. Evidence: `captures/neural/internal-release-smoke-final.log`. An initial run caught a semicolon inside a CFG comment being interpreted as a command separator; the comment was corrected and the complete smoke rerun passed. Renderer output formats/resolution are unchanged.
+
+Package relocation, installer and exported-game validation are recorded in the follow-up package checkpoint. Visual menu navigation and friends' fresh-machine acceptance remain pending.

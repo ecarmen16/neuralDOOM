@@ -1,5 +1,9 @@
 # Pre-playtest checkpoint - 2026-09-06
 
+## Current: internal native RTX Release preparation
+
+Graphics controls and visible dynamic geometry are implemented. The internal installer/package includes native RTX Release and matching source; DLAA/NR runtimes remain local only. Safe keys use F3 for reflections and preserve F5/F9/F12. See [INTERNAL_TESTING.md](../../INTERNAL_TESTING.md) for exact keys and installation, and TEST_RESULTS.md for current verification. Earlier entries below are historical.
+
 ## 2026-09-07 - User playtest feedback and brightness tuning
 
 The user reports the lighting/reflections and HDR look good, with screen reflections stronger and overall lighting brighter than desired. The active local NR INI tuning overrides were cleared, retaining only NR enabled and full-resolution rendering. Local playtest bounce was found at 1.5 and set to 1.125; reflection strength was reduced from 1 to 0.65. HDR settings and other controls were preserved. Both original config files were backed up under the ignored `captures/dogfood/tuning-backups` directory.

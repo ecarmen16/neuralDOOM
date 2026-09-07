@@ -1,5 +1,7 @@
 # Windows setup details
 
+For the native internal Release ZIP, use [INTERNAL_TESTING.md](../../INTERNAL_TESTING.md). Setup no longer accepts NR runtime path/URL copying or downloads; historical legacy instructions below are superseded by this restriction. Existing local compatibility profiles remain separate.
+
 ## Visual Studio
 
 Install Visual Studio 2022 with:

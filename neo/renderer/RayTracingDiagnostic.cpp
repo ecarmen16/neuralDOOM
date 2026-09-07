@@ -4,6 +4,8 @@
 #pragma hdrstop
 
 #include "RenderCommon.h"
+#include "StreamlineIntegration.h"
+#include "../framework/KeyInput.h"
 #include "../framework/Common_local.h"
 #include "../sys/DeviceManager.h"
 #include <cmath>
@@ -1852,4 +1854,58 @@ CONSOLE_COMMAND_SHIP( rayTracingDynamicTest, "Test dynamic ray insertion, moveme
 #else
 	common->Printf( "RT_DYNAMIC_TEST status=SKIP reason=build-disabled\n" );
 #endif
+}
+
+
+static void R_ToggleLightingControl( idCVar& setting, const char* label )
+{
+#if defined( USE_RAYTRACING )
+	setting.SetBool( !setting.GetBool() );
+	common->Printf( "%s: %s\n", label, setting.GetBool() ? "ON" : "OFF" );
+#else
+	common->Printf( "%s: unavailable in this build\n", label );
+#endif
+}
+CONSOLE_COMMAND_SHIP( rayTracingReflectionToggle, "Toggle only material reflections", NULL ) { R_ToggleLightingControl( r_rayTracedReflections, "RTX reflections" ); }
+CONSOLE_COMMAND_SHIP( rayTracingBounceToggle, "Toggle only diffuse material bounce", NULL ) { R_ToggleLightingControl( r_rayTracedGI, "RTX bounce" ); }
+CONSOLE_COMMAND_SHIP( rayTracingAOToggle, "Toggle only ray-traced ambient occlusion", NULL ) { R_ToggleLightingControl( r_rayTracedAO, "RTX AO" ); }
+CONSOLE_COMMAND_SHIP( rayTracingContactToggle, "Toggle only ray-traced contact shadows", NULL ) { R_ToggleLightingControl( r_rayTracedContactShadows, "RTX contacts" ); }
+CONSOLE_COMMAND_SHIP( rayTracingDynamicToggle, "Toggle moving ray geometry; preserve lighting choices", NULL ) { R_ToggleLightingControl( r_rayTracingDynamicGeometry, "Moving ray geometry" ); }
+CONSOLE_COMMAND_SHIP( rayTracingSkinnedToggle, "Toggle animated ray geometry; requires moving ray geometry", NULL ) { R_ToggleLightingControl( r_rayTracingSkinnedGeometry, "Animated ray geometry" ); }
+CONSOLE_COMMAND_SHIP( neuralReconstructionToggle, "Switch native-resolution TAA/DLAA when available; preserve NR input", NULL )
+{
+	if( cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) || !R_StreamlineIsDLSSSupported() )
+	{
+		common->Printf( "Reconstruction unchanged: NR requires DLAA input; otherwise use a DLAA-capable build.\n" );
+		return;
+	}
+	const bool enable = cvarSystem->GetCVarInteger( "r_neuralBackend" ) != 2;
+	cvarSystem->SetCVarInteger( "r_neuralBackend", enable ? 2 : 0 );
+	cvarSystem->SetCVarInteger( "r_neuralReconstructionMode", enable ? 1 : 0 );
+	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "neuralHistoryReset\n" );
+	common->Printf( "Reconstruction: %s (full resolution)\n", enable ? "DLAA" : "TAA" );
+}
+
+static idCVar r_neuralKeysVersion( "r_neuralKeysVersion", "0", CVAR_ARCHIVE | CVAR_INTEGER, "safe RTX key migration version", 0, 1 );
+CONSOLE_COMMAND_SHIP( neuralInstallKeys, "Install unused RTX F keys; preserve custom bindings and quicksave/load/screenshots", NULL )
+{
+	if( args.Argc() > 1 && r_neuralKeysVersion.GetInteger() >= 1 ) { return; }
+	if( idStr::Icmp( idKeyInput::GetBinding( K_F6 ), "toggle r_rayTracedGI; neuralHistoryReset" ) == 0 ) { idKeyInput::SetBinding( K_F6, "" ); }
+	// Undo only the exact old shipped conflict; never replace a custom quickload key.
+	if( idStr::Icmp( idKeyInput::GetBinding( K_F9 ), "toggle r_rayTracedReflections; neuralHistoryReset" ) == 0 ) { idKeyInput::SetBinding( K_F9, "loadgame quick" ); }
+	struct key_t { int key; const char* command; const char* oldCommand; };
+	const key_t keys[] = {
+		{ K_F1, "neuralReconstructionToggle", "" }, { K_F2, "rayTracingDynamicToggle", "" },
+		{ K_F3, "rayTracingReflectionToggle", "" }, { K_F4, "rayTracingBounceToggle", "toggle r_rayTracedGI; neuralHistoryReset" },
+		{ K_F7, "rayTracingAOToggle", "toggle r_rayTracedAO; neuralHistoryReset" },
+		{ K_F8, "rayTracingContactToggle", "toggle r_rayTracedContactShadows; neuralHistoryReset" },
+		{ K_F10, "rayTracingDebugCycle", "" }, { K_F11, "rayTracingToggle", "" }
+	};
+	for( const key_t& key : keys )
+	{
+		const char* binding = idKeyInput::GetBinding( key.key );
+		if( !binding[0] || ( key.oldCommand[0] && idStr::Icmp( binding, key.oldCommand ) == 0 ) ) { idKeyInput::SetBinding( key.key, key.command ); }
+	}
+	r_neuralKeysVersion.SetInteger( 1 );
+	common->Printf( "RTX keys installed in free slots. F1 TAA/DLAA, F2 moving geometry, F3 reflections, F4 bounce, F7 AO, F8 contacts, F10 views, F11 all lighting. F6 reserved for external NR. Custom keys preserved.\n" );
 }

@@ -148,3 +148,10 @@ Local acquisition record:
 - Vendor-published and verified SHA-256: `F5C0A3D870707DDDC3570FB4BCD3655CF48A8A68C3A9D342910CFA21B77DCF48`.
 - Local ignored target: `local-proprietary/streamline-v2.12.0/`.
 - The package and all DLLs remain untracked. Using the NGX/DLSS components is subject to NVIDIA's included terms; this engineering record is not legal advice.
+
+
+## 2026-09-07 - Native internal Release package
+
+The internal package uses the SDK-free DX12/RTX Release configuration, with the corresponding tracked source and recursively pinned submodule source included in the same ZIP. Original GPL/additional-license/dependency notices remain alongside source. No new dependency is integrated. The packaging allowlist consists of this source, the exact native executable and manifest-verified compiled shaders. Unused upstream prebuilt formatter/OpenAL/FFmpeg binaries and import libraries are omitted. The documented build has FFMPEG off and uses Windows XAudio, not the omitted OpenAL binary.
+
+No retail resources, lighting/mod packs, NVIDIA DLLs, ReShade/RenoDX add-ons or PDBs are included. The installer imports owned game data and the separately obtained, fingerprint-verified lighting pack locally after extraction. It links to Microsoft's official VC++ x64 Redistributable when needed instead of redistributing a runtime installer. DLAA/NR distribution remains blocked as recorded above. Source setup no longer downloads/copies an NR runtime from an arbitrary path or URL.

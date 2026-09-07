@@ -8,7 +8,9 @@ The new [material reflection pass](docs/neural-rendering/RAY_TRACED_REFLECTIONS.
 
 **Start here:** [RTX lighting and keybinds](docs/neural-rendering/RTX_LIGHTING.md), [quick playtest](docs/neural-rendering/DOGFOOD_CHECKLIST.md), [build instructions](docs/neural-rendering/WINDOWS_SETUP.md).
 
-There are two supported launchers: `Launch-NeuralDoom.cmd` preserves saved settings; `Launch-NeuralDoom-RTX.cmd` enables all four ray-traced lighting effects and native HDR. Both offer Native, DLAA, or NR and select the manifest-verified build. The NR option uses the already-installed engine-loaded compatibility stack without a DXGI proxy; F6 toggles NR and F4 toggles bounce. Its output remains the existing SDR compatibility path. The older NR/mod launchers are in [tools/neural-rendering/legacy](tools/neural-rendering/legacy/README.md). Existing playtest saves and display preferences remain in the same folder.
+For friends testing the native RTX Release ZIP, use **Install-InternalTest.cmd** then **Play-InternalTest.cmd**. See [internal installation and exact keys](INTERNAL_TESTING.md). The package contains matching source and no game data or vendor runtimes.
+
+There are two supported local development launchers: `Launch-NeuralDoom.cmd` preserves saved settings; `Launch-NeuralDoom-RTX.cmd` seeds all four ray-traced lighting effects on first use and preserves subsequent lighting/HDR choices. Both honor Next Launch Profile from System Options, or offer Native, DLAA, or NR when no preference is saved, and select the manifest-verified build. The NR option uses the already-installed engine-loaded compatibility stack without a DXGI proxy; F6 toggles NR and F4 toggles bounce. Its output remains the existing SDR compatibility path. The older NR/mod launchers are in [tools/neural-rendering/legacy](tools/neural-rendering/legacy/README.md). Existing playtest saves and display preferences remain in the same folder.
 
 **Settings > System Options** provides automatic ultrawide HUD layout and size controls. **Settings > Game Options > Field of View** supports 60–100, including narrower base FOVs for 5120×1440. Native HDR uses Windows HDR and separate scene/UI brightness controls.
 
@@ -31,9 +33,9 @@ A read-only readiness check, requiring no game launch, copying or downloads:
 .\tools\neural-rendering\Setup-NeuralDoom.ps1 -RepoRoot . -Profile DLAA -ValidateOnly
 ```
 
-D3HDP remains optional. Legacy runtime setup is only offered with `-IncludeLegacyNR` or explicit `-NRRuntimePath`/`-NRRuntimeUrl` parameters. Downloads, retail data, lighting/mod packs, ReShade/RenoDX components and NVIDIA runtimes remain local and ignored. Run `Audit-NeuralDoom-PublicSource.cmd` before pushing source; this does not approve redistribution of those binaries or assets. [CONTRIBUTING.md](CONTRIBUTING.md) documents the Git checks.
+D3HDP remains optional. Legacy runtime download/copy options are rejected by setup; existing local compatibility components remain separate. Downloads, retail data, lighting/mod packs, ReShade/RenoDX components and NVIDIA runtimes remain local and ignored. Run `Audit-NeuralDoom-PublicSource.cmd` before pushing source; this does not approve redistribution of those binaries or assets. [CONTRIBUTING.md](CONTRIBUTING.md) documents the Git checks.
 
-**An NR DLL path or URL only stages that runtime.** It does not install the official Streamline SDK, configure DLAA, or assemble/validate the legacy ReShade/RenoDX chain. Native RTX and HDR need no NR runtime. See [Windows setup](docs/neural-rendering/WINDOWS_SETUP.md) for the separate installation paths; a fresh-machine end-to-end setup test remains pending.
+**The internal installer ships Native RTX, not DLAA/NR binaries.** Their distribution remains blocked by the dependency review in [THIRD_PARTY_AND_LEGAL.md](docs/neural-rendering/THIRD_PARTY_AND_LEGAL.md). Native RTX and HDR need no NR runtime. See [Windows setup](docs/neural-rendering/WINDOWS_SETUP.md) for local development profiles.
 
 neuralDoom is not affiliated with or endorsed by id Software, Bethesda, NVIDIA, the RBDOOM-3-BFG project, ReShade, or RenoDX. Upstream authorship, license terms, and the original RBDOOM documentation are preserved below.
 

@@ -17,13 +17,10 @@ the automated test map quickly.
 
 All profiles share persistent test settings and saves in `captures/dogfood`.
 The first launch starts in a 2560x720 window. Resolution and HUD choices persist.
-The RTX launcher requests native HDR (Auto), using Windows HDR when enabled and
-SDR fallback otherwise. The ordinary dogfood launcher preserves saved HDR
-settings. Native/DLAA keep the bridge disabled. Choose option 3 (NR) for the engine-loaded local compatibility stack: F6 toggles NR, F4 toggles bounce. NR uses the existing SDR compatibility output and full-resolution DLAA passthrough when disabled.
+Both launchers preserve saved HDR settings. Select HDR Output in System Options, then restart; native HDR uses Windows HDR when enabled and otherwise falls back to SDR. Native/DLAA keep the bridge disabled. Choose option 3 (NR) for the engine-loaded local compatibility stack: F6 toggles NR, F4 toggles bounce. NR uses the existing SDR compatibility output and full-resolution DLAA passthrough when disabled.
 
-- [ ] **Material lighting:** Run `exec neural_rtx_keys.cfg` once for the optional
-  bindings. F4 toggles full-resolution material bounce, F8 toggles contact shadows,
-  and F9 toggles reflections,
+- [ ] **Material lighting:** Safe keys install automatically; remap them in Keyboard Bindings. F4 toggles full-resolution material bounce, F8 toggles contact shadows,
+  and F3 toggles reflections,
   F10 cycles comparison views, and F11 toggles all RTX effects. Check colored
   lighting near a wall/corner; the new bounce default is `r_rayTracedGIStrength 1.125`.
   See [RTX_LIGHTING.md](RTX_LIGHTING.md) for controls and current limitations.

@@ -77,6 +77,16 @@ static bindInfo_t keyboardBinds[] =
 	{ "#str_04069",	"screenshot"							},	// SCREENSHOT
 	{ "#str_02068",	"clientMessageMode"						},	// SCREENSHOT
 	{ "#str_02122",	"clientMessageMode 1"					},	// SCREENSHOT
+	{ "Renderer Comparisons", "" },
+	{ "TAA / DLAA (full resolution)", "neuralReconstructionToggle" },
+	{ "Moving ray geometry", "rayTracingDynamicToggle" },
+	{ "Animated ray geometry", "rayTracingSkinnedToggle" },
+	{ "RTX reflections only", "rayTracingReflectionToggle" },
+	{ "RTX diffuse bounce only", "rayTracingBounceToggle" },
+	{ "RTX ambient occlusion only", "rayTracingAOToggle" },
+	{ "RTX contact shadows only", "rayTracingContactToggle" },
+	{ "RTX diagnostic views", "rayTracingDebugCycle" },
+	{ "All four RTX lighting effects", "rayTracingToggle" },
 	//{ "#str_04071",	"clientDropWeapon"						}	// DROP WEAPON
 };
 

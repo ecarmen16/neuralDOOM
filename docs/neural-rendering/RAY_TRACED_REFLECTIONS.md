@@ -8,7 +8,7 @@ Diffuse bounce strength now defaults to **1.125**, previously 1.5: a 25% reducti
 
 `Launch-NeuralDoom-RTX.cmd` enables reflections along with bounce, AO and contact shadows. `Launch-NeuralDoom.cmd` retains saved choices. Both support Native, optional DLAA, or the existing local NR compatibility profile. No bridge is needed. Factory defaults remain opt-in.
 
-Run `exec neural_rtx_keys.cfg` to install or refresh the optional bindings. **F9** toggles reflections, **F4** toggles diffuse bounce, **F10** cycles all seven comparison views and **F11** toggles all four effects. The config is editable and never automatically overwrites key bindings.
+Safe defaults install automatically. Use Keyboard Bindings to remap actions, or Install Free RTX Keys in System Options to fill empty keys. **F3** toggles reflections, **F4** toggles diffuse bounce, **F10** cycles all seven comparison views and **F11** toggles all four effects. Custom bindings are preserved. F5/F9/F12 remain quicksave/quickload/screenshot.
 
 | Console command | Default | Purpose |
 |---|---:|---|
@@ -26,7 +26,7 @@ All reflection cvar changes participate in the existing temporal-history reset m
 
 ## Three-check playtest
 
-1. **Material response:** At your usual 5120×1440 resolution, stand near glossy metal panels or a polished floor. Toggle F9, then compare views 5 and 6. Metal should reflect nearby lit geometry; matte walls should retain mostly probe lighting. Check the reduced bounce with F4 separately.
+1. **Material response:** At your usual 5120×1440 resolution, stand near glossy metal panels or a polished floor. Toggle F3, then compare views 5 and 6. Metal should reflect nearby lit geometry; matte walls should retain mostly probe lighting. Check the reduced bounce with F4 separately.
 2. **Motion:** Walk sideways and turn near the reflective surface. Watch for shimmer, trails, disappearing reflections, bright speckles or hard screen-edge changes. Fire and watch a door/character; those objects are not yet in the ray scene.
 3. **Transitions:** Toggle F11 off/on, resize, then reload a save or change maps. Repeat briefly in DLAA if Native looks good. Reflections should recover and the ultrawide HUD should remain stable.
 

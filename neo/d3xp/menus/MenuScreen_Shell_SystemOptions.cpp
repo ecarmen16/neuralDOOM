@@ -35,6 +35,7 @@ If you have questions concerning this license or the applicable additional terms
 
 const static int NUM_SYSTEM_OPTIONS_OPTIONS = 8;
 
+static idCVar r_neuralLaunchProfile( "r_neuralLaunchProfile", "-1", CVAR_ARCHIVE | CVAR_INTEGER, "launcher preference: -1 ask, 0 Native, 1 DLAA, 2 local NR; next launch", -1, 2 );
 static idCVar r_neuralReconstructionMode( "r_neuralReconstructionMode", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "saved reconstruction preference in the DLAA launch profile: 0 TAA, 1 DLAA", 0, 1 );
 struct neuralMenuSetting_t { const char* label; const char* name; float step, maximum; };
 static const neuralMenuSetting_t neuralMenuSettings[] = {
@@ -282,7 +283,12 @@ void idMenuScreen_Shell_SystemOptions::Initialize( idMenuHandler* data )
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RECONSTRUCTION ) { control->SetLabel( "Reconstruction" ); control->SetDescription( "Native resolution TAA or DLAA. DLAA requires the DLAA launch profile; NR keeps DLAA as its input." ); }
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RENDER_STATUS ) { control->SetLabel( "Rendering Status" ); }
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RT_QUALITY ) { control->SetLabel( "Ray Quality" ); control->SetDescription( "Changes ray samples, not rendering resolution or lighting strength." ); }
-		else { control->SetLabel( "Doom Lighting Defaults" ); control->SetDescription( "Restore contrast and lighting strengths; preserve HDR calibration, feature toggles and resolution." ); }
+		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_DOOM_DEFAULTS ) { control->SetLabel( "Doom Lighting Defaults" ); control->SetDescription( "Restore contrast and lighting strengths; preserve HDR calibration, feature toggles and resolution." ); }
+		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_LAUNCH_PROFILE ) { control->SetLabel( "Next Launch Profile" ); control->SetDescription( "Applies after quitting and reopening the launcher. DLAA/NR require separately installed local components." ); }
+		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_NR_STATUS ) { control->SetLabel( "NR Compatibility" ); control->SetDescription( "F6 belongs to the external NR add-on. Its on/off state is not reported to the engine. Native HDR is bypassed in the NR profile." ); }
+		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RT_ALL ) { control->SetLabel( "All RTX Lighting" ); control->SetDescription( "Toggle AO, contacts, bounce and reflections together; preserves their strengths and ray quality." ); }
+		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RT_DEBUG ) { control->SetLabel( "RTX Diagnostic View" ); }
+		else { control->SetLabel( "Install Free RTX Keys" ); control->SetDescription( "Fill unused F keys only. Preserves custom binds, F5 quicksave, F9 quickload and F12 screenshot. Remap actions in Keyboard Bindings." ); }
 		control->SetDataSource( &systemData, field );
 		control->SetupEvents( DEFAULT_REPEAT_TIME, options->GetChildren().Num() );
 		control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, field );
@@ -538,6 +544,7 @@ void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::LoadData
 	for( int i = 0; i < 9; i++ ) { originalRaySettings[i] = cvarSystem->GetCVarFloat( neuralMenuSettings[i].name ); }
 	for( int i = 0; i < 3; i++ ) { originalRaySamples[i] = cvarSystem->GetCVarInteger( neuralSampleSettings[i] ); }
 	originalReconstruction = r_neuralReconstructionMode.GetInteger();
+	originalLaunchProfile = r_neuralLaunchProfile.GetInteger();
 	originalRenderAPI = r_graphicsAPI.GetString();
 	originalFramerate = com_engineHz.GetInteger();
 	originalAntialias = r_antiAliasing.GetInteger();
@@ -652,6 +659,19 @@ idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustField
 */
 void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustField( const int fieldIndex, const int adjustAmount )
 {
+	if( fieldIndex == SYSTEM_FIELD_LAUNCH_PROFILE )
+	{
+#if defined( USE_STREAMLINE )
+		r_neuralLaunchProfile.SetInteger( ( r_neuralLaunchProfile.GetInteger() + ( adjustAmount > 0 ? 2 : 4 ) ) % 4 - 1 );
+#else
+		r_neuralLaunchProfile.SetInteger( 0 );
+#endif
+		return;
+	}
+	if( fieldIndex == SYSTEM_FIELD_NR_STATUS ) { return; }
+	if( fieldIndex == SYSTEM_FIELD_RT_ALL ) { cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "rayTracingToggle\n" ); return; }
+	if( fieldIndex == SYSTEM_FIELD_RT_DEBUG ) { cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "rayTracingDebugCycle\n" ); return; }
+	if( fieldIndex == SYSTEM_FIELD_SAFE_KEYS ) { cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "neuralInstallKeys\n" ); return; }
 	const int rayIndex = fieldIndex - SYSTEM_FIELD_RT_FIRST;
 	if( rayIndex >= 0 && rayIndex < 9 )
 	{
@@ -877,6 +897,23 @@ idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::GetField
 */
 idSWFScriptVar idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::GetField( const int fieldIndex ) const
 {
+	if( fieldIndex == SYSTEM_FIELD_LAUNCH_PROFILE )
+	{
+		const char* names[] = { "Ask on launch", "Native RTX", "DLAA (local SDK)", "NR (local add-on)" };
+		return names[r_neuralLaunchProfile.GetInteger() + 1];
+	}
+	if( fieldIndex == SYSTEM_FIELD_NR_STATUS ) { return cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) ? "NR profile; add-on F6" : "Not loaded"; }
+	if( fieldIndex == SYSTEM_FIELD_RT_ALL )
+	{
+		const int count = cvarSystem->GetCVarBool( "r_rayTracedAO" ) + cvarSystem->GetCVarBool( "r_rayTracedContactShadows" ) + cvarSystem->GetCVarBool( "r_rayTracedGI" ) + cvarSystem->GetCVarBool( "r_rayTracedReflections" );
+		return count == 4 ? "All on" : ( count == 0 ? "All off" : "Mixed" );
+	}
+	if( fieldIndex == SYSTEM_FIELD_RT_DEBUG )
+	{
+		const char* views[] = { "Scene", "AO visibility", "Contact visibility", "Material bounce", "Material albedo", "Reflections", "Reflection roughness" };
+		return views[idMath::ClampInt( 0, 6, cvarSystem->GetCVarInteger( "r_rayTracingDebug" ) )];
+	}
+	if( fieldIndex == SYSTEM_FIELD_SAFE_KEYS ) { return "Apply (preserve custom)"; }
 	const int rayIndex = fieldIndex - SYSTEM_FIELD_RT_FIRST;
 	if( rayIndex >= 0 && rayIndex < 9 )
 	{
@@ -1128,6 +1165,7 @@ bool idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsDataCh
 {
 	for( int i = 0; i < 9; i++ ) { if( originalRaySettings[i] != cvarSystem->GetCVarFloat( neuralMenuSettings[i].name ) ) { return true; } }
 	for( int i = 0; i < 3; i++ ) { if( originalRaySamples[i] != cvarSystem->GetCVarInteger( neuralSampleSettings[i] ) ) { return true; } }
+	if( originalLaunchProfile != r_neuralLaunchProfile.GetInteger() ) { return true; }
 	if( originalReconstruction != r_neuralReconstructionMode.GetInteger() ) { return true; }
 
 	if( idStr::Icmp( r_graphicsAPI.GetString(), originalRenderAPI ) != 0 )

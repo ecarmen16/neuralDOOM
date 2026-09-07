@@ -1391,6 +1391,11 @@ public:
 			SYSTEM_FIELD_RT_LAST = SYSTEM_FIELD_RT_FIRST + 8,
 			SYSTEM_FIELD_RT_QUALITY,
 			SYSTEM_FIELD_DOOM_DEFAULTS,
+			SYSTEM_FIELD_LAUNCH_PROFILE,
+			SYSTEM_FIELD_NR_STATUS,
+			SYSTEM_FIELD_RT_ALL,
+			SYSTEM_FIELD_RT_DEBUG,
+			SYSTEM_FIELD_SAFE_KEYS,
 			MAX_SYSTEM_FIELDS
 		};
 
@@ -1428,6 +1433,7 @@ public:
 		float originalHDRUIWhite;
 		float originalRaySettings[9];
 		int originalReconstruction;
+		int originalLaunchProfile;
 		int originalRaySamples[3];
 		// RB begin
 		//int originalShadowMapping; // TODO use for quality of shadowmaps?

@@ -8,6 +8,7 @@ param(
     [string]$NRRuntimePath,
     [string]$NRRuntimeUrl,
     [ValidateSet('Native', 'DLAA')][string]$Profile = 'Native',
+    [ValidateSet('Release', 'RelWithDebInfo')][string]$Configuration = 'RelWithDebInfo',
     [switch]$BuildEngine,
     [switch]$ValidateOnly,
     [switch]$IncludeLegacyNR,
@@ -200,87 +201,30 @@ function Test-SetupD3HDPArchive {
     throw "D3HDP archive is not a recognized release. Size $($file.Length), SHA-256 $sha256, MD5 $md5."
 }
 
-function Install-SetupNRRuntime {
-    param(
-        [string]$SourcePath,
-        [string]$SourceUrl,
-        [Parameter(Mandatory)][string]$Destination,
-        [Parameter(Mandatory)][string]$CacheDirectory
-    )
-
-    if (-not [string]::IsNullOrWhiteSpace($SourcePath) -and
-        -not [string]::IsNullOrWhiteSpace($SourceUrl)) {
-        throw 'Specify only one of -NRRuntimePath or -NRRuntimeUrl.'
-    }
-
-    if (-not [string]::IsNullOrWhiteSpace($SourceUrl)) {
-        $cachedRuntime = Join-Path $CacheDirectory 'nvngx_dlssnr.dll'
-        Invoke-SetupDownload -Uri ([uri]$SourceUrl) -Destination $cachedRuntime | Out-Null
-        $SourcePath = $cachedRuntime
-    }
-
-    if ([string]::IsNullOrWhiteSpace($SourcePath)) {
-        return $false
-    }
-
-    $SourcePath = $SourcePath.Trim('"')
-    if (-not (Test-Path -LiteralPath $SourcePath -PathType Leaf)) {
-        throw "DLSS Neural Rendering runtime does not exist: $SourcePath"
-    }
-    $SourcePath = (Resolve-Path -LiteralPath $SourcePath).Path
-    $runtimeFile = Get-Item -LiteralPath $SourcePath
-    if ($runtimeFile.Length -lt 1048576) {
-        throw "The selected runtime is unexpectedly small ($($runtimeFile.Length) bytes): $SourcePath"
-    }
-    $headerBytes = if ($PSVersionTable.PSVersion.Major -ge 6) {
-        @(Get-Content -LiteralPath $SourcePath -AsByteStream -TotalCount 2)
-    } else {
-        @(Get-Content -LiteralPath $SourcePath -Encoding Byte -TotalCount 2)
-    }
-    if ($headerBytes.Count -ne 2 -or $headerBytes[0] -ne 77 -or $headerBytes[1] -ne 90) {
-        throw "The selected runtime is not a Windows PE DLL: $SourcePath"
-    }
-
-    if ($SourcePath -ne $Destination) {
-        Copy-Item -LiteralPath $SourcePath -Destination $Destination -Force
-    }
-
-    $runtimeHash = Get-SetupFileSha256 -Path $Destination
-    Write-Host "[installed] nvngx_dlssnr.dll ($runtimeHash)" -ForegroundColor Green
-    $signature = Get-AuthenticodeSignature -LiteralPath $Destination
-    if ($signature.SignerCertificate) {
-        Write-Host "[signature] $($signature.Status): $($signature.SignerCertificate.Subject)"
-    } else {
-        Write-Host "[signature] $($signature.Status)" -ForegroundColor Yellow
-    }
-    return $true
-}
-
 function Test-SetupReady {
     param(
         [Parameter(Mandatory)][string]$Root,
         [Parameter(Mandatory)][string]$RenderingProfile
     )
-    & (Join-Path $PSScriptRoot 'Start-NeuralDoom-Dogfood.ps1') -RepoRoot $Root -Profile $RenderingProfile -ValidateOnly
+    & (Join-Path $PSScriptRoot 'Start-NeuralDoom-Dogfood.ps1') -RepoRoot $Root -Profile $RenderingProfile -Configuration $Configuration -ValidateOnly
     $lighting = & (Join-Path $PSScriptRoot 'Get-NeuralLightingData.ps1') -RepoRoot $Root
     Write-Host "[lighting] $($lighting.detail)"
     if (-not $lighting.hasCandidates) {
         throw 'Full lighting data is missing. Extract base/_rbdoom_global_illumination_data.pk4 from the official RBDOOM-3-BFG 1.6.0 release, then rerun setup with -LightingPackPath pointing to that file. See docs/neural-rendering/PROBE_LIGHTING.md.'
     }
-    Write-Host 'READY: Launch-NeuralDoom.cmd for saved settings; Launch-NeuralDoom-RTX.cmd enables all RTX lighting.' -ForegroundColor Green
+    Write-Host 'READY: Launch-NeuralDoom.cmd for saved settings; Launch-NeuralDoom-RTX.cmd seeds missing RTX preferences. Internal Release ZIP: Play-InternalTest.cmd.' -ForegroundColor Green
 }
 
 if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
     $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 }
 $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
+if ($IncludeLegacyNR -or $NRRuntimePath -or $NRRuntimeUrl -or $ForceNRRuntime) { throw 'NR runtime installation is not supported. Native RTX needs no NR runtime; existing local compatibility components are not distributed or copied by setup.' }
 if ($ValidateOnly) {
     if ($BuildEngine) { throw '-ValidateOnly does not build or install files; omit -BuildEngine.' }
     Test-SetupReady -Root $RepoRoot -RenderingProfile $Profile
     return
 }
-# Native RTX/HDR needs no compatibility runtime. Legacy setup is an explicit opt-in.
-if (-not $IncludeLegacyNR -and -not $NRRuntimePath -and -not $NRRuntimeUrl) { $SkipNRRuntime = $true }
 if ($NonInteractive -and -not $D3HDPArchivePath -and -not $D3HDPArchiveUrl) { $SkipD3HDP = $true }
 
 $d3hdpSourcePage = 'https://www.moddb.com/mods/d3hdp-bfg-lite/downloads/d3hdp-bfg-lite'
@@ -289,7 +233,6 @@ if ([string]::IsNullOrWhiteSpace($D3HDPArchiveUrl)) {
 }
 $cacheDirectory = Join-Path $RepoRoot '.neuraldoom-cache'
 $d3hdpFolder = Join-Path $RepoRoot 'mod_D3HDP_Lite'
-$nrRuntimeDestination = Join-Path $RepoRoot 'nvngx_dlssnr.dll'
 
 Write-Host ''
 Write-Host '========================================' -ForegroundColor DarkCyan
@@ -413,27 +356,6 @@ if (-not $SkipD3HDP -and (Test-Path -LiteralPath $d3hdpFolder -PathType Containe
     }
 }
 
-if (-not $SkipNRRuntime -and
-    ($ForceNRRuntime -or -not (Test-Path -LiteralPath $nrRuntimeDestination -PathType Leaf))) {
-    if ([string]::IsNullOrWhiteSpace($NRRuntimePath) -and
-        [string]::IsNullOrWhiteSpace($NRRuntimeUrl) -and
-        -not $NonInteractive) {
-        Write-Host ''
-        Write-Host 'DLSS Neural Rendering runtime' -ForegroundColor Cyan
-        $nrChoice = (Read-Host 'Browse for nvngx_dlssnr.dll [B], download from a URL [U], or skip [S] (default B)').Trim()
-        if ([string]::IsNullOrWhiteSpace($nrChoice) -or $nrChoice -ieq 'B') {
-            $NRRuntimePath = Select-SetupFile -Title 'Select nvngx_dlssnr.dll' -Filter 'DLSS Neural Rendering runtime (nvngx_dlssnr.dll)|nvngx_dlssnr.dll|DLL files (*.dll)|*.dll' -InitialDirectory (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Downloads')
-            if ([string]::IsNullOrWhiteSpace($NRRuntimePath)) {
-                $NRRuntimePath = Read-Host 'nvngx_dlssnr.dll path, or press Enter to skip'
-            }
-        } elseif ($nrChoice -ieq 'U') {
-            $NRRuntimeUrl = Read-Host 'HTTPS URL for nvngx_dlssnr.dll'
-        }
-    }
-
-    Install-SetupNRRuntime -SourcePath $NRRuntimePath -SourceUrl $NRRuntimeUrl -Destination $nrRuntimeDestination -CacheDirectory $cacheDirectory | Out-Null
-}
-
 if ($BuildEngine) {
     $buildDirectory = Join-Path $RepoRoot $(if ($Profile -eq 'DLAA') { 'build-streamline' } else { 'build-rt' })
     if ($Profile -eq 'DLAA' -and -not (Test-Path -LiteralPath (Join-Path $buildDirectory 'CMakeCache.txt'))) {
@@ -441,11 +363,9 @@ if ($BuildEngine) {
     }
     Write-SetupStep "Building $Profile with native ray tracing"
     & (Join-Path $PSScriptRoot 'Configure-RBDOOM-DX12.ps1') -RepoRoot $RepoRoot -BuildDirectory $buildDirectory -RayTracing ON
-    & (Join-Path $PSScriptRoot 'Build-RBDOOM.ps1') -RepoRoot $RepoRoot -BuildDirectory $buildDirectory -Configuration RelWithDebInfo
+    & (Join-Path $PSScriptRoot 'Build-RBDOOM.ps1') -RepoRoot $RepoRoot -BuildDirectory $buildDirectory -Configuration $Configuration
 }
 Write-SetupStep 'Validating the exact native RTX build, shaders and local game installation'
 Test-SetupReady -Root $RepoRoot -RenderingProfile $Profile
-if ($IncludeLegacyNR -or $NRRuntimePath -or $NRRuntimeUrl) {
-    Write-Host 'Legacy compatibility launchers are in tools/neural-rendering/legacy. They use separately staged local components.'
-}
+
 Write-Host 'Setup assembles local files. Retail assets, downloaded lighting/mod packs and NVIDIA runtimes are excluded from the GitHub source.'
