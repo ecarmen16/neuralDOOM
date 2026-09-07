@@ -19,7 +19,7 @@ Validation performed:
 - Focused review checked native target-0 preservation, matching capture layer/response, skinned shader metadata, order-sensitive permutations, shared atlas/radiance lifetimes, optional framebuffer ownership, history/viewport reset and current-miss rejection, debug isolation, finite FP16 composition and all-off/compiled-out control flow. Material response was moved after filtering to avoid borrowing reflectivity from neighbors/history. GPU behavior is not established by this review.
 - `git diff --check` and the clean public-source audit passed (2,486 tracked files); NVRHI and ShaderMake remained clean at their existing pins. No assets, SDK binaries, runtime blobs, personal settings, captures or machine paths were staged. A pre-commit audit invocation without `-AllowDirty` reported the expected dirty-tree guard; the staged pre-commit check and subsequent clean audit passed.
 
-Runtime boundary: **no GPU/gameplay test was performed for the reflection addition**, per the user's request to handle visual comparisons. The user reported the preceding review/material-lighting build was a substantial improvement, but wanted less bounce brightness. The GI default and the existing local saved value were changed from 1.5 to 1.125, with a local configuration backup. This is configuration evidence, not measured reflection image quality.
+Runtime boundary: **no GPU/gameplay test was performed for the reflection addition**, with manual visual acceptance pending. The preceding material-lighting playtest identified excessive bounce brightness. The GI default and the existing local saved value were changed from 1.5 to 1.125, with a local configuration backup. This is configuration evidence, not measured reflection image quality.
 
 The opt-in smoke harness now checks reflection coverage, full-resolution dimensions, live off/on/resume, resize and all seven debug views; that scenario remains unrun. Reflection material response, noise/trails, dynamic-object omissions, screen-edge fallback, 5120x1440 performance and Native/DLAA/HDR visual quality require the [three-check playtest](RAY_TRACED_REFLECTIONS.md#three-check-playtest). Static BSP-only geometry, approximate hit shading and limited current-view light lists remain explicit limitations. Next bounded implementation task: rigid dynamic ray instances for doors and props.
 
@@ -43,9 +43,9 @@ Both real `Setup-NeuralDoom.ps1 -Profile Native -ValidateOnly` and `-Profile DLA
 
 The renderer fixes are automatic neural-backend joint history, object-motion raster/depth agreement with unjittered output vectors, and automatic history invalidation after RTX cvar edits. The smoke helper now checks lighting-change resets without supplying manual resets for GI/contact toggles, but that updated GPU scenario has not been run.
 
-**No game was launched during this review.** The user first lifted the GPU pause, then requested that visual comparisons be left to them and work finish with review/fixes/rebuilds. These results prove compilation and local setup integrity, not final GPU stability or image quality. Live character/weapon motion, RTX cvar transitions, albedo mode 4, map/save reload, new material-shader fallback, and the combined 5120x1440 DLAA/HDR/RTX path remain pending on these exact binaries. RT-OFF compilation passed; its latest runtime regression check is also pending. Prior gameplay results below apply to their own recorded artifacts.
+**No game was launched during this review.** These results prove compilation and local setup integrity, not final GPU stability or image quality. Live character/weapon motion, RTX cvar transitions, albedo mode 4, map/save reload, new material-shader fallback, and the combined 5120x1440 DLAA/HDR/RTX path remain pending on these exact binaries. RT-OFF compilation passed; its latest runtime regression check is also pending. Prior gameplay results below apply to their own recorded artifacts.
 
-See [the review and three-check playtest](REVIEW_2026-09-06.md). No new graphical feature was added during review; full render resolution is retained. GitHub push remains pending the user's login.
+See [the review and three-check playtest](REVIEW_2026-09-06.md). No new graphical feature was added during review; full render resolution is retained. Publication remains separate from build validation.
 
 # Test results
 
@@ -55,7 +55,7 @@ Implemented full-resolution textured diffuse bounce/emission, contact shadows, A
 
 `Build-RBDOOM.ps1 -BuildDirectory build-rt -Configuration RelWithDebInfo` passed. Native smoke `smoke-20260906-192933-7ef79bd1` passed with AO, contacts, material GI, live off/on, debug views, example key bindings and 1280×720 → 1920×1080 resize under native DX12/NVRHI validation. GPU samples reported zero invalid contact/GI values. The earlier native DX12 error 538 was caused by NVRHI retaining a framebuffer binding across the HDR snapshot copy; clearing the command-list state after the copy and invalidating the engine vertex-buffer cache fixed the reproduced error. No submodule changes were needed.
 
-The user then requested no further launches to use the GPU. Final albedo-debug/empty-light-state edits have not been rebuilt. SDK-ON, RT-OFF, 5120×1440 HDR/DLAA, new-resource map reload and fallback checks remain pending. [CHECKPOINT.md](CHECKPOINT.md) records the precise tested artifact, completed CPU installer tests, known visual limits and resume steps. This is an implementation checkpoint, not a release validation claim.
+No further runtime checks were performed at this checkpoint. Final albedo-debug/empty-light-state edits have not been rebuilt. SDK-ON, RT-OFF, 5120×1440 HDR/DLAA, new-resource map reload and fallback checks remain pending. [CHECKPOINT.md](CHECKPOINT.md) records the precise tested artifact, completed CPU installer tests, known visual limits and resume steps. This is an implementation checkpoint, not a release validation claim.
 
 
 ## 2026-09-06 — Ultrawide feedback and narrower FOV control
@@ -104,7 +104,7 @@ Two focused smoke checks pass with full DX12 validation and 64 GPU samples:
 
 Public-source audit, whitespace and PowerShell syntax checks pass. Focused review
 confirms unchanged default FOV, old-range weapon interpolation, viewport-based
-projection and isolation from the user's saved settings. The menu's expanded
+projection and isolation from existing saved settings. The menu's expanded
 range is reviewed in source; the automated scenarios set its existing `g_fov`
 cvar directly. This results-only commit does not rebuild the tested binaries.
 
@@ -131,7 +131,7 @@ lighting, AO ON/OFF/ON. Sampled shaded/occluded receivers are 356/221 initially,
 while disabled and reaches 900 after resuming. Static AS: 82,833 triangles,
 5,242,880 bytes; one build per map. Gameplay, captures, history reset and exit
 pass. Initial captures were inspected; final HDR monitor appearance and moving
-camera quality still require the user's short visual check.
+camera quality still require a short visual check.
 
 Focused review covers shader binding ABI, depth agreement, immutable AS lifetime,
 deferred initialization, resize rebinding, baseline SSAO retention and live
@@ -160,7 +160,7 @@ and 600 warmup frames; compiled OFF uses 180 warmup frames.
 | `smoke-20260906-181910-b778744e` | Compiled OFF, 2560x720 -> 1920x1080 | PASS: ray diagnostics skip; AO frames/counters remain zero; raster rendering and resize pass |
 | `ao-lifecycle-final` | Native AO, two consecutive Mars City 2 loads, 1280x720 | PASS: exactly two static AS builds, dispatch counters restart at each load, both scenes shade and exit normally |
 
-The user enabled Windows HDR during this task. The DLAA run confirms
+Windows HDR was enabled for this test. The DLAA run confirms
 `windowsHDR=1`, `active=1`, scRGB FP16 and 10-bit display metadata. Actual HDR
 transport is tested with `diagnostic=0`: scRGB maxima are 11.046875/11.734375
 before resize and 10.0 afterward, below the configured 12.5 scRGB / 1,000-nit
@@ -224,15 +224,15 @@ Final source audit and diff review are recorded with the checkpoint; see `UNATTE
 - Runtime inventory: PASS. The staged `neuralDoom.exe`, Streamline/DLSS runtime, embedded ReShade runtime, add-on, and `nvngx_dlssnr.dll` were detected; the proxy `dxgi.dll` remained absent as expected for embedded startup.
 - D3HDP installed-state handling: PASS. The existing ignored `mod_D3HDP_Lite/` was retained. The prior local archive remains recognized by exact size and SHA-256; the current ModDB release is pinned to the canonical page's reported size and MD5 for the clean-install download test.
 - Public-source audit: PASS with `-AllowDirty`. All 2,445 tracked files were checked; no retail resource/capture, local runtime payload, cache/mod directory, or concrete local machine path was tracked.
-- Pending: exercise a fresh 2 GB ModDB download/mirror redirect and a fresh NR file/URL copy in a disposable clean install. Neither path was forced against the user's working installation during this validation.
+- Pending: exercise a fresh 2 GB ModDB download/mirror redirect and a fresh NR file/URL copy in a disposable clean install. Neither path was forced against the existing test installation during this validation.
 
 ## 2026-09-03 / ND3-350 / engine-owned compatibility startup
 
 - `RelWithDebInfo`, Streamline-enabled: PASS. Reconfigured `build-streamline` after adding the renderer source and built/staged `neuralDoom.exe` successfully (19,845,120 bytes; SHA-256 `FE2944D2B4EC0536FF846B1BB47A86FDDFC740864E636D128540C34D9FB07DFD`).
 - `RelWithDebInfo`, SDK-OFF: PASS. Reconfigured `build` and built the default executable successfully; the compatibility loader has no link-time ReShade dependency and defaults disabled.
 - Reversible local mode switch: PASS. The helper moved the ignored `dxgi.dll` to `neuraldoom-reshade64.dll` and left no proxy DLL beside the executable.
-- Embedded startup probe: PASS. `ReShade.log` identifies ReShade 6.8.0.2155 as loaded from `neuraldoom-reshade64.dll`; DLSS5 add-on version `0.2026.828.2110` registered with API 18; the local NR runtime was preloaded at device init; a ReShade runtime was created on the RTX 5090 at 1280x720.
-- Gameplay/visual parity with the earlier feature-18 pass: PASS. The user launched the embedded NR + D3HDP profile and confirmed that the NR path and F6 behavior still work in gameplay.
+- Embedded startup probe: PASS. `ReShade.log` identifies ReShade 6.8.0.2155 as loaded from `neuraldoom-reshade64.dll`; DLSS5 add-on version `0.2026.828.2110` registered with API 18; the local NR runtime was preloaded at device init; a ReShade runtime was created on the test GPU at 1280x720.
+- Gameplay/visual parity with the earlier feature-18 pass: PASS. Manual playtesting launched the embedded NR + D3HDP profile and confirmed that the NR path and F6 behavior still work in gameplay.
 
 ## 2026-09-02 / working tree / neuralDoom setup and identity
 
@@ -253,7 +253,7 @@ Final source audit and diff review are recorded with the checkpoint; see `UNATTE
 
 ### Regressions
 
-- None observed in the automated feature-off smoke. Full visual D3HDP/NR quality validation remains the user's active manual test.
+- None observed in the automated feature-off smoke. Full visual D3HDP/NR quality validation remains manual acceptance.
 
 ### Conclusion
 
@@ -280,7 +280,7 @@ Compatibility is proven for private local experimentation. Visual-quality tuning
 |---|---|---|
 | SDK-OFF and SDK-ON builds | PASS | Both VS2022 x64 DX12 `RelWithDebInfo` trees linked after adding mode `3` and view-extent reporting. |
 | 67%-to-native evaluation | PASS | `neuralBackendStatus`: 153 evaluated, 153 presented, 0 rejected; render 857x482, output 1280x720, last `DLSS Quality evaluated`. |
-| Project-priority review | DEFERRED | The RTX 5090 does not need reconstruction for Doom 3 performance. Quality mode remains an infrastructure diagnostic; the planned NR path should normally retain 100% source resolution. |
+| Project-priority review | DEFERRED | This checkpoint prioritizes native-resolution reconstruction quality. Quality mode remains an infrastructure diagnostic; the planned NR path should normally retain 100% source resolution. |
 
 ## 2026-09-02 / ND3-320 / native-resolution Streamline DLAA
 
@@ -360,7 +360,7 @@ ND3-280 is `DONE`. Automated and visible validation prove complete frame consump
 | Test | Result | Evidence | Notes |
 |---|---|---|---|
 | Configure/build | PASS | established configure; final build output | All shaders current; C++ linked/staged; SHA-256 `EDB8BB8641CCD35FB8078C4634813B3D11DAFC79FB03476099DE4FCE1D456E21`. |
-| T15 map/save-load signal | PASS | scripted map load, user save resume, and `neuralHistoryStatus` | First tracked view consumed `initialization|level-load|framebuffer-resize`; resumed gameplay rendered normally without stale feedback. |
+| T15 map/save-load signal | PASS | scripted map load, test save resume, and `neuralHistoryStatus` | First tracked view consumed `initialization|level-load|framebuffer-resize`; resumed gameplay rendered normally without stale feedback. |
 | Manual reset propagation | PASS | `temporal_history_sequence.log` | Epoch advanced 4 to 5; subsequent status showed the request consumed by a rendered primary view. |
 | T16 camera teleport/cut | PASS | extreme disposable `setviewpos`, source review, and combined visible regression | Epoch advanced with named `camera-teleport|camera-cut`. Authored camera files now emit an exact cut bit; normal camera motion remained stable. |
 | Major FOV discontinuity | PASS | `g_fov 80 -> 120`, 30 rendered frames, named status | Epoch advanced and last reason reported `fov-change`. |
@@ -380,7 +380,7 @@ The unified epoch, automated reset paths, and combined visible regression pass. 
 
 ## 2026-09-01 / 99b03cf5 + ND3-260 worktree / reactive and transparency masks
 
-- Tester/machine label: local Windows development machine; runtime visually checked by user.
+- Validation: Windows runtime checked manually.
 - Branch and base commit: `feature/neural-rendering-spike`, `99b03cf5`.
 - Build configuration: `RelWithDebInfo`, VS2022 x64, DX12 only.
 - GPU and driver: NVIDIA GeForce RTX 5090, 610.47.
@@ -415,7 +415,7 @@ ND3-260 and combined T09-T13 pass. D-008 records the independent reactive/transp
 
 ## 2026-09-01 / 442c0427 + ND3-250 worktree / viewmodel motion vectors
 
-- Tester/machine label: local Windows development machine; runtime visually checked by user.
+- Validation: Windows runtime checked manually.
 - Branch and base commit: `feature/neural-rendering-spike`, `442c0427`.
 - Build configuration: `RelWithDebInfo`, VS2022 x64, DX12 only.
 - GPU and driver: NVIDIA GeForce RTX 5090, 610.47.
@@ -446,7 +446,7 @@ ND3-250 and T08 pass. Shared scene color/depth with independently enabled viewmo
 
 ## 2026-09-01 / e63f0bb9 + ND3-240 worktree / skinned-object motion vectors
 
-- Tester/machine label: local Windows development machine; runtime visually checked by user.
+- Validation: Windows runtime checked manually.
 - Branch and base commit: `feature/neural-rendering-spike`, `e63f0bb9`.
 - Build configuration: `RelWithDebInfo`, VS2022 x64, DX12 only.
 - GPU and driver: NVIDIA GeForce RTX 5090, 610.47.
@@ -477,11 +477,11 @@ ND3-240 passes T06 and T07. ND3-250 viewmodel ordering/velocity is now `READY`.
 
 ## 2026-09-01 / c9c5e063 + ND3-230 worktree / rigid-object motion vectors
 
-- Tester/machine label: local Windows development machine; runtime visually checked by user.
+- Validation: Windows runtime checked manually.
 - Branch and base commit: `feature/neural-rendering-spike`, `c9c5e063`.
 - Build configuration: `RelWithDebInfo`, VS2022 x64, DX12 only.
 - GPU and driver: NVIDIA GeForce RTX 5090, 610.47.
-- Scene/save/map: resumable user save in Mars City Hangar with a visible moving rigid object.
+- Scene/save/map: resumable test save in Mars City Hangar with a visible moving rigid object.
 - Relevant cvars: diagnostic `r_neuralDebug 2`; feature-off `r_neuralDebug 0`; `r_neuralRigidMotionVectors` defaults to `0` and is forced by diagnostic mode `2`.
 
 | Test | Result | Evidence | Notes |
@@ -503,13 +503,13 @@ ND3-230 passes T04, T05, and the feature-off regression. ND3-240 skinned pose hi
 
 ## 2026-09-01 / d6d361fa + ND3-220 worktree / signed motion-vector diagnostic
 
-- Tester/machine label: local Windows development machine; runtime visually checked by user.
+- Validation: Windows runtime checked manually.
 - Branch and base commit: `feature/neural-rendering-spike`, `d6d361fa`.
 - Build configuration: `RelWithDebInfo`, VS2022 x64.
 - CMake options: established DX12-only configuration.
 - GPU and driver: NVIDIA GeForce RTX 5090, 610.47.
 - Resolution / HDR / AA: runtime tests at the current window size; validation capture at 1725x985; `_taaMotionVectors` is `R16G16_FLOAT`; TAA active.
-- Scene/save/map: resumable user save in Mars City Hangar.
+- Scene/save/map: resumable test save in Mars City Hangar.
 - Relevant cvars: `r_graphicsAPI dx12`, `r_neuralDebug 2`; capture additionally used `r_fullscreen 0` and `r_logLevel 1`.
 
 | Test | Result | Evidence / artifact path | Notes |
@@ -539,13 +539,13 @@ ND3-220 passes for camera/static-world visualization and moves ND3-230 rigid-obj
 
 ## 2026-09-01 / 992b6355 + Phase 3 worktree / HUD-free LDR diagnostic
 
-- Tester/machine label: local Windows development machine; runtime visually checked by user.
+- Validation: Windows runtime checked manually.
 - Branch and base commit: `feature/neural-rendering-spike`, `992b6355`.
 - Build configuration: `RelWithDebInfo`, VS2022 x64.
 - CMake options: `FFMPEG=OFF`, `BINKDEC=ON`, `USE_DX12=ON`, `USE_VULKAN=OFF`; established `/wd4530` and Windows SDK DXC overrides.
 - GPU and driver: NVIDIA GeForce RTX 5090, 610.47.
 - Resolution / HDR / AA: 1280x720 validation capture; output resource `R8G8B8A8_UNORM`; TAA active.
-- Scene/save/map: resumable user save in Mars City Hangar.
+- Scene/save/map: resumable test save in Mars City Hangar.
 - Relevant cvars: `r_graphicsAPI dx12`; `r_neuralDebug 0` and `1`; RenderDoc capture additionally used `r_fullscreen 0` and `r_logLevel 1`.
 
 | Test | Result | Evidence / artifact path | Notes |
@@ -576,13 +576,13 @@ ND3-200 and ND3-210 pass. Phase 3 has a measured HUD-free display-referred bound
 
 ## 2026-08-31 / ea29c006 / upstream DX12 baseline
 
-- Tester/machine label: local Windows development machine; runtime visually checked by user.
+- Validation: Windows runtime checked manually.
 - Branch and commit: `feature/neural-rendering-spike`, upstream `ea29c006e84fedcc0e7c173c383a087ce0a8c0d5` plus documentation/helper changes.
 - Build configuration: `RelWithDebInfo`, VS2022 x64.
 - CMake options: `FFMPEG=OFF`, `BINKDEC=ON`, `USE_DX12=ON`, `USE_VULKAN=OFF`; local `/wd4530` compatibility flag; Windows SDK DXC override.
 - GPU and driver: NVIDIA GeForce RTX 5090, 610.47.
 - Resolution / HDR / AA: 1280x720 capture; `R16G16B16A16_FLOAT` HDR scene; single-sample depth/motion/LDR; TAA pass active.
-- Scene/save/map: resumable user save in Mars City Hangar.
+- Scene/save/map: resumable test save in Mars City Hangar.
 - Relevant cvars: `r_graphicsAPI dx12`, `r_logLevel 1`, windowed capture; full console cvar dump remains pending.
 
 | Test | Result | Evidence / artifact path | Notes |
@@ -656,7 +656,7 @@ Use one section per tested commit/configuration. Include failures; do not rewrit
 - Native 2560x720, aspect 1.777778, scale 1.15: PASS, captures/neural/smoke-20260906-120459-41267828. Inspected after.png: centered health/ammo and full-width world rendering. DLAA 2560x720, aspect 1.777778: PASS, captures/neural/smoke-20260906-120607-d4a602b7. Both advanced 64 primary frames and passed reset/capture/backend checks. DLAA used normal GPU access outside the restricted sandbox.
 - Commit-guard fixtures rejected a dummy forbidden runtime filename and a staged machine path even after the working file was cleaned; accepted clean staged text. Initial sandbox PowerShell launch failed from language-mode restrictions; the same checks passed with normal process access.
 - Focused diff review covered enum ordering, live cvar reads, archive/change detection, restart behavior, upstream attributes and branding compatibility. Interactive menu navigation, save/relaunch persistence and live window-resize visual tests remain pending; runtime smoke checks use explicit HUD values and do not exercise those UI flows.
-- Git setup uses origin ecarmen16/neuralDoom and upstream RobertBeckebans/RBDOOM-3-BFG. Remote provisioning/push remains pending repository availability and authenticated GitHub CLI. No proprietary payloads are included in the source checkpoint.
+- Git uses the configured downstream origin and the RBDOOM-3-BFG upstream. Publication is separate from this validation checkpoint. No proprietary payloads are included in the source checkpoint.
 - Next: validate menu interaction and resize persistence, then implement the first native HDR capability/output negotiation slice described in MODERNIZATION_PLAN.md.
 
 
@@ -750,7 +750,7 @@ All paths below are under the build checkout's ignored `captures/neural` directo
 | `smoke-20260906-133145-19f47621` | 1-sample completion, 3600-to-3500 request restart, cancel, then new 64-sample request | PASS; exactly two completion markers (1 and 64), final CSV contains 64 valid samples |
 
 The lifecycle scenario used an ignored copy of the smoke runner with only its cfg
-sequence extended. It did not drive the user's active game or configuration.
+sequence extended. It did not drive an active game or its configuration.
 All 20 PNGs from the ten final comparison runs passed CRC, full pixel-stream
 decompression, dimensions and scanline-filter checks at 4800x1350. Full-size preview
 tooling returned base64 transport errors. A first verification attempt lacked
@@ -876,7 +876,7 @@ or frame-rate claim is established by this checkpoint.
 
 ## 2026-09-06 - Native DXR intersections and presentation lifetime fixes
 
-RT-001A / ND3-661 on `codex/rt-foundation`, based on `5fab1f08`. The user requested
+RT-001A / ND3-661 on `codex/rt-foundation`, based on `5fab1f08`. The planned scope included
 continued unattended development and a concise later playtest. See
 `RAY_TRACING_DIAGNOSTICS.md` for the resource contract and `DOGFOOD_CHECKLIST.md`
 for the manual pass. This checkpoint adds on-demand GPU diagnostics, not gameplay
@@ -985,7 +985,7 @@ with `-ValidateOnly`. Whitespace and public-source checks precede the commit.
 RT-001B remains: persistent mesh/instance registration and material mapping, map
 lifetime rebuild/release, then moving/skinned/cutout geometry and one selected
 light's ray-traced visibility. Actual unsupported hardware, invalid-shader/device
-loss recovery, other maps/mods and full path tracing remain unverified. The user
+loss recovery, other maps/mods and full path tracing remain unverified. The manual
 playtest focuses on ultrawide HUD behavior, motion, lighting, saved settings and
 optional real HDR calibration.
 
@@ -1021,21 +1021,21 @@ Configured each existing tree using `Configure-RBDOOM-DX12.ps1 -RepoRoot <game> 
 
 `Test-NeuralBuildIdentity.ps1`: PASS (exact-target selection, stale-output rejection, configuration isolation, safe-clean and PowerShell syntax fixtures). `git diff --check`: PASS. Focused code review checked fixed/automatic branches, first-use exposure initialization, bounded elapsed-time adaptation, live DLSS exposure-option refresh, SDK-off compilation, archived-setting precedence and SSR material selection. Build logs are ignored local `captures/neural/settings-{configure,build}-<tree>.log` files.
 
-No gameplay, GPU capture or visual comparison performed. The user owns visual checks. Auto-exposure off now changes the formerly incorrect adaptive behavior; dark rooms can become considerably darker. DLAA/native luminance equivalence is not established. See SETTINGS_REVIEW.md for the one-time preset and focused checks. No SDK or private NR dependency was added.
+No gameplay, GPU capture or visual comparison performed. Visual acceptance requires manual testing. Auto-exposure off now changes the formerly incorrect adaptive behavior; dark rooms can become considerably darker. DLAA/native luminance equivalence is not established. See SETTINGS_REVIEW.md for the one-time preset and focused checks. No SDK or private NR dependency was added.
 
 
 ## 2026-09-07 — User DLAA settings-menu crash and preference reset
 
-User reported an access violation while in settings, on the DLAA launch route. Windows Application Error 1000 identifies engine fault RVA `0x5363c3`; resolving against the matching RelWithDebInfo executable/PDB through DbgHelp gives `idSWFScriptObject::GetVariable(const char*, bool) + 0x63`, `neo/swf/SWF_ScriptObject.cpp:526`. The log includes `slSetConstants: eErrorDuplicatedConstants` with native TAA fallback earlier; causality is not established. No crash dump was found in the inspected locations. A symbol address without a call stack does not establish the underlying menu/object-lifetime defect. No speculative renderer or SWF fix applied.
+A playtest reported an access violation while in settings, on the DLAA launch route. Windows Application Error 1000 identifies engine fault RVA `0x5363c3`; resolving against the matching RelWithDebInfo executable/PDB through DbgHelp gives `idSWFScriptObject::GetVariable(const char*, bool) + 0x63`, `neo/swf/SWF_ScriptObject.cpp:526`. The log includes `slSetConstants: eErrorDuplicatedConstants` with native TAA fallback earlier; causality is not established. No crash dump was found in the inspected locations. A symbol address without a call stack does not establish the underlying menu/object-lifetime defect. No speculative renderer or SWF fix applied.
 
-At the user's request, backed up and removed active shared `D3BFGConfig.cfg` and generated `neural_dogfood.cfg`; no migration marker existed. Reset the local NR tuning section to addon defaults with enable/full-resolution safeguards retained. Saved games, logs, prior backups and runtime components are preserved. Existing launchers share this preference directory. All game preferences, including HDR calibration and key bindings, will regenerate; automatic contrast migration remains pending for next normal launch. No game launched. Next investigation needs the exact settings action or a captured crash stack; preference reset alone is not evidence that the crash is fixed.
+Backed up and removed active shared `D3BFGConfig.cfg` and generated `neural_dogfood.cfg`; no migration marker existed. Reset the local NR tuning section to addon defaults with enable/full-resolution safeguards retained. Saved games, logs, prior backups and runtime components are preserved. Existing launchers share this preference directory. All game preferences, including HDR calibration and key bindings, will regenerate; automatic contrast migration remains pending for next normal launch. No game launched. Next investigation needs the exact settings action or a captured crash stack; preference reset alone is not evidence that the crash is fixed.
 
 
 ## 2026-09-07 — Menu hover lifetime regression
 
 `Test-SWFHoverLifetime.py` compiled the actual `idSWF::HandleEvent` mouse-hover block with MSVC against reference-count fixtures: PASS for removed next target, repeated same target, empty space, reentrant roll-out and balanced references. The identical test against pre-fix `SWF_Events.cpp` fails with `retain after free`, establishing a real regression rather than a source-text assertion. Matching-binary disassembly confirms the reported fault is the initial object dereference, not the later hash-chain bounds workaround; that unrelated workaround was not modified.
 
-`Configure-RBDOOM-DX12.ps1` then `Build-RBDOOM.ps1 -Configuration RelWithDebInfo` passed for all three existing trees. Focused diff review and `git diff --check` passed. No renderer settings, shaders, SDKs or formats changed. No game launched; exact reproduction of the user's menu crash remains pending because no stack/dump or exact input sequence was available.
+`Configure-RBDOOM-DX12.ps1` then `Build-RBDOOM.ps1 -Configuration RelWithDebInfo` passed for all three existing trees. Focused diff review and `git diff --check` passed. No renderer settings, shaders, SDKs or formats changed. No game launched; exact reproduction of the reported menu crash remains pending because no stack/dump or exact input sequence was available.
 
 | Tree | Executable SHA-256 |
 |---|---|
@@ -1064,7 +1064,7 @@ Evidence is kept locally under `captures/neural/final-dlaa-borderless-smoke.log`
 | build-rt | `5EE3E982F5FA3475A5DBD95D3DD5DCBC7490C2F3A53E67D204E7D88DEF32B8A2` |
 | build | `9192B68133D40D9C3E0DF1BA5D09ED579093C315D37C59664ED6914EB2F8D112` |
 
-No user preference/saved-game resets. Appearance, live menu TAA/DLAA switching and real door/character comparisons remain the user's dogfood checks. Known limitations: visible-only opaque dynamic geometry, bounded budgets and suspended reflection temporal accumulation while dynamic surfaces are present. Next task: use visual feedback to prioritize off-screen dynamic coverage and secondary-hit history, then profile BLAS cost.
+No user preference/saved-game resets. Appearance, live menu TAA/DLAA switching and real door/character comparisons remain manual playtest checks. Known limitations: visible-only opaque dynamic geometry, bounded budgets and suspended reflection temporal accumulation while dynamic surfaces are present. Next task: use visual feedback to prioritize off-screen dynamic coverage and secondary-hit history, then profile BLAS cost.
 
 
 ## 2026-09-07 - Internal controls and Release readiness
@@ -1075,7 +1075,7 @@ Native RTX `Release` and all three existing `RelWithDebInfo` configurations buil
 
 The native RTX Release GPU smoke passed with validation enabled, all four features, synthetic/dynamic ray tests, safe key startup and all eight transitions through the new named bindable lighting commands. Temporal epochs advanced correctly; sampled invalid lighting values were zero; exit 0. Evidence: `captures/neural/internal-release-smoke-final.log`. An initial run caught a semicolon inside a CFG comment being interpreted as a command separator; the comment was corrected and the complete smoke rerun passed. Renderer output formats/resolution are unchanged.
 
-Package relocation, installer and exported-game validation are recorded in the follow-up package checkpoint. Visual menu navigation and friends' fresh-machine acceptance remain pending.
+Package relocation, installer and exported-game validation are recorded in the follow-up package checkpoint. Visual menu navigation and external fresh-machine acceptance remain pending.
 
 
 ## 2026-09-07 - Exported installer and relocated Release validation
@@ -1086,7 +1086,7 @@ Ran `Install-InternalTest.ps1 -NonInteractive` in a newly extracted folder with 
 
 Ran `Test-NeuralDoom-Smoke.ps1 -Configuration Release -Profile Native -RayTracingDiagnostics Synthetic -RayTracedAO -RayTracedContactShadows -RayTracedGI -RayTracedReflections -ResizeWidth 1920 -ResizeHeight 1080` against the extracted installed EXE and its own data/shaders, with validation enabled: PASS, exit 0, all named lighting toggles/reset epochs valid, dynamic GPU test passed, full-resolution reflection output and zero sampled invalid lighting values. Evidence: `captures/neural/internal-install-test.log`, `internal-package-tests.log`, and `internal-installed-smoke.log`. This verifies relocation on the development machine, not a different GPU/driver or untouched Windows installation.
 
-The final package refresh includes this record and the package regression script; engine/shader bytes are unchanged from the tested Release. Local Native, DLAA and NR launch validation is repeated after final manifest refresh. No package was uploaded or sent, and no private runtime or retail data entered the ZIP. Friends' menu/visual tests and fresh-machine acceptance remain the next step.
+The final package refresh includes this record and the package regression script; engine/shader bytes are unchanged from the tested Release. Local Native, DLAA and NR launch validation is repeated after final manifest refresh. No package was uploaded or sent, and no private runtime or retail data entered the ZIP. External menu/visual tests and fresh-machine acceptance remain the next step.
 
 
 ## 2026-09-07 - Automatic dependency acquisition and setup bootstrap
@@ -1100,9 +1100,9 @@ The final package refresh includes this record and the package regression script
 
 ## 2026-09-07 - Automatic installer integration passed
 
-The complete `fc5d2fd8` package compiled into a single Windows x64 .NET setup EXE; its embedded payload self-verification passed. The bootstrap sources are extracted from and hash-matched to the included source archive before compilation, avoiding checkout line-ending differences. Windows PowerShell 5.1 installed the extracted package without a LightingPackPath: it verified cached publisher archives from the successful live-download test, extracted/verified the lighting pack, imported owned BFG data and passed exact Release/shader/lighting readiness checks. Desktop shortcut creation was suppressed for this automated test to avoid changing the user's desktop; no game was launched. Evidence: `captures/neural/automatic-installer-integration.log`. Source engine/shader bytes remain unchanged from the previously GPU-tested Release.
+The complete `fc5d2fd8` package compiled into a single Windows x64 .NET setup EXE; its embedded payload self-verification passed. The bootstrap sources are extracted from and hash-matched to the included source archive before compilation, avoiding checkout line-ending differences. Windows PowerShell 5.1 installed the extracted package without a LightingPackPath: it verified cached publisher archives from the successful live-download test, extracted/verified the lighting pack, imported owned BFG data and passed exact Release/shader/lighting readiness checks. Desktop shortcut creation was suppressed for this automated test to avoid changing desktop shortcuts; no game was launched. Evidence: `captures/neural/automatic-installer-integration.log`. Source engine/shader bytes remain unchanged from the previously GPU-tested Release.
 
-The offline dependency suite also covers Steam path detection with a registry fixture. The final setup refresh includes these test records; `--verify` is repeated on its final EXE. Actual first-time VC++ installation/UAC and friends' fresh-machine interactive acceptance remain pending; signature rejection and installer exit handling were tested with mocked processes. Public archive download and real extraction were tested live. No third-party payload is bundled or committed. Final EXE/ZIP hashes accompany the artifacts.
+The offline dependency suite also covers Steam path detection with a registry fixture. The final setup refresh includes these test records; `--verify` is repeated on its final EXE. Actual first-time VC++ installation/UAC and external fresh-machine interactive acceptance remain pending; signature rejection and installer exit handling were tested with mocked processes. Public archive download and real extraction were tested live. No third-party payload is bundled or committed. Final EXE/ZIP hashes accompany the artifacts.
 # Installer destination and workspace cleanup — 2026-09-07
 
 `Bootstrap-InternalSetup.ps1` now asks interactive setup users to choose/create an
@@ -1112,9 +1112,9 @@ existing unrelated nonempty destinations remain rejected. No renderer changed.
 
 Windows PowerShell 5.1 extraction of the verified package into an explicitly
 selected separate test directory passed. PowerShell parsing and `git diff
---check` passed. The interactive folder picker awaits the user's installer test;
+--check` passed. The interactive folder picker awaits manual installer acceptance;
 no game was launched. See `WORKSPACE_LAYOUT.md` for the source, release, evidence,
-and preserved Desktop archive layout.
+and ignored local archive layout.
 
 
 ## Graphical setup wizard — 2026-09-07
@@ -1141,5 +1141,29 @@ Evidence is under `captures/neural/wizard-*`.
 Limits: progress reports actual stages with an indeterminate bar, not a guessed
 overall percentage. Cancellation waits for the current operation (including a
 large transfer) and preserves downloads; it does not roll back an installed
-Microsoft prerequisite. A real missing-runtime UAC flow and a user's end-to-end
+Microsoft prerequisite. A real missing-runtime UAC flow and an end-to-end
 wizard installation remain acceptance tests. No game launches automatically.
+
+
+## Public documentation and artifact privacy — 2026-09-07
+
+The shared checklist, checkpoint and planning notes now use general contributor
+and playtest instructions. Removed account references, personal scheduling and
+login notes, saved display-calibration values and local archive descriptions.
+Original notes remain only in ignored private reference storage. Technical
+validation results, limitations and license attribution are retained.
+
+`Test-NeuralDoom-PublicSource.ps1` now checks profile paths regardless of case
+or separator and inspects staged text independently of the working copy.
+Findings report file/line only. `Build-InternalPackage.py` checks every payload
+entry for ASCII/UTF-16 personal profile paths and accepts an explicit native
+build directory. `Test-PublicPrivacy.py` passed the corresponding negative and
+placeholder/staged-content fixtures. The staged fixture caught a PowerShell
+argument-quoting issue in the initial regex; a simpler expression fixed it.
+
+A fresh native Release built using a neutral temporary drive mapping instead
+of a personal source path. Inspection of the resulting executable found no
+personal profile paths, including ISPC assertion strings. No renderer sources,
+shader algorithms or output formats changed, and no game was launched. The
+refreshed package must pass the same privacy gate and setup payload verification
+before handoff. Existing Git history has not been rewritten.

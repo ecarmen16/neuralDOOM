@@ -1,6 +1,6 @@
 # Full-resolution RTX material lighting
 
-**2026-09-06 reflection update:** Full-resolution rough reflections now use the native material response and replace matched probe specular. Default GI strength is 1.125, down 25%. See [reflection controls, contracts and the three-check playtest](RAY_TRACED_REFLECTIONS.md). GPU validation of this addition remains with the user.
+**2026-09-06 reflection update:** Full-resolution rough reflections now use the native material response and replace matched probe specular. Default GI strength is 1.125, down 25%. See [reflection controls, contracts and the three-check playtest](RAY_TRACED_REFLECTIONS.md). GPU validation of this addition remains pending manual testing.
 
 `Launch-NeuralDoom-RTX.cmd` enables reflections, material bounce, contact shadows and AO. It supports Native and optional DLAA rendering, with native HDR output when Windows HDR is enabled. `Launch-NeuralDoom.cmd` preserves saved feature choices. Both select the exact CMake output and verify its build manifest. No ReShade bridge is required.
 

@@ -1,6 +1,6 @@
 # Rendering settings review — 2026-09-07
 
-Goal: preserve Doom 3 shadow contrast while retaining full-resolution material lighting and DLAA. These are conservative starting values, not a claim of exact 2004 renderer matching. Visual comparison remains with the user.
+Goal: preserve Doom 3 shadow contrast while retaining full-resolution material lighting and DLAA. These are conservative starting values, not a claim of exact 2004 renderer matching. Visual comparison remains pending manual testing.
 
 ## Findings and changes
 
@@ -17,7 +17,7 @@ Goal: preserve Doom 3 shadow contrast while retaining full-resolution material l
 |---|---|---|
 | Scene contrast | Ambient 0.375; fixed luminance 0.5; exposure +0.5 EV | Ambient and Brightness menu controls; fixed/automatic exposure via console. Saved exposure remains user-owned. |
 | Direct lights | Light scale 3; bump/specular/shadows enabled | Preserve authored lighting rather than reducing all direct light. Saved light scale is not overwritten. |
-| HDR | Factory SDR; launcher AutoHDR option; scene white 200, peak 1000, UI white 200 nits | Existing sliders are sufficient for calibration. Actual display peak is not a GPU capability. Preserve the user's saved peak 650 and UI white 160. |
+| HDR | Factory SDR; launcher AutoHDR option; scene white 200, peak 1000, UI white 200 nits | Existing sliders are sufficient for calibration. Actual display peak is not a GPU capability. Preserve existing display calibration when changing unrelated settings. |
 | RT diffuse | Off by factory; RTX launcher enables; strength 1.125, 4 rays, radius 384, emissive 2 | Intensity and quality are separate cvars. Leave emissive at 2 until tested separately; visible radiance cache and explicit offscreen lighting differ. |
 | RT reflections | Off by factory; RTX launcher enables; blend 0.65, 4 rays, roughness limit 0.7, distance 2048 | Full viewport resolution. Static opaque world geometry only; dynamic geometry remains future work. |
 | Occlusion | SSAO on; RT AO optional, strength 1, 8 rays, radius 64 | RT AO feeds the existing AO path; retain SSAO enable as required by that path. Do not disable it thinking it is a redundant independent effect. |

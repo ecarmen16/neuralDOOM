@@ -41,7 +41,7 @@ These archived cvars apply to the gameplay HUD only. The first centers ordinary 
 
 New-config defaults are `swf_hudMaxAspect 1.777778` (Auto, centered 16:9) and `swf_hudScale 1` (original size). Controls are live and do not change world-camera or weapon FOV. Menus, PDA/world GUIs, absolute-edge anchors, and full-screen overlay bounds retain their existing placement. HUD scaling also scales centered HUD elements, including the crosshair. The SWF mouse-coordinate conversion uses the last rendered HUD scale. Split-screen render calls retain their existing layout.
 
-The smoke runner's HUD settings are disposable and do not change the user's saved preferences. System Options exposes HUD Layout (Full width, Auto 16:9, Centered 21:9) and HUD Size (50-150% in 5% steps). Leaving the menu archives changes without requesting a restart. Layout is recomputed from the current viewport every frame, so resizing needs no separate apply action. Existing saved values, including full width, are preserved. Broader interaction, notification, and motion review remains pending.
+The smoke runner's HUD settings are disposable and do not change existing saved preferences. System Options exposes HUD Layout (Full width, Auto 16:9, Centered 21:9) and HUD Size (50-150% in 5% steps). Leaving the menu archives changes without requesting a restart. Layout is recomputed from the current viewport every frame, so resizing needs no separate apply action. Existing saved values, including full width, are preserved. Broader interaction, notification, and motion review remains pending.
 
 
 ## Native HDR prototype

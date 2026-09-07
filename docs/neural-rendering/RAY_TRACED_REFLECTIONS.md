@@ -30,7 +30,7 @@ All reflection cvar changes participate in the existing temporal-history reset m
 2. **Motion:** Walk sideways and turn near the reflective surface. Watch for shimmer, trails, disappearing reflections, bright speckles or hard screen-edge changes. Fire and watch a door/character; those objects are not yet in the ray scene.
 3. **Transitions:** Toggle F11 off/on, resize, then reload a save or change maps. Repeat briefly in DLAA if Native looks good. Reflections should recover and the ultrawide HUD should remain stable.
 
-The code and compiled shader contracts are checked without launching the game. This pass's GPU correctness, visual quality and 5090 performance are still playtest items. Report profile, map/location and the visible issue; no manual diagnostic run is required.
+The code and compiled shader contracts are checked without launching the game. This pass's GPU correctness, visual quality and GPU performance are still playtest items. Report profile, map/location and the visible issue; no manual diagnostic run is required.
 
 ## Implementation contract
 

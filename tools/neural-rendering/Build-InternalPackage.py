@@ -9,6 +9,7 @@ import json
 import pathlib
 import subprocess
 import struct
+import re
 import zipfile
 
 
@@ -18,6 +19,12 @@ def git(root, *args):
 
 def digest(data):
     return hashlib.sha256(data).hexdigest().upper()
+
+
+def has_personal_profile_path(data):
+    # Covers ASCII/UTF-8 and UTF-16 diagnostic strings, including compiler output.
+    pattern = rb'''(?i)\b[a-z]:[\\/]+Users[\\/]+(?![<%${])[^\\/\s<>"']+'''
+    return re.search(pattern, data) is not None or re.search(pattern, data.replace(b'\0', b'')) is not None
 
 
 def pe_imports(data):
@@ -63,6 +70,7 @@ def main():
     ap.add_argument('--source', type=pathlib.Path, required=True)
     ap.add_argument('--game', type=pathlib.Path, required=True)
     ap.add_argument('--output', type=pathlib.Path, required=True)
+    ap.add_argument('--build-directory', type=pathlib.Path, help='Native Release build directory (defaults to <game>/build-rt)')
     args = ap.parse_args()
     source, game = args.source.resolve(), args.game.resolve()
     revision = git(source, 'rev-parse', 'HEAD').decode().strip()
@@ -71,7 +79,8 @@ def main():
             raise RuntimeError(f'Commit or preserve outstanding edits before packaging: {root}')
         if git(root, 'rev-parse', 'HEAD').decode().strip() != revision:
             raise RuntimeError('Source and build checkout commits differ')
-    manifest = json.loads((game / 'build-rt/neuraldoom-build-Release.json').read_text(encoding='utf-8-sig'))
+    build_directory = args.build_directory or game / 'build-rt'
+    manifest = json.loads((build_directory / 'neuraldoom-build-Release.json').read_text(encoding='utf-8-sig'))
     if manifest['commit'] != revision or manifest['dirty'] or manifest['configuration'] != 'Release':
         raise RuntimeError('Rebuild Release from the clean matching source commit')
     if manifest['features']['streamline'] != 'OFF' or manifest['features']['rayTracing'] != 'ON':
@@ -114,6 +123,9 @@ def main():
     portable['imports'] = imports
     portable['files'] = [{'path': name, 'sha256': digest(data)} for name, data in sorted(files.items())]
     files['internal-package.json'] = (json.dumps(portable, indent=2) + '\n').encode()
+    for name, data in files.items():
+        if has_personal_profile_path(data):
+            raise RuntimeError(f'Personal profile path in package entry: {name}. Build release artifacts from a neutral path.')
     args.output.parent.mkdir(parents=True, exist_ok=True)
     # Never overwrite a previously handed-out artifact.
     with args.output.open('xb') as out, zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED, compresslevel=6) as z:

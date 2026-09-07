@@ -69,3 +69,5 @@ neo/bin/
 /releases/
 *.nv-gpudmp
 *.rdc
+__pycache__/
+*.pyc

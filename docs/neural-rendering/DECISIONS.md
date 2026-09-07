@@ -100,7 +100,7 @@ Resolve these only after `RECON_REPORT.md` and targeted captures provide evidenc
 
 **Reasoning:** Native-resolution DLAA exercises the full official DLSS temporal contract and exposes incorrect depth, motion, jitter, reset, mask, exposure, and layer inputs without simultaneously changing render resolution. It gives a direct image-quality verdict against the established native TAA path before resolution plumbing expands the test surface.
 
-**Consequence:** `r_neuralBackend 2` evaluates Streamline DLAA Preset K from linear HDR into the existing pre-tone-map `_taaResolved` target. NVIDIA auto exposure is used for this first slice; the engine exposure buffer remains in the neutral contract for later validation. A minimal `r_neuralBackend 3` Quality path exists only to prove cross-resolution extents and fallback. Full scaling-mode UX and tuning remain deferred because 100% source resolution is preferred for the planned neural-rendering experiment on the RTX 5090.
+**Consequence:** `r_neuralBackend 2` evaluates Streamline DLAA Preset K from linear HDR into the existing pre-tone-map `_taaResolved` target. NVIDIA auto exposure is used for this first slice; the engine exposure buffer remains in the neutral contract for later validation. A minimal `r_neuralBackend 3` Quality path exists only to prove cross-resolution extents and fallback. Full scaling-mode UX and tuning remain deferred because 100% source resolution is preferred for the planned neural-rendering experiment on the test GPU.
 
 ## D-013 - Brand the downstream project neuralDoom and keep dependencies layered
 
@@ -132,6 +132,6 @@ Resolve these only after `RECON_REPORT.md` and targeted captures provide evidenc
 
 Capture the native probe specular layer and its material response during IBL shading, then blend ray hits into that layer. Keep probes for ray misses and unsupported receivers. This preserves native material roughness/normal maps and avoids unconditional extra specular light. For multi-stage materials, overwrite the three capture targets together and replace only that matching layer.
 
-Share the existing static-world GI scene/material/light cache; do not duplicate its atlas or add a denoiser SDK. Filter incident radiance at full viewport resolution and apply current-pixel BRDF response afterward. Reuse engine temporal epochs with explicit normal/distance/roughness rejection. Keep compiled-out and feature-off fallbacks, and require offline shader permutation/output/binding checks alongside builds while the user handles visual validation.
+Share the existing static-world GI scene/material/light cache; do not duplicate its atlas or add a denoiser SDK. Filter incident radiance at full viewport resolution and apply current-pixel BRDF response afterward. Reuse engine temporal epochs with explicit normal/distance/roughness rejection. Keep compiled-out and feature-off fallbacks, and require offline shader permutation/output/binding checks alongside builds with separate manual visual validation.
 
-Reduce default diffuse bounce strength 1.5 to 1.125 in response to the user's brightness feedback. Do not reduce render resolution. Rigid dynamic geometry is the next bounded scene-coverage task after reflection playtesting.
+Reduce default diffuse bounce strength 1.5 to 1.125 in response to the contrast review. Do not reduce render resolution. Rigid dynamic geometry is the next bounded scene-coverage task after reflection playtesting.

@@ -90,7 +90,7 @@ Steam libraries may be elsewhere. Run `Setup-NeuralDoom.cmd` and select the owne
 
 ## Native RTX source installation
 
-Use a recursive clone of `ecarmen16/neuralDoom` and the branch containing the desired checkpoint. In an existing clone, initialize the pinned dependencies with `git submodule update --init --recursive`. Install the prerequisites above first.
+Use a recursive clone of the downstream repository and the branch containing the desired checkpoint. In an existing clone, initialize the pinned dependencies with `git submodule update --init --recursive`. Install the prerequisites above first.
 
 Extract `base/_rbdoom_global_illumination_data.pk4` from the official RBDOOM 1.6.0 release; see [PROBE_LIGHTING.md](PROBE_LIGHTING.md). Then run:
 

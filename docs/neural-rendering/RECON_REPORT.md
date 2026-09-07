@@ -10,7 +10,7 @@ Scope: first-session, read-only renderer reconnaissance plus build/helper docume
 
 ## Executive result
 
-The unmodified upstream renderer configured and built as a DX12-only `RelWithDebInfo` target, then launched successfully against locally staged user-owned Doom 3 BFG data. The user visually confirmed that a new game rendered through DX12 and created a resumable save. No renderer C/C++, shader, game-code, or CMake dependency-list files were changed.
+The unmodified upstream renderer configured and built as a DX12-only `RelWithDebInfo` target, then launched successfully against locally staged user-owned Doom 3 BFG data. Manual playtesting confirmed that a new game rendered through DX12 and created a resumable save. No renderer C/C++, shader, game-code, or CMake dependency-list files were changed.
 
 The renderer already has most of the raw resources needed for an eventual temporal upscaler: pre-tonemap HDR color, depth, jittered and unjittered matrices, camera reprojection vectors, two feedback images, and a post-tonemap LDR image. It does **not** yet have complete motion: the existing velocity pass is camera-only, retains no previous rigid transforms or previous skinned poses, and has no proven discontinuity reset lifecycle. The first safe code task is therefore diagnostic output separation and capture, not an SDK call.
 
@@ -62,7 +62,7 @@ Runtime command:
 .\tools\neural-rendering\Run-RBDOOM.ps1
 ```
 
-The helper launched with `+set r_graphicsAPI dx12`. The user visually confirmed DX12, entered a new game, observed correct rendering, and created a resumable save. Local metadata is under the ignored path `captures/neural/20260831-220206/baseline-metadata.md`.
+The helper launched with `+set r_graphicsAPI dx12`. Manual playtesting confirmed DX12, entered a new game, observed correct rendering, and created a resumable save. Local metadata is under the ignored path `captures/neural/20260831-220206/baseline-metadata.md`.
 
 ## Frame flow
 
@@ -178,7 +178,7 @@ The swapchain format defaults to `RGBA8_UNORM` in `neo/sys/DeviceManager.h`; no 
 - The first F12 capture was intentionally retained as failed evidence: the key also invoked RBDOOM's screenshot path, producing a valid container with only buffer unmaps and `Present`.
 - Using Print Screen avoided the conflict and produced complete captures with RenderDoc reporting no replay problems.
 - Stationary frame 1487: ignored local file `captures/neural/renderdoc-baseline-pass2/baseline_frame1487.rdc`, 430,744,078 bytes, SHA-256 `4BE1C051078CBB08C974F622566C864894EC32DC452CC0263C6AB714CC3614B4`.
-- Forward-motion frame 1469: ignored local file `captures/neural/renderdoc-motion/lateral_frame1469.rdc`, 435,818,501 bytes, SHA-256 `D734ADF641C71EABC1499D1224372040048EC8AE001BA70A0CA1AB3BBB397BA8` (the directory name predates the user's choice to move forward rather than laterally).
+- Forward-motion frame 1469: ignored local file `captures/neural/renderdoc-motion/lateral_frame1469.rdc`, 435,818,501 bytes, SHA-256 `D734ADF641C71EABC1499D1224372040048EC8AE001BA70A0CA1AB3BBB397BA8`.
 - Frame 1487 event order: `Render_MotionVectors` EID 8074-8080; `Render_TemporalAA` 8085-8092; `Render_ToneMapPass` 8097-8126; first swapchain blit 8130-8142; `Render_PostProcessing` 8146-8180; `Render_DrawViewGUI` 8185-8308.
 - Captured resources: `_currentRenderHDR` is 1280x720 `R16G16B16A16_FLOAT`; `_currentDepth` is single-sample `D24_UNORM_S8_UINT`; `_currentRenderLDR` is single-sample `R8G8B8A8_UNORM`; `_taaMotionVectors` is single-sample `R16G16_FLOAT`. `_taaFeedback1`, `_taaFeedback2`, and `_taaResolved` are present and active in the TAA sequence.
 

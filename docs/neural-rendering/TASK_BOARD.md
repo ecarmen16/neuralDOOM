@@ -25,7 +25,7 @@ Working branch: `codex/rt-foundation`, prepared from the completed `codex/probe-
 | RT-REFLECTIONS | VERIFY | Full-resolution native-material reflections, probe replacement, temporal/spatial filter and 25% lower GI default | Native RT, DLAA and RT-OFF builds plus offline shader contracts; GPU playtest pending. See RAY_TRACED_REFLECTIONS.md. |
 
 The implemented diagnostics and exact resource contract are in
-[RAY_TRACING_DIAGNOSTICS.md](RAY_TRACING_DIAGNOSTICS.md). The user's short manual
+[RAY_TRACING_DIAGNOSTICS.md](RAY_TRACING_DIAGNOSTICS.md). The short manual
 pass is [DOGFOOD_CHECKLIST.md](DOGFOOD_CHECKLIST.md), launched with
 `Launch-NeuralDoom-RTX.cmd` in the game checkout. The first gameplay effect is
 documented in [RAY_TRACED_AO.md](RAY_TRACED_AO.md). Full instance/material scene
@@ -33,7 +33,7 @@ registration, moving occluders and path tracing remain open.
 
 See `UNATTENDED_WORKFLOW.md` for the implemented controls and test commands, and the 2026-09-06 entry in `TEST_RESULTS.md` for exact evidence and failures.
 
-Planning checkpoint: development branch is `codex/modernization-foundation`, based on `76ff35b5`. See [MODERNIZATION_PLAN.md](MODERNIZATION_PLAN.md) for the initial reviewed state, AFK validation policy, and ordered ND3-600 through ND3-680 backlog. The modernization table above supersedes its initial READY status; older DONE entries below retain their historical evidence.
+Planning checkpoint: development branch is `codex/modernization-foundation`, based on `76ff35b5`. See [MODERNIZATION_PLAN.md](MODERNIZATION_PLAN.md) for the initial reviewed state, unattended validation policy, and ordered ND3-600 through ND3-680 backlog. The modernization table above supersedes its initial READY status; older DONE entries below retain their historical evidence.
 
 | ID | Status | Task | Exit evidence |
 |---|---|---|---|
@@ -43,7 +43,7 @@ Planning checkpoint: development branch is `codex/modernization-foundation`, bas
 | ND3-003 | DONE | Compile unmodified `RelWithDebInfo` | Successful build; `LAST_BUILD.txt`; staged executable hash recorded |
 | ND3-004 | DONE | Launch baseline with local BFG data | User verified DX12/new game and created a save; clean exit |
 | ND3-010 | DONE | Renderer reconnaissance | `RECON_REPORT.md` with exact paths/symbols |
-| ND3-011 | DONE | Select reproducible test save/scene | User save resumed in Mars City Hangar; stationary and forward-motion captures recorded |
+| ND3-011 | DONE | Select reproducible test save/scene | Test save resumed in Mars City Hangar; stationary and forward-motion captures recorded |
 | ND3-012 | DONE | Capture baseline GPU frame | Full stationary and moving RenderDoc captures; formats/order recorded in `RECON_REPORT.md` |
 
 ## Proof-of-concept track
@@ -76,7 +76,7 @@ Planning checkpoint: development branch is `codex/modernization-foundation`, bas
 | ND3-300 | DONE | Re-verify current Streamline/DLSS docs and license | Official v2.12.0 pinned; local development allowed; GPL binary redistribution explicitly blocked pending legal review |
 | ND3-310 | DONE | Add OFF-by-default SDK build option | Default DX12 and isolated Streamline 2.12.0 configurations built successfully; SDK-enabled executable hash recorded |
 | ND3-320 | DONE | Integrate native DLAA | SDK evaluated 597 native-resolution frames with zero rejects; saved-game A/B showed no visible regression and only subtle/no readily discernible change from native TAA |
-| ND3-330 | DEFERRED | Add full DLSS quality-mode/resolution plumbing | Preliminary 67%-to-native Quality mode evaluated 153 frames with zero rejects; not a project priority on RTX 5090 |
+| ND3-330 | DEFERRED | Add full DLSS quality-mode/resolution plumbing | Preliminary 67%-to-native Quality mode evaluated 153 frames with zero rejects; deferred while native-resolution reconstruction is validated |
 | ND3-340 | DONE | Validate RenoDX interception compatibility | Local ReShade log: feature 18 evaluated at 5120x1440; corrected launch produced a user-confirmed visible neural image; no external binaries tracked |
 | ND3-350 | DONE | Start local NR compatibility stack from NeuralDoom | SDK-OFF/ON builds pass; renamed ReShade runtime was explicitly loaded by the engine, API 18 add-on registered, NR runtime preloaded at D3D12 device init, and user confirmed visible gameplay NR/F6 behavior |
 | ND3-400 | DEFERRED | Implement official DLSS 5 backend | Public SDK and legal path required |

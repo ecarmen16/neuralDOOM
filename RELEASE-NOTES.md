@@ -134,10 +134,10 @@ The path command shows the priority how a file is being looked up in the virtual
 Higher is better.
 ```
 Current search path:
-C:\Users\rober\Saved Games\id Software\RBDOOM 3 BFG/mod_E3_Alpha_Weapons
+%USERPROFILE%\Saved Games\id Software\RBDOOM 3 BFG/mod_E3_Alpha_Weapons
 C:\Projects\RBDOOM-3-BFG/mod_E3_Alpha_Weapons
 C:\Projects\RBDOOM-3-BFG/mod_E3_Alpha_Weapons/zzz_E3_Alpha_Weapons.resources (41 files)
-C:\Users\rober\Saved Games\id Software\RBDOOM 3 BFG/mod_D3HDP_Lite
+%USERPROFILE%\Saved Games\id Software\RBDOOM 3 BFG/mod_D3HDP_Lite
 C:\Projects\RBDOOM-3-BFG/mod_D3HDP_Lite
 C:\Projects\RBDOOM-3-BFG/mod_D3HDP_Lite/zzzD3HDPBFGLite06.resources (1641 files)
 C:\Projects\RBDOOM-3-BFG/mod_D3HDP_Lite/zzzD3HDPBFGLite05.resources (3173 files)
@@ -145,7 +145,7 @@ C:\Projects\RBDOOM-3-BFG/mod_D3HDP_Lite/zzzD3HDPBFGLite04.resources (1683 files)
 C:\Projects\RBDOOM-3-BFG/mod_D3HDP_Lite/zzzD3HDPBFGLite03.resources (1047 files)
 C:\Projects\RBDOOM-3-BFG/mod_D3HDP_Lite/zzzD3HDPBFGLite02.resources (777 files)
 C:\Projects\RBDOOM-3-BFG/mod_D3HDP_Lite/zzzD3HDPBFGLite01.resources (524 files)
-C:\Users\rober\Saved Games\id Software\RBDOOM 3 BFG/base
+%USERPROFILE%\Saved Games\id Software\RBDOOM 3 BFG/base
 C:\Projects\RBDOOM-3-BFG/base
 C:\Projects\RBDOOM-3-BFG/base/maps/site3.resources (1725 files)
 ...

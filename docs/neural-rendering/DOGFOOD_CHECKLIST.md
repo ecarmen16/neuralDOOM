@@ -1,69 +1,55 @@
-# neuralDoom RTX playtest: about 5 minutes
+# neuralDoom playtest checklist
 
-Latest changes: [graphics controls and moving ray geometry](GRAPHICS_AND_DYNAMIC_RAYS.md).
+Use this checklist for a short, repeatable graphics and settings test. Record
+manual observations separately from automated build and runtime results.
 
-For this build, use **option 2 (DLAA)** and check these first:
+## Start the build
 
-- [ ] **Settings:** Scroll to Reconstruction. Switch TAA/DLAA, adjust Reflection Strength and Bounce Strength independently, and change Ray Quality. Confirm Rendering Status stays at your full resolution. Try both mouse scrolling and the scrollbar.
-- [ ] **Motion:** Watch a door open and a character move near a reflective floor or lit wall. Toggle Moving Ray Geometry, then Animated Ray Geometry. Look for stuck silhouettes, trails, missing materials or unusual noise.
-- [ ] **Persistence/contrast:** Quit normally and relaunch; your reconstruction and RTX choices should remain. Doom Lighting Defaults restores conservative contrast without changing HDR calibration, ray quality or resolution.
+For the internal native RTX package, use the **neuralDoom Internal Test** Start
+menu entry or the installed `Play-InternalTest.cmd`. Installation and the exact
+comparison keys are documented in [INTERNAL_TESTING.md](../../INTERNAL_TESTING.md).
 
-Visual acceptance remains yours; automated checks do not judge appearance.
+Development checkouts may also offer Native, DLAA and local NR launch profiles.
+Test DLAA or NR only when their required components are already installed and
+validated. They are not included in the native RTX test package.
 
-In the game installation's `RBDOOM-3-BFG` folder, double-click
-`Launch-NeuralDoom-RTX.cmd`. Choose **DLAA** for the new controls; **Native** provides the SDK-free comparison. The launcher verifies the exact build and opens the
-main menu. Start a game, or press **~** and enter `devmap game/mars_city2` to visit
-the automated test map quickly.
+## Five-minute check
 
-All profiles share persistent test settings and saves in `captures/dogfood`.
-The first launch starts in a 2560x720 window. Resolution and HUD choices persist.
-Both launchers preserve saved HDR settings. Select HDR Output in System Options, then restart; native HDR uses Windows HDR when enabled and otherwise falls back to SDR. Native/DLAA keep the bridge disabled. Choose option 3 (NR) for the engine-loaded local compatibility stack: F6 toggles NR, F4 toggles bounce. NR uses the existing SDR compatibility output and full-resolution DLAA passthrough when disabled.
+- [ ] **Settings:** Open System Options and scroll through the graphics controls
+  with both mouse and keyboard. Adjust reflection and bounce strengths separately.
+  Confirm Rendering Status matches the selected profile and resolution.
+- [ ] **Material lighting:** Near a screen, reflective surface or dark corner,
+  compare F3 reflections, F4 bounce, F7 ambient occlusion and F8 contact shadows.
+  F11 toggles all four effects together. Check that shadows remain readable and
+  screen reflections do not overwhelm the original lighting.
+- [ ] **Moving geometry:** Watch a door and an animated character near a reflective
+  surface. Compare Moving Ray Geometry (F2) and Animated Ray Geometry in settings.
+  Look for stale silhouettes, trails, missing materials or distracting noise.
+- [ ] **HUD and field of view:** Select a suitable HUD layout, size and FOV. Resize
+  the window and switch to the display's fullscreen resolution. Check centered
+  crosshairs, readable health/ammo, PDA layout and text clipping. The FOV control
+  uses a 16:9 reference value; lower it if wide-screen edge stretching is excessive.
+- [ ] **Motion and effects:** Walk through a doorway, turn quickly, fire and open
+  the PDA. Check for lighting pops, trails, stutter or missing effects.
+- [ ] **HDR, when supported:** Enable Windows HDR before testing native HDR output.
+  Calibrate Scene White, Peak and UI White for the display. Compare lamps, dark
+  corners and menus. `hdrStatus` reports active output; an SDR screenshot cannot
+  establish the appearance of an HDR display.
+- [ ] **Persistence:** Quit normally and relaunch. Confirm graphics, resolution,
+  HUD and bindings persist. Doom Lighting Defaults should restore conservative
+  contrast without resetting unrelated display calibration or controls.
+- [ ] **Save/load:** In a safe test session, check F5 quicksave and F9 quickload.
 
-- [ ] **Material lighting:** Safe keys install automatically; remap them in Keyboard Bindings. F4 toggles full-resolution material bounce, F8 toggles contact shadows,
-  and F3 toggles reflections,
-  F10 cycles comparison views, and F11 toggles all RTX effects. Check colored
-  lighting near a wall/corner; the new bounce default is `r_rayTracedGIStrength 1.125`.
-  See [RTX_LIGHTING.md](RTX_LIGHTING.md) for controls and current limitations.
-- [ ] **RTX AO comparison:** In a room with corners and nearby surfaces, enter
-  `r_rayTracedAO 0`, then `r_rayTracedAO 1`. Look for changes in ambient contact
-  shading. Walk, turn and watch a door/character. Report flicker, seams, excessive
-  darkness or stutter. The ray scene now includes supported visible opaque moving geometry.
-  Off-screen dynamic objects, glass, particles and the first-person weapon remain excluded.
-- [ ] **Ultrawide HUD:** Settings > System > System Options: choose **HUD Layout =
-  Auto (16:9)** and a comfortable **HUD Size**. Resize the window and switch to
-  your usual fullscreen resolution. Health/ammo should stay centered and readable;
-  the crosshair should stay centered. Try Full width and Centered 21:9 too.
-- [ ] **Field of view:** Settings > Game Options > Field of View now spans
-  **60–100** in five-degree steps. It is a 16:9 reference value: at 5120x1440,
-  80 gives about 118 degrees horizontally; 70 gives about 109. Try **70** if
-  objects at the edges look stretched. Back out to apply/save; no restart needed.
-  Lower settings show less of the scene. Multiplayer retains its existing
-  minimum of 80. Borderless mode uses the current monitor's desktop resolution.
-- [ ] **Motion and lighting:** Walk through a dark room and a doorway, turn quickly,
-  fire, and watch an animated character. Check for flashes, lighting pops, trails,
-  unusually crushed shadows or distracting reflections. Open the PDA and inspect
-  health/ammo/objective messages for clipping.
-- [ ] **DLAA comparison:** Quit, choose DLAA in the launcher and repeat the same
-  route. Compare thin edges, grates, reflections and the weapon during movement.
-  Note which profile looks better and whether either stutters.
-- [ ] **Persistence:** Change HUD Size, leave the menu, quit and relaunch. Confirm
-  the size/layout and chosen resolution remain set and still adapt to resizing.
-- [ ] **HDR:** With Windows HDR enabled, the RTX launcher requests HDR output on
-  startup. Check bright
-  lamps, dark corners and menu brightness; adjust HDR Scene White, Peak and UI
-  White. `hdrStatus` should report `windowsHDR=1` and `active=1`. Ordinary PNGs
-  cannot show the monitor's actual HDR appearance.
+Optional DLAA testing should repeat the same route and settings, comparing thin
+edges, grates, reflections and weapon motion. Full path tracing is not implemented;
+current dynamic ray coverage is limited to supported visible opaque geometry.
+Glass, particles, off-screen dynamic objects and the weapon are excluded from
+that ray scene.
 
-No manual diagnostics are required. `rayTracingAOStatus` is available if needed;
-an enabled pass in a populated room should show nonzero `matched` and `occluded`.
-AO, contact shadows, diffuse bounce and static-world reflections are implemented.
-Dynamic ray geometry and full path tracing remain upcoming. The ordinary dogfood launcher
-uses your saved AO setting; `r_rayTracedAO 0` returns to raster SSAO immediately.
-AO replaces SSAO on matching static surfaces. Less occlusion can look brighter;
-this is a change in ambient shading, not an additional light or AA technique.
+## Report a result
 
-For feedback, send **Native/DLAA, map/location, what you did, and what looked
-wrong**. `screenshot screenshots/dogfood.png` captures an SDR preview. Logs are
-`captures/dogfood/base/dogfood-Native.log` and `dogfood-DLAA.log`; the corresponding
-`build-*.json` files identify the executable used. Logs are replaced on the next
-launch of that profile, so retain one if it documents a problem.
+Include the build/version, profile, GPU/driver, resolution, HDR state, map, steps,
+observed problem and whether a specific effect toggle removes it. Test settings
+and saves are stored under `captures/dogfood`; profile logs are under
+`captures/dogfood/base`. Preserve relevant logs before relaunching that profile.
+Review logs and screenshots for personal information before sharing them.

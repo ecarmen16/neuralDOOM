@@ -42,7 +42,7 @@ try {
         if ($forbiddenLeafNames -contains $leaf.ToLowerInvariant()) {
             $failures += "Tracked local runtime: $trackedFile"
         }
-        if ($normalized -match '(^|/)(captures|neural-local|local-proprietary|local-research|\.neuraldoom-cache|mod_D3HDP_Lite)(/|$)') {
+        if ($normalized -match '(^|/)(captures|releases|neural-local|local-proprietary|local-research|\.neuraldoom-cache|mod_D3HDP_Lite)(/|$)') {
             $failures += "Tracked local-only path: $trackedFile"
         }
         if ($normalized -match '(?i)\.(resources?|pk4|rdc)$') {
@@ -54,18 +54,32 @@ try {
         $RepoRoot,
         [Environment]::GetFolderPath('UserProfile')
     )
+    $machinePaths = @($machinePaths | ForEach-Object { $_; $_.Replace('\', '/') } | Select-Object -Unique)
     foreach ($machinePath in $machinePaths) {
-        $grepArgs = @('grep', '-I', '-n', '-F')
+        $grepArgs = @('grep', '-I', '-n', '-i', '-F')
         if ($Staged) { $grepArgs += '--cached' }
         $personalPathMatches = @(& git @grepArgs -- $machinePath . 2>$null)
         if ($LASTEXITCODE -eq 0) {
             foreach ($match in $personalPathMatches) {
-                $failures += "Machine-specific path in tracked text: $match"
+                $location = ($match -split ':', 3)[0..1] -join ':'
+                $failures += "Machine-specific path in tracked text: $location"
             }
         } elseif ($LASTEXITCODE -ne 1) {
             throw 'git grep failed.'
         }
     }
+
+    # Catch paths from other machines as well, allowing documented placeholders.
+    $grepArgs = @('grep', '-I', '-n', '-i', '-E')
+    if ($Staged) { $grepArgs += '--cached' }
+    $profilePattern = '[a-z]:[\\/]+Users[\\/]+[[:alnum:]_.-]+'
+    $profileMatches = @(& git @grepArgs -- $profilePattern . 2>$null)
+    if ($LASTEXITCODE -eq 0) {
+        foreach ($match in $profileMatches) {
+            $location = ($match -split ':', 3)[0..1] -join ':'
+            $failures += "Personal profile path in tracked text: $location"
+        }
+    } elseif ($LASTEXITCODE -ne 1) { throw 'Profile-path audit failed.' }
 
     if (-not $AllowDirty) {
         $dirty = @(& git status --porcelain --untracked-files=all)

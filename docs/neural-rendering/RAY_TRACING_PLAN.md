@@ -3,12 +3,12 @@
 Current implementation: [RTX_LIGHTING.md](RTX_LIGHTING.md) covers static-world
 AO, contact shadows and diffuse material bounce; [RAY_TRACED_REFLECTIONS.md](RAY_TRACED_REFLECTIONS.md)
 adds full-resolution native-material reflections. The new reflection pass has
-build/offline contract validation and awaits the user's GPU playtest. Dynamic
+build/offline contract validation and awaits manual GPU testing. Dynamic
 instance/material/motion gates below remain open. The following reconnaissance
 records the earlier capability baseline; `sceneImplemented=0` describes the
 incomplete full scene, not the absence of these optional static-world effects.
 
-Source review and capability check: 2026-09-06, starting at `5ca342cf` on `codex/probe-lighting`. The user expanded the modernization scope to investigate RTX/path tracing while AFK. This extends the initial project's scope; it does not claim a ray-traced renderer is implemented.
+Source review and capability check: 2026-09-06, starting at `5ca342cf` on `codex/probe-lighting`. The modernization scope was extended to investigate native ray tracing and path tracing. This extends the initial project's scope; it does not claim a ray-traced renderer is implemented.
 
 The next implementation branch is `codex/rt-foundation`, prepared from the validated probe-lighting checkpoint. Build one reusable ray scene, prove intersections, then introduce shadows, reflections, diffuse bounce lighting, and finally an optional full path-tracing mode. Indirect lighting is the largest anticipated change to Doom 3's atmosphere; a single light's shadow visibility is a smaller first correctness test. These are engineering priorities, not measured visual-quality gains.
 
@@ -28,7 +28,7 @@ The configured Windows SDK 10.0.26100.0 DXC compiled the initial isolated `cs_6_
 
 ## Implementation sequence and acceptance gates
 
-| Stage | Concrete work | AFK exit evidence |
+| Stage | Concrete work | Unattended exit evidence |
 |---|---|---|
 | RT-001: intersections | Add an OFF-by-default native RT option, a separate compute shader target, persistent static-mesh BLAS, an instance TLAS, build/update synchronization, and an ID/distance debug output. First prove a synthetic triangle, then a small retail-map region. Retain resource ownership until the GPU has finished. | Known hit/miss rays agree with CPU reference triangles; instance transforms and visibility masks work; static geometry behind the camera remains hittable; shader/build errors and unsupported features give a working raster fallback. Count triangles, instances, AS bytes and build time. |
 | RT-002: scene motion and cutouts | Extend scene registration to doors, lifts and rigid objects, then MD5 skinned geometry. Produce posed vertices for BLAS updates using the same joint/weight convention as raster skinning. Apply alpha-test UV transforms and thresholds at ray hits. | Moving-door occlusion, translated/rotated props, animated silhouettes and perforated grates match the raster scene. Map changes release/rebuild AS resources safely. No reliance on the current camera's draw list or PVS alone. |
@@ -53,6 +53,6 @@ Begin with deterministic visibility and an engine-owned reference accumulator so
 
 Use the existing exact-artifact build manifests, bounded smoke runner and GPU timing export. Add separate AS-build, ray-dispatch and denoise timers; retain total GPU time because passes can overlap. Begin at a modest debug resolution and fixed seeds, then cover 2560x720 and the verified 4800x1350 windowed ultrawide size. Full 5120x1440 is 7,372,800 pixels; ray count, render resolution, bounce count and denoising cost need measured quality modes. Earlier raster timings do not predict path-tracing performance.
 
-Both SDK-OFF and the existing SDK-ON build must keep working. Exercise disabled, unsupported, missing-shader and device-loss paths, then map load, cut, resize and mode changes. Automated readbacks, captures and short motion sequences can establish correctness while the user is AFK. Preferred darkness, reflection strength, denoising softness and HDR display calibration remain eventual visual decisions.
+Both SDK-OFF and the existing SDK-ON build must keep working. Exercise disabled, unsupported, missing-shader and device-loss paths, then map load, cut, resize and mode changes. Automated readbacks, captures and short motion sequences can establish correctness during unattended testing. Preferred darkness, reflection strength, denoising softness and HDR display calibration remain eventual visual decisions.
 
 RT-001A implements the OFF-by-default synthetic test and static-map audit. Next, RT-001B must add persistent scene registration, stable mesh/instance identity, map-lifetime cleanup and a material mapping before RT-002's moving geometry and RT-003's selected-light shadows. No full path-tracing quality preset or frame-rate target is promised at this checkpoint.

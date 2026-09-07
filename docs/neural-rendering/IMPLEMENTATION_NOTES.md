@@ -17,11 +17,11 @@ Next: exercise the default ModDB download from a clean install directory and run
 - Inspected public RHI commit `3fd79d9f8b0a776788f0c065aa2a130da283c31c`, RenoDX commit `66f4a40362cd7840bc0647734c434670539addb0`, and ReShade commit `358c345ca2fe64f86e67c694f8379c356627adcb`. RHI installs ReShade as the graphics proxy and then launches the game normally; it is a manager, not a process injector. The local DLSS5 add-on dynamically requests ReShade API functions and is not statically linked to ReShade.
 - Added `neo/renderer/NeuralCompatibility.cpp/.h`. `R_NeuralCompatibilityInitialize` runs before Streamline and D3D12 device creation when `r_neuralCompatibilityEnable 1` is explicitly requested. It loads only a user-local `neuraldoom-reshade64.dll`, verifies the public ReShade add-on exports, and leaves the normal path unchanged when disabled.
 - ReShade retains its public D3D12 hook/object lifecycle in this compatibility mode, but it is loaded deliberately by the engine rather than through a drop-in `dxgi.dll` proxy. This is not a native DLSSNR API integration and does not make the external add-on or experimental runtime an engine dependency.
-- Added `r_neuralCompatibilityProfile`. Empty preserves GUI/INI tuning. `working` applies the values from the user-validated NeuralDoom run before add-on initialization; `neutral` resets the strength controls to 1 while retaining NR-on, upscaling-off, preset/style, and guide defaults. `neuralCompatibilityStatus` reports startup state.
+- Added `r_neuralCompatibilityProfile`. Empty preserves GUI/INI tuning. `working` applies the values from the playtest-validated NeuralDoom run before add-on initialization; `neutral` resets the strength controls to 1 while retaining NR-on, upscaling-off, preset/style, and guide defaults. `neuralCompatibilityStatus` reports startup state.
 - Added the reversible `Switch-NeuralDoom-ReShadeMode.cmd`/PowerShell helper and `Launch-NeuralDoom-EmbeddedNR.cmd`. The switch moves, never duplicates, the ignored local ReShade runtime and refuses ambiguous dual-runtime state.
 - Reconfigured and built both Streamline-enabled and SDK-OFF `RelWithDebInfo` targets successfully. A local startup probe loaded ReShade 6.8.0.2155 from `neuraldoom-reshade64.dll`, registered the DLSS5 add-on through ReShade API 18, preloaded the ignored NR runtime at D3D12 device initialization, created the 1280x720 ReShade runtime, and shut the D3D12 runtime down after the probe. No third-party binary or configuration entered Git.
 
-The user subsequently ran the embedded NR + D3HDP launcher and confirmed the same visible gameplay NR/F6 behavior. ND3-350 is complete.
+The playtester subsequently ran the embedded NR + D3HDP launcher and confirmed the same visible gameplay NR/F6 behavior. ND3-350 is complete.
 
 Next: capture stationary/motion/effects comparisons while tuning from the `working` profile, then promote the selected values into named neuralDoom presets.
 
@@ -38,7 +38,7 @@ Next: validate the full guided path from a clean local install while keeping all
 ## 2026-09-02 - Local experimental Neural Rendering compatibility checkpoint
 
 - ReShade/RenoDX remained an ignored, manual local validation layer. With the custom executable launched using explicit DX12, Streamline, native DLAA, 100% screen-fraction, normal Doom render mode, and TAA-routing controls, RenoDX intercepted the engine's NGX DLSS call and successfully evaluated experimental feature 18 at 5120x1440.
-- The user confirmed that this corrected launch produced a visibly new neural image. This supersedes the earlier ambiguous visual result, which did not use the same complete launch state.
+- The playtester confirmed that this corrected launch produced a visibly new neural image. This supersedes the earlier ambiguous visual result, which did not use the same complete launch state.
 - Added a portable double-click launcher that resolves the engine relative to itself and supplies the verified options. It contains no machine-specific path and does not package any external runtime.
 - Local add-on settings and binaries remain outside version control. Visual tuning, exact paired captures, and third-party texture-pack evaluation are separate follow-up work.
 
@@ -49,7 +49,7 @@ Next: perform a representative still/motion/effects quality matrix, identify sta
 - Extended the Streamline backend selector with `r_neuralBackend 3` for a narrow DLSS Quality diagnostic. The renderer now reports the primary view's actual rendered viewport as the input extent while retaining the native `_taaResolved` output extent; mode `2` continues to require equal native dimensions for DLAA.
 - Preset K Quality options, frame tags, history reset, fallback, and the existing temporal inputs are shared with DLAA. Option and history state reset when the active Streamline mode or output dimensions change.
 - Both SDK-OFF and SDK-ON builds passed. A disposable `r_screenFraction 67` run reconstructed 857x482 into 1280x720 for 153 evaluated/presented frames with zero rejects and a clean shutdown.
-- This capability is retained as infrastructure evidence, not the visual objective. The RTX 5090 already renders Doom 3 with ample headroom; the intended path remains 100% scene resolution so future neural rendering can consume maximum source detail.
+- This capability is retained as infrastructure evidence, not the visual objective. The intended path remains 100% scene resolution so future neural rendering can consume maximum source detail.
 
 Next: keep the normal runtime at mode `2`/100% and define the legally usable, documented NR evaluation boundary. Full mode UI, recommended-resolution selection, and performance tuning remain deferred.
 
@@ -62,7 +62,7 @@ Next: keep the normal runtime at mode `2`/100% and define the legally usable, do
 - Any unavailable SDK/device, invalid/native-resolution mismatch, matrix failure, option/tag/constant failure, or evaluation failure returns `false`, preserving the established native TAA path. A gap in evaluated engine frame indices forces a DLSS history reset, making live mode `0`/`2` A/B toggles safe. Backend status reports evaluated, presented, and rejected counts plus the most recent result.
 - Both `USE_STREAMLINE=OFF` and official-v2.12.0 `USE_STREAMLINE=ON` `RelWithDebInfo` builds passed. A disposable 1280x720 `game/mars_city2` run evaluated and presented 597 DLAA frames with zero rejects and exited cleanly. Existing missing-envprobe and reliable-message warnings were unchanged.
 
-Visible saved-game A/B completed: the user found native TAA and DLAA difficult to distinguish, with no reported rendering regression. ND3-320 is complete as temporal-contract infrastructure; DLAA is not treated as the project's transformative visual feature.
+Visible saved-game A/B completed: native TAA and DLAA were difficult to distinguish in manual comparison, with no reported rendering regression. ND3-320 is complete as temporal-contract infrastructure; DLAA is not treated as the project's transformative visual feature.
 
 ## 2026-09-01 - Streamline core lifecycle and native DX12 device handoff
 
@@ -71,7 +71,7 @@ Visible saved-game A/B completed: the user found native TAA and DLAA difficult t
 - After NVRHI device creation, `idRenderBackend::Init` retrieves `D3D12_Device` from NVRHI and passes it to `slSetD3DDevice`. A DLSS-requested path then checks support using the device adapter LUID. `streamlineStatus` reports compile/request/init/device/feature state and exact Streamline result strings.
 - `idRenderBackend::Shutdown` now calls `slShutdown` after renderer resources are released but before `GLimp_Shutdown` destroys DXGI/D3D12. Any init/device failure logs a warning and retains the native renderer.
 - The SDK-enabled build stages `sl.interposer.dll`, `sl.common.dll`, `sl.dlss.dll`, and `nvngx_dlss.dll` beside its ignored executable. No runtime binary enters Git or the normal build.
-- Both SDK-OFF and SDK-ON `RelWithDebInfo` builds passed. Logged core-only startup recorded successful Streamline init and D3D12 device acceptance on the RTX 5090; an engine-driven `+quit` completed with exit code 0.
+- Both SDK-OFF and SDK-ON `RelWithDebInfo` builds passed. Logged core-only startup recorded successful Streamline init and D3D12 device acceptance on the test GPU; an engine-driven `+quit` completed with exit code 0.
 
 - The application-ID-zero probe succeeded: `slInit` loaded the requested DLSS feature using the experimental custom-engine/project identity, `slSetD3DDevice` accepted the RTX 5090, and `slIsFeatureSupported(kFeatureDLSS)` returned `eOk`. The scripted process exited normally with code 0.
 
@@ -118,7 +118,7 @@ Next: add the early-init/native-device adapter and explicit fallback without ena
 - Configure and `RelWithDebInfo` build passed; new files were included and all DXIL remained current.
 - Feature-off staged build remained alive for ten seconds with `r_neuralBackend 0`.
 - Hidden DX12 validator test deliberately set `r_taaMotionVectors 0`, loaded `game/mars_city2`, consumed 177 frames with 0 rejected, reported epoch/reset propagation and matching 1725x985 render/output sizes, then exited with code 0.
-- Visible saved-game validation consumed 1,076 frames with 0 rejected, epoch/reset epoch 4, and matching 1725x985 sizes. The user confirmed normal gameplay, weapon, HUD, and objective rendering through the unchanged TAA fallback.
+- Visible saved-game validation consumed 1,076 frames with 0 rejected, epoch/reset epoch 4, and matching 1725x985 sizes. The playtester confirmed normal gameplay, weapon, HUD, and objective rendering through the unchanged TAA fallback.
 - Staged executable: 24,773,632 bytes; SHA-256 `71ECE524E25533B168BB75AA0D8CFA262F7182DD5167A62D6BFA1F3087E9F886`.
 
 ### Next narrow task
@@ -160,7 +160,7 @@ Next: add the early-init/native-device adapter and explicit fallback without ena
 - Hidden DX12 map-load/manual sequence exited with code 0. Status advanced epoch 4 to 5 across `neuralHistoryReset`.
 - Hidden viewport/FOV/teleport/restart sequences exited with code 0. Named status evidence recorded initialization/level-load/framebuffer-resize, `fov-change`, `camera-teleport|camera-cut`, and another framebuffer-restart epoch.
 - Runtime logs are local and untracked under the engine save path: `temporal_history_sequence.log`, `temporal_history_transitions.log`, `temporal_history_camera.log`, `temporal_history_fov.log`, and `temporal_history_status.log`.
-- Combined visible T15-T17 check passed. After save resume, FOV discontinuity, and `vid_restart`, the user confirmed stable rendering; `neuralHistoryStatus` reported epoch 6, pending none, last reset `framebuffer-resize`, and a valid tracked view.
+- Combined visible T15-T17 check passed. After save resume, FOV discontinuity, and `vid_restart`, manual testing confirmed stable rendering; `neuralHistoryStatus` reported epoch 6, pending none, last reset `framebuffer-resize`, and a valid tracked view.
 
 ### Known limitations
 
@@ -512,7 +512,7 @@ Next: add the early-init/native-device adapter and explicit fallback without ena
 
 - Primary target: RBDOOM-3-BFG, Windows x64, DX12/NVRHI.
 - Baseline configuration: `-DFFMPEG=OFF -DBINKDEC=ON -DUSE_DX12=ON -DUSE_VULKAN=OFF`.
-- No source clone, build, or runtime validation was performed on the user's Windows machine by this starter-pack generator.
+- No source clone, build, or runtime validation was performed on the target Windows environment by this starter-pack generator.
 - First session is intentionally renderer-code-free and should create `RECON_REPORT.md`.
 
 ## Entry template
@@ -570,7 +570,7 @@ Next: add the early-init/native-device adapter and explicit fallback without ena
 
 Reviewed accumulated changes against upstream `ea29c006`. Corrected frontend joint-history eligibility for `r_neuralBackend`; object motion now rasterizes with `space->mvp` and derives velocity from interpolated unjittered current/previous clips. `neuralBackendStatus` exposes cumulative draw counters. Velocity remains RG16F, previous-minus-current pixels, +Y down; existing set-6 spare rows carry the current unjittered matrix. No render-resolution reduction or new resource format was introduced.
 
-`R_RayTracingSettingsChanged` consumes modification flags for all 13 RTX controls before model history collection and adds `NTRR_LIGHTING_CHANGE` through `PrepareTemporalHistory`. Existing TAA/DLAA epoch/reset propagation handles it; RT-OFF does no work. Build schema 2 records compiled shader SHA-256 values, checked by setup/playtest/smoke. Clean-build targets require matching dedicated CMake directories. Offline failure fixtures and all three RelWithDebInfo builds passed. No game was launched: the user requested visual comparisons be left to them. Live validation of these fixes remains pending. Detailed findings, constraints and next checks: [REVIEW_2026-09-06.md](REVIEW_2026-09-06.md).
+`R_RayTracingSettingsChanged` consumes modification flags for all 13 RTX controls before model history collection and adds `NTRR_LIGHTING_CHANGE` through `PrepareTemporalHistory`. Existing TAA/DLAA epoch/reset propagation handles it; RT-OFF does no work. Build schema 2 records compiled shader SHA-256 values, checked by setup/playtest/smoke. Clean-build targets require matching dedicated CMake directories. Offline failure fixtures and all three RelWithDebInfo builds passed. No game was launched; manual visual comparisons remain pending. Live validation of these fixes remains pending. Detailed findings, constraints and next checks: [REVIEW_2026-09-06.md](REVIEW_2026-09-06.md).
 
 
 ## 2026-09-06 - Full-resolution native-material reflections and reduced bounce
@@ -582,23 +582,23 @@ Reviewed accumulated changes against upstream `ea29c006`. Corrected frontend joi
 - `base/neural_rtx_keys.cfg` adds optional F9; the RTX launcher enables all four effects. Launcher/setup manifests require all ten raw RT shaders. `Test-NeuralDoom-Smoke.ps1` now includes opt-in reflection toggles, full-resolution counters and seven debug views. `Test-ReflectionShaderContract.py` checks actual compiled bundles without a GPU. The existing saved local GI default was reduced to 1.125 with a backup; no personal settings were added to tracked files.
 - Configure/build command: `Configure-RBDOOM-DX12.ps1 -RepoRoot <game-checkout> -BuildDirectory <tree> -RayTracing ON|OFF`, then `Build-RBDOOM.ps1 -RepoRoot <game-checkout> -BuildDirectory <tree> -Configuration RelWithDebInfo`. Native RT, optional DLAA and RT-OFF builds pass. Final hashes and read-only setup/contract results are in TEST_RESULTS.md.
 - Focused review fixed an order-sensitive shader lookup that would compile but fail at startup, retained skinned shader joint metadata, isolated reflection/debug composition, checked framebuffer ownership and reset/rebinding paths, and moved material response after filtering. The offline test passes 64 exact lookups, both MRT signatures and all three compute layouts; deliberate macro misordering fails as expected.
-- Runtime validation: none for this addition, as requested. The user reported the preceding material-lighting build looked substantially better, with excessive bounce brightness. Reflection correctness, noise/trails, offscreen transitions, native/DLAA ultrawide performance and map/resize behavior remain unverified. Static geometry and current-view lights limit reflected objects/occlusion; no full-path-tracing claim or new SDK dependency.
+- Runtime validation: none for this addition, as requested. The playtester reported the preceding material-lighting build looked substantially better, with excessive bounce brightness. Reflection correctness, noise/trails, offscreen transitions, native/DLAA ultrawide performance and map/resize behavior remain unverified. Static geometry and current-view lights limit reflected objects/occlusion; no full-path-tracing claim or new SDK dependency.
 
 Next: the three-check reflection playtest, then rigid dynamic ray instances for doors/props.
 
 
-## 2026-09-06 - Overnight NR toggle checkpoint
+## 2026-09-06 - NR toggle checkpoint
 
 `Start-NeuralDoom-Dogfood.ps1` adds NR as launcher option 3, selects the current manifest-verified Streamline/RT build, and sets the existing engine compatibility startup flag. New `EmbeddedNR.ps1` validates the existing local stack, refuses a DXGI proxy, checks Streamline DLL identity, and stages only the engine EXE beside the already-installed components. It enables the existing NR toggle and disables NR upscaling while preserving other tuning, with local engine/config backups. `-PrepareOnly` creates no game process; `-ValidateOnly` changes no settings. No proprietary runtime is obtained or copied.
 
 `base/neural_rtx_keys.cfg` reserves F6 for the existing add-on hotkey and moves bounce to F4. NR startup explicitly unbinds the old engine F6 action and supplies F4. The smoke binding expectation and current README/control docs follow that mapping. Native/DLAA retain native HDR; the existing engine already bypasses scRGB presentation when compatibility startup is active, so NR comparisons use its SDR path.
 
-`Test-NeuralEmbeddedNR.ps1` passed using text-only fixtures: read-only validation; rejected proxy, absent runtime, SDK mismatch and duplicate settings; exact current engine staging; full-resolution configuration; preservation of unrelated tuning/runtime files; F6/F4 separation; and a process-launch trap. Log: `captures/neural/nr-launch-fixtures.log`. No renderer C++/shader change and no rebuild required. Real-install preparation and combined NR/RTX gameplay remain pending at the user's requested overnight stop. Resume with readiness/preparation, then a manual F6 comparison.
+`Test-NeuralEmbeddedNR.ps1` passed using text-only fixtures: read-only validation; rejected proxy, absent runtime, SDK mismatch and duplicate settings; exact current engine staging; full-resolution configuration; preservation of unrelated tuning/runtime files; F6/F4 separation; and a process-launch trap. Log: `captures/neural/nr-launch-fixtures.log`. No renderer C++/shader change and no rebuild required. Real-install preparation and combined NR/RTX gameplay remain pending at the recorded checkpoint. Resume with readiness/preparation, then a manual F6 comparison.
 
 
 ## 2026-09-07 - NR defaults reset and subdued local lighting
 
-The user reported good lighting/reflection/HDR quality but excessive brightness and requested a clean NR tuning baseline. Inspection found one active root `reshade.ini`; other matching files were backups or research templates. Removed saved `[RenoDX.DLSS5]` tuning keys, including custom tone/color/structure and paper-white values, retaining only `NeuralUplift=1` and `NREnableUpscaling=0`. The installed add-on supplies missing defaults on its next initialization. Other sections were preserved byte-for-byte; no runtime binaries were changed or copied.
+The playtester reported good lighting/reflection/HDR quality but excessive brightness and requested a clean NR tuning baseline. Inspection found one active root `reshade.ini`; other matching files were backups or research templates. Removed saved `[RenoDX.DLSS5]` tuning keys, including custom tone/color/structure and paper-white values, retaining only `NeuralUplift=1` and `NREnableUpscaling=0`. The installed add-on supplies missing defaults on its next initialization. Other sections were preserved byte-for-byte; no runtime binaries were changed or copied.
 
 The current `captures/dogfood/base/D3BFGConfig.cfg` had GI strength 1.5 and reflection strength 1. Set those to 1.125 and 0.65, preserving every other setting, including native HDR white/peak values. Both original files were backed up in the ignored `captures/dogfood/tuning-backups` directory. New `base/neural_rtx_contrast.cfg` applies these two controls and resets history when explicitly executed. The preset is not auto-executed, so later user tuning remains persistent. Engine factory defaults are unchanged.
 
@@ -619,7 +619,7 @@ See [SETTINGS_REVIEW.md](SETTINGS_REVIEW.md) for the complete rendering controls
 
 The reported DLAA settings crash faults on the initial object/hash-table read in `idSWFScriptObject::GetVariable`, not its index bounds workaround (matching executable disassembly at RVA 0x5363c3). `idSWF::HandleEvent` in `neo/swf/SWF_Events.cpp` retained a new hover target only after invoking the old target's onRollOut callback. A callback that rebuilds the display list can release that target first. The new scoped `idSWFScriptVar` retains the hit before callbacks. The previous hover is also retained locally and detached before its callback, preventing reentrant release of the same member reference; any reentrantly installed hover reference is released before replacement.
 
-`tools/neural-rendering/Test-SWFHoverLifetime.py` compiles the actual hover-dispatch source block against reference-count fixtures. Removed-target, repeated-hit, empty-space, nested-callback and balanced-reference checks pass. The same test with pre-fix source fails with `retain after free`. Run from an MSVC developer environment with Python 3. This is a deterministic regression for the discovered lifetime bug, not a captured reproduction of the user's exact menu action. No crash dump was available, so matching the reported crash's root cause remains subject to in-game confirmation. Resource formats, renderer settings and resolution are unchanged. Build/verification results are recorded in TEST_RESULTS.md. Next: verify moving between settings controls and scrolling in the DLAA profile; investigate separately if the crash recurs with a stack.
+`tools/neural-rendering/Test-SWFHoverLifetime.py` compiles the actual hover-dispatch source block against reference-count fixtures. Removed-target, repeated-hit, empty-space, nested-callback and balanced-reference checks pass. The same test with pre-fix source fails with `retain after free`. Run from an MSVC developer environment with Python 3. This is a deterministic regression for the discovered lifetime bug, not a captured reproduction of the reported menu action. No crash dump was available, so matching the reported crash's root cause remains subject to in-game confirmation. Resource formats, renderer settings and resolution are unchanged. Build/verification results are recorded in TEST_RESULTS.md. Next: verify moving between settings controls and scrolling in the DLAA profile; investigate separately if the crash recurs with a stack.
 
 
 ## 2026-09-07 - Graphics controls and dynamic ray geometry
@@ -631,7 +631,7 @@ Implemented both approved tasks. See [GRAPHICS_AND_DYNAMIC_RAYS.md](GRAPHICS_AND
 
 `RayTracingDiagnostic.cpp` adds named individual lighting, dynamic/skinned geometry and TAA/DLAA commands, plus `neuralInstallKeys` to fill free keys and migrate only exact historical F6/F9 conflicts. `base/default.cfg` assigns unused F1/F2/F3/F4/F7/F8/F10/F11; `neural_rtx_keys.cfg` delegates to safe installation. `MenuScreen_Shell_Bindings.cpp` exposes these commands as named rebinding rows. `MenuScreen.h` / `MenuScreen_Shell_SystemOptions.cpp` add next-launch profile, external-NR status (not its private effect state), all-lighting, diagnostic view and safe-key actions. Profile changes are archived and apply after normal quit/relaunch; HDR settings are no longer forcibly overwritten by the RTX launcher. No renderer resource/coordinate changes.
 
-`Build-InternalPackage.py` exports clean matching source/submodules plus native Release EXE and hash-matched shaders, rejects debug CRT and vendor imports, and writes a portable manifest and ZIP checksum. `Install-InternalTest.ps1` validates portable identity, checks the VC++ runtime, imports local owned data through Setup, and rebases exact-build manifests. The two internal CMD entry points need no developer toolchain. `Setup-NeuralDoom.ps1` supports Release validation and rejects obsolete NR path/URL installation before mutation. See INTERNAL_TESTING.md for package scope, exact keys, build and test instructions. Tests exercise actual migration source, launcher preference selection and named-toggle runtime behavior. Next: friends' fresh-machine installation and visual feedback.
+`Build-InternalPackage.py` exports clean matching source/submodules plus native Release EXE and hash-matched shaders, rejects debug CRT and vendor imports, and writes a portable manifest and ZIP checksum. `Install-InternalTest.ps1` validates portable identity, checks the VC++ runtime, imports local owned data through Setup, and rebases exact-build manifests. The two internal CMD entry points need no developer toolchain. `Setup-NeuralDoom.ps1` supports Release validation and rejects obsolete NR path/URL installation before mutation. See INTERNAL_TESTING.md for package scope, exact keys, build and test instructions. Tests exercise actual migration source, launcher preference selection and named-toggle runtime behavior. Next: external fresh-machine installation and visual feedback.
 
 
 ## 2026-09-07 - Automatic supporting downloads and one-file setup
