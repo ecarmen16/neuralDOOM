@@ -7,6 +7,8 @@ param(
     [string]$Configuration = 'RelWithDebInfo',
     [switch]$ValidateOnly,
     [switch]$PrepareOnly,
+    [switch]$NoLauncher,
+    [ValidateSet('TAA', 'DLAA', 'Quality', 'Balanced', 'Performance')][string]$Reconstruction,
     [switch]$RayTracedAO,
     [switch]$RayTracedContactShadows,
     [switch]$RayTracedGI,
@@ -18,6 +20,9 @@ param(
 . (Join-Path $PSScriptRoot 'EmbeddedNR.ps1')
 if ($ValidateOnly -and $PrepareOnly) { throw 'Choose either -ValidateOnly or -PrepareOnly.' }
 $RepoRoot = Resolve-NeuralRepoRoot $RepoRoot
+$showLauncher = -not $Profile -and -not $ValidateOnly -and -not $PrepareOnly -and -not $NoLauncher
+$selectedReconstruction = if ($Reconstruction) { [array]::IndexOf(@('TAA','DLAA','Quality','Balanced','Performance'), $Reconstruction) } else { $null }
+$askAtLaunch = $false
 $pendingProfile = Join-Path $RepoRoot 'captures/dogfood/installed-profile.pending'
 if (-not $Profile -and (Test-Path -LiteralPath $pendingProfile)) {
     $selectedProfile = (Get-Content -LiteralPath $pendingProfile -Raw).Trim()
@@ -27,20 +32,35 @@ if (-not $Profile -and (Test-Path -LiteralPath $pendingProfile)) {
 $profileConfig = Join-Path $RepoRoot 'captures/dogfood/base/D3BFGConfig.cfg'
 if (-not $Profile -and (Test-Path -LiteralPath $profileConfig)) {
     $profileText = Get-Content -LiteralPath $profileConfig -Raw
-    if ($profileText -match '(?m)^set\s+r_neuralLaunchProfile\s+"?([012])"?\s*$') {
-        $Profile = @('Native', 'DLAA', 'NR')[[int]$Matches[1]]
+    if ($profileText -match '(?m)^set\s+r_neuralLaunchProfile\s+"?(-1|[012])"?\s*$') {
+        $askAtLaunch = [int]$Matches[1] -eq -1
+        if (-not $askAtLaunch) { $Profile = @('Native', 'DLAA', 'NR')[[int]$Matches[1]] }
     }
 }
-if (-not $Profile -and (Test-Path -LiteralPath (Join-Path $RepoRoot '.neuraldoom-install.json'))) {
+if (-not $Profile -and -not $askAtLaunch -and (Test-Path -LiteralPath (Join-Path $RepoRoot '.neuraldoom-install.json'))) {
     $installed = Get-Content -LiteralPath (Join-Path $RepoRoot '.neuraldoom-install.json') -Raw | ConvertFrom-Json
     if ($installed.profile -in @('Native', 'DLAA', 'NR')) { $Profile = $installed.profile }
 }
+if ($showLauncher) {
+    . (Join-Path $PSScriptRoot 'LaunchPicker.ps1')
+    $preferredMode = 1
+    if (Test-Path -LiteralPath $profileConfig) {
+        $profileText = Get-Content -LiteralPath $profileConfig -Raw
+        if ($profileText -match '(?m)^set\s+r_neuralReconstructionMode\s+"?([0-4])"?\s*$') { $preferredMode = [int]$Matches[1] }
+    }
+    if ($null -ne $selectedReconstruction) { $preferredMode = $selectedReconstruction }
+    $choice = Show-NeuralLaunchPicker -RepoRoot $RepoRoot -BuildDirectory $BuildDirectory -Configuration $Configuration -PreferredProfile $Profile -PreferredMode $preferredMode
+    if ($null -eq $choice) { return }
+    $Profile = $choice.Profile
+    $selectedReconstruction = if ($Profile -eq 'DLAA') { $choice.Mode } else { $null }
+    $askAtLaunch = $false
+}
 if (-not $Profile) {
     if ($ValidateOnly) { throw '-ValidateOnly requires -Profile Native, DLAA or NR.' }
-    Write-Host 'neuralDoom playtest'
+    Write-Host 'neuralDoom'
     Write-Host '1. Native rendering'
-    Write-Host '2. Native DLAA'
-    Write-Host '3. NR toggle on F6 (existing engine-loaded compatibility stack)'
+    Write-Host '2. DLAA / DLSS'
+    Write-Host '3. Neural Rendering (F6 toggle)'
     $selection = Read-Host 'Choose 1, 2 or 3 (Enter = Native)'
     switch ($selection) {
         '' { $Profile = 'Native' }
@@ -50,6 +70,7 @@ if (-not $Profile) {
         default { throw 'Choose 1, 2 or 3.' }
     }
 }
+if ($null -ne $selectedReconstruction -and $Profile -ne 'DLAA') { throw '-Reconstruction requires the DLAA / DLSS profile.' }
 if (-not $BuildDirectory) {
     $BuildDirectory = Join-Path $RepoRoot $(if ($Profile -ne 'Native') { 'build-streamline' } else { 'build-rt' })
 }
@@ -64,7 +85,7 @@ if ($manifest.sha256 -ne (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
     throw 'The executable does not match its build manifest. Rebuild before playtesting.'
 }
 if ($manifest.features.dx12 -ne 'ON' -or $manifest.features.rayTracing -ne 'ON') {
-    throw 'This checklist requires a DX12 build configured with -RayTracing ON.'
+    throw 'This launcher requires a DX12 build configured with -RayTracing ON.'
 }
 foreach ($shader in @('ray_query', 'ambient_occlusion', 'contact_shadows', 'visibility_debug', 'material_atlas', 'diffuse_bounce', 'bounce_composite', 'reflections', 'reflection_filter', 'reflection_composite')) {
     $shaderPath = Join-Path $RepoRoot "base/renderprogs2/dxil/rt/$shader.cs.dxil"
@@ -82,7 +103,7 @@ if ($Profile -ne 'Native') {
 $nrState = $null
 if ($Profile -eq 'NR') { $nrState = Get-NeuralEmbeddedNRState -RepoRoot $RepoRoot -BuildExecutable $exe }
 if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot 'base/maps/mars_city2.resources'))) {
-    throw 'Run this launcher from the game checkout containing your local BFG data.'
+    throw 'Doom 3 BFG data is missing. Rerun setup and select your installed BFG game folder.'
 }
 $saveRoot = Join-Path $RepoRoot 'captures/dogfood'
 $saveBase = Join-Path $saveRoot 'base'
@@ -90,13 +111,17 @@ $firstRun = -not (Test-Path -LiteralPath (Join-Path $saveBase 'D3BFGConfig.cfg')
 [string]$savedConfig = if ($firstRun) { '' } else { Get-Content -LiteralPath (Join-Path $saveBase 'D3BFGConfig.cfg') -Raw }
 $backend = if ($Profile -ne 'Native') { 2 } else { 0 }
 $quality = 0
-# Keep the user's TAA/DLAA choice in this profile; NR always needs DLAA input.
+# Preserve reconstruction choices in the SDK profile; NR uses native DLAA input.
 if ($Profile -eq 'DLAA' -and -not $firstRun) {
     if ($savedConfig -match '(?m)^set\s+r_neuralReconstructionMode\s+"?([0-4])"?\s*$') {
         $mode = [int]$Matches[1]
         if ($mode -eq 0) { $backend = 0 }
         elseif ($mode -ge 2) { $backend = 3; $quality = $mode - 2 }
     }
+}
+if ($null -ne $selectedReconstruction) {
+    $backend = if ($selectedReconstruction -eq 0) { 0 } elseif ($selectedReconstruction -eq 1) { 2 } else { 3 }
+    $quality = [Math]::Max(0, $selectedReconstruction - 2)
 }
 $sessionLog = "dogfood-$Profile-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 6) + '.log'
 $sdk = if ($Profile -ne 'Native') { 1 } else { 0 }
@@ -133,23 +158,16 @@ if ([Text.Encoding]::UTF8.GetByteCount(($launchArgs -join ' ')) -ge 1024) {
 }
 Write-Host "Profile:    $Profile"
 Write-Host "Reconstruction: $(if ($backend -eq 2) { 'DLAA' } elseif ($backend -eq 3) { 'DLSS ' + @('Quality','Balanced','Performance')[$quality] } else { 'Native TAA' })"
-if ($RayTracedAO) { Write-Host 'RTX AO:     Saved preference (enabled on first use; world and supported dynamic geometry). Toggle live with r_rayTracedAO 0 / 1.' }
-if ($RayTracedContactShadows) { Write-Host 'RTX contact shadows: Saved preference (enabled on first use). Toggle with r_rayTracedContactShadows 0 / 1.' }
-if ($RayTracedReflections) { Write-Host 'RTX reflections: Saved preference, full resolution. Toggle with r_rayTracedReflections 0 / 1.' }
-if ($RayTracedGI) { Write-Host 'RTX material bounce: Saved preference (enabled on first use). Toggle with r_rayTracedGI 0 / 1; strength: r_rayTracedGIStrength.' }
-Write-Host 'Safe keys install automatically; remap in Keyboard Bindings (F4 GI, F6 NR, F7 AO, F8 contacts, F3 reflections, F10 views, F11 all).'
+Write-Host 'Rendering controls: System Settings. Remap toggles in Keyboard Bindings; console: ~.'
 if ($Profile -eq 'NR') {
-    Write-Host 'NR: F6 toggles the installed add-on; F4 toggles bounce. Full-resolution DLAA passthrough when NR is off.'
-    Write-Host 'NR uses engine-loaded compatibility components without a dxgi.dll proxy. Native HDR is bypassed in this profile.'
-    Write-Host "NR launch stages the verified engine at: $($nrState.executable)"
+    Write-Host 'F6: NR on/off with native-resolution DLAA input. Native HDR is unavailable in this profile.'
+    Write-Verbose "NR executable: $($nrState.executable)"
 }
-Write-Host "Executable: $exe"
-Write-Host "Commit:     $($manifest.commit) (dirty=$($manifest.dirty))"
-Write-Host "Settings:   $saveRoot"
-Write-Host "Display:    $DisplayOutput"
-Write-Host 'Checklist:  docs/neural-rendering/DOGFOOD_CHECKLIST.md'
+Write-Host "Log: captures/dogfood/base/$sessionLog"
+Write-Verbose "Executable: $exe; commit: $($manifest.commit); dirty: $($manifest.dirty)"
+Write-Verbose "Settings: $saveRoot; display: $DisplayOutput"
 if ($ValidateOnly) {
-    Write-Host 'PASS: exact executable, manifest, feature flags, runtime files and local map data. No game started.'
+    Write-Host 'PASS: installation validated.'
     return
 }
 $existingGame = $null
@@ -167,12 +185,15 @@ try {
     $probe.Dispose()
 } catch { throw "Cannot write saves/logs in $saveBase. Choose a writable installation folder. $($_.Exception.Message)" }
 $playtestCommands = @(
-    ('set r_neuralLaunchProfile ' + [array]::IndexOf(@('Native', 'DLAA', 'NR'), $Profile)),
+    ('set r_neuralLaunchProfile ' + $(if ($askAtLaunch) { -1 } else { [array]::IndexOf(@('Native', 'DLAA', 'NR'), $Profile) })),
     ('set r_neuralDLSSQuality ' + $quality),
     'set r_screenFraction 100', 'set r_renderMode 0', 'set r_useTemporalAA 1', 'set r_antiAliasing 2',
-    'neuralInstallKeys startup', 'set com_fixedTic 0', 'set s_noSound 0', 'set r_hdrDiagnostic 0',
-    'neuralBackendStatus', 'hdrStatus', 'rayTracingStatus'
+    'neuralInstallKeys startup', 'set com_fixedTic 0', 'set s_noSound 0', 'set r_hdrDiagnostic 0'
 )
+if ($Profile -eq 'DLAA' -and $null -ne $selectedReconstruction) {
+    $playtestCommands += 'set r_neuralReconstructionMode ' + $selectedReconstruction
+}
+if ($VerbosePreference -ne 'SilentlyContinue') { $playtestCommands += @('neuralBackendStatus', 'hdrStatus', 'rayTracingStatus') }
 # Versioned migration: apply in the game after its saved config has loaded.
 # Only acknowledge it after a successful session, so preparation/crashes retry.
 $settingsMigrationMarker = Join-Path $saveRoot 'settings-doom-contrast-v1.applied'
@@ -185,17 +206,16 @@ if ($settingsMigrationPending) {
     }
     $preset = Join-Path $PSScriptRoot '../../base/neural_rtx_contrast.cfg'
     $playtestCommands += @(Get-Content -LiteralPath $preset -ErrorAction Stop)
-    Write-Host 'Applying updated Doom contrast defaults once; HDR calibration and rendering quality are preserved.'
+    Write-Host 'Applying updated Doom contrast defaults.'
 }
 if ($Profile -eq 'NR') {
     $exe = Initialize-NeuralEmbeddedNRLaunch -RepoRoot $RepoRoot -BuildExecutable $exe -ExpectedHash $manifest.sha256 -SaveBase $saveBase
-    # The key migration removes only the old shipped F6 bounce binding.
-    $playtestCommands += 'neuralCompatibilityStatus'
+    if ($VerbosePreference -ne 'SilentlyContinue') { $playtestCommands += 'neuralCompatibilityStatus' }
 }
 $playtestCommands | Set-Content -LiteralPath (Join-Path $saveBase 'neural_dogfood.cfg') -Encoding ASCII
 $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $saveRoot "build-$Profile.json") -Encoding UTF8
 if ($PrepareOnly) {
-    Write-Host 'PREPARED: playtest settings and selected executable are ready. No game started.'
+    Write-Host 'PREPARED: ready to launch.'
     return
 }
 # Interactive launch explicitly requested by the person running this helper.

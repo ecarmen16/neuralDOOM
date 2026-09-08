@@ -1251,3 +1251,73 @@ runtime pins, installation data or settings changed. The C# UI build passed;
 the complete installer is regenerated with matching committed source and the
 unchanged Native and neural Release engines. Next check: choose Upgrade / repair
 using the replacement installer.
+
+## 2026-09-07 - Release review, launch controls and FPS
+
+Focused review found and corrected:
+
+- `ambient_occlusion.cs.hlsl` and `contact_shadows.cs.hlsl`: dynamic ray hits
+  used a BLAS-local primitive index against the shared triangle buffer. Include
+  `CommittedInstanceID()` as the global triangle offset, matching GI/reflections.
+  The old normal lookup could bias contact rays into moving doors. Triangle
+  layouts, world-space coordinates and resource formats are unchanged.
+- `RenderWorld.cpp::RenderScene`, `GLMatrix.cpp::R_SetupProjectionMatrix`,
+  `RenderCommon.h::viewDef_t`, and `RenderBackend.cpp/.h`: snapshot temporal-AA
+  eligibility per view before choosing the DLSS input viewport and jitter.
+  Disabling AA now restores the full viewport. Keep camera/object motion validity
+  separate from native TAA feedback; successful DLSS does not populate that
+  feedback. Auxiliary captures do not overwrite primary previous-camera matrices.
+  Motion-vector units, formats, sign and jitter conventions are unchanged.
+- `RenderSystem_init.cpp`, `RenderBackend.cpp::PostProcess`,
+  `postprocess.ps.hlsl`, and System Options: `r_filmicPostFXIntensity` is an
+  archived 0–1 blend, default 1; its menu uses 5% steps. The existing float4
+  constant `rpJitterTexScale.z` carries intensity, with no resource/layout change.
+  Zero bypasses the SDR effect; 100% retains its previous output. Native HDR
+  retains its existing bypass.
+- `Common.cpp::com_showFPS` defaults to 1. System Options (`MenuScreen.h` and
+  `MenuScreen_Shell_SystemOptions.cpp`) adds FPS Counter with archived on/off
+  persistence. Existing `Console.cpp::DrawFPS/Resize` already anchors it to the
+  current top-right safe area, independently of HUD width. Saved values survive.
+- `sys_session_local.cpp/.h`: `com_startInDoom3` defaults on. A one-time startup
+  sign-in uses existing profile/save enumeration and the normal transition to
+  the Doom 3 menu. `+set com_startInDoom3 0` retains the game selector; later
+  session/sign-out transitions are not automatically bypassed.
+- `LaunchPicker.cs/.ps1` and `Start-NeuralDoom-Dogfood.ps1`: show available
+  profiles before interactive startup, retain setup/menu preferences, and persist
+  explicit DLSS quality choices. NR stays native DLAA and SDR; it never inherits
+  a saved reduced-resolution DLSS preset. Explicit profiles and validation paths
+  bypass the picker. `InternalSetup.cs` preserves Back-navigation drafts and
+  permits cache-only retries. Normal helper logs omit redundant diagnostics.
+
+Validation completed from isolated fixtures:
+
+- DX12 configured with ray tracing ON; SDK-on RelWithDebInfo and both SDK-on/off
+  Release builds passed using `Configure-RBDOOM-DX12.ps1` and
+  `Build-RBDOOM.ps1`. No new dependency or runtime version was introduced.
+- `Test-NeuralDoom-Smoke.ps1 -TemporalTransitions -RayTracingDiagnostics Synthetic`
+  passed six DLAA/DLSS/AA-off/native-TAA transitions and synthetic static/dynamic
+  ray diagnostics. Native viewports returned to 1280x720; motion history resumed
+  with nonzero object-motion draws and zero SDK rejections.
+- Separate `-DLSSPresetMatrix` and all-four-RTX runs passed. At 1280x720 output,
+  Quality/Balanced/Performance used 853x480, 742x418 and 640x360 inputs. RTX
+  counters, history resets and each effect's off/on rollback passed.
+- SDK-off `-FilmicBlendMatrix` passed pixel checks: zero/bypass mean error
+  0.0001, 50%-blend midpoint error 0.2767, full-effect difference 8.9871, in
+  8-bit channel units. The scene and jitter were held fixed for comparison.
+- Fresh startup runs with `com_startInDoom3` 0 and 1 exited successfully and
+  respectively retained the selector or signed in to IDLE before quitting.
+  Both reported FPS default 1 and saved an explicit change to 0.
+- Launcher UI tests passed component availability, saved/default choices, all
+  reconstruction mappings, NR isolation, explanation text fit and Play/Cancel.
+  Embedded-NR preparation fixtures passed profile priority, saved DLSS presets,
+  explicit quality persistence and preservation of player tuning.
+- Installer lifecycle/dependency/wizard tests passed, including repeated menu
+  selection, Back navigation, retry cache, upgrade rollback and saved settings.
+  CPU tests covered scrolled menu selection, SWF hover lifetime, dynamic geometry
+  and safe F-key bindings. Compiled reflection contracts passed 64 permutation
+  lookups and resource layouts. Public-source/index/binary privacy checks passed.
+
+No installed player folder was modified. Visual acceptance remains manual,
+especially the reported F8 door angle, moving reflections, NR appearance and HDR.
+Next task: the five-minute check in `INTERNAL_TESTING.md`, using the rebuilt
+installer and its matching source revision.

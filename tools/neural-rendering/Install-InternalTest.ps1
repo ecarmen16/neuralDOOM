@@ -69,7 +69,7 @@ if (-not $GamePath -and -not $NonInteractive) {
 if (-not $GamePath -or -not (Test-Path -LiteralPath (Join-Path $GamePath 'base/maps/mars_city2.resources'))) {
     throw 'Doom 3 BFG Edition was not found. Rerun setup and select its installation folder, or pass -GamePath.'
 }
-Write-Host "Using owned BFG installation: $GamePath"
+Write-Verbose "Owned BFG installation: $GamePath"
 Write-SetupStatus 'Checking Microsoft prerequisites...'
 Install-SetupVCRuntime -RepoRoot $RepoRoot
 if (-not $LightingPackPath) { $LightingPackPath = Get-SetupLightingPack -RepoRoot $RepoRoot }

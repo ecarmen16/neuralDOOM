@@ -15,6 +15,11 @@ Install the repository's commit checks once per checkout:
 git config core.hooksPath .githooks
 ```
 
+Use your GitHub handle and GitHub no-reply email for project attribution. Set
+`user.name` and `user.email` locally in this checkout before committing; check
+both author and committer fields with `git log --format=fuller` before pushing.
+Preserve upstream authorship and license notices.
+
 The hook checks staged whitespace and staged source content. Game resources, captures, local SDK/NR runtimes, private staging folders and concrete machine paths must not enter commits. The checked-in ignore rules cover disposable artifacts without relying on `.git/info/exclude`. A source audit complements review; it is not a complete license or secret scanner.
 
 ## Build and verify

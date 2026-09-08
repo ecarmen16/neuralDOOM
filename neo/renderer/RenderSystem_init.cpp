@@ -279,6 +279,7 @@ idCVar r_ldrContrastThreshold( "r_ldrContrastThreshold", "1.1", CVAR_RENDERER | 
 idCVar r_ldrContrastOffset( "r_ldrContrastOffset", "3", CVAR_RENDERER | CVAR_FLOAT | CVAR_NEW, "" );
 
 idCVar r_useFilmicPostFX( "r_useFilmicPostFX", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL | CVAR_NEW, "filmic look with chromatic abberation and film grain" );
+idCVar r_filmicPostFXIntensity( "r_filmicPostFXIntensity", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Filmic post FX blend: 0 off, 1 full; bypassed by native HDR", 0, 1 );
 
 idCVar r_forceAmbient( "r_forceAmbient", "0.375", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT | CVAR_NEW, "render additional ambient pass to make the game less dark", 0.0f, 1.0f );
 

@@ -670,6 +670,7 @@ struct viewDef_t
 	Framebuffer*		targetRender;				// SP: The framebuffer to render to
 
 	int					taaFrameCount;				// RB: so we have the same frame index in frontend and backend
+	bool				useTemporalAA;				// snapshot with projection jitter and input resolution
 	int					neuralBackendMode;			// snapshot alongside this view's input resolution
 	int					neuralDLSSQuality;
 	uint64				temporalHistoryEpoch;		// engine-owned generation shared by all temporal inputs
@@ -1367,6 +1368,7 @@ extern idCVar r_neuralHistoryFovThreshold;
 extern idCVar r_neuralBackend;
 
 extern idCVar r_useFilmicPostFX;
+extern idCVar r_filmicPostFXIntensity;
 extern idCVar r_useCRTPostFX;
 extern idCVar r_crtCurvature;
 extern idCVar r_crtVignette;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Native ray-intersection diagnostics and opt-in static-world ambient occlusion.
+// Optional ray-traced lighting and intersection diagnostics.
 #include "precompiled.h"
 #pragma hdrstop
 
@@ -22,17 +22,17 @@ idCVar r_rayTracedAO( "r_rayTracedAO", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_
 static idCVar r_rayTracedAORadius( "r_rayTracedAORadius", "64", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Ray-traced AO radius in Doom world units", 1, 256 );
 static idCVar r_rayTracedAOStrength( "r_rayTracedAOStrength", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Ray-traced AO darkening strength", 0, 2 );
 static idCVar r_rayTracedAOSamples( "r_rayTracedAOSamples", "8", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "Ray-traced AO hemisphere samples per pixel", 1, 32 );
-static idCVar r_rayTracedContactShadows( "r_rayTracedContactShadows", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Supplement direct-light shadows with static-world ray-traced contact shadows" );
+static idCVar r_rayTracedContactShadows( "r_rayTracedContactShadows", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Supplement direct-light shadows with ray-traced contact shadows" );
 static idCVar r_rayTracedContactDistance( "r_rayTracedContactDistance", "128", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Contact-shadow ray reach in Doom world units", 1, 512 );
 static idCVar r_rayTracedContactStrength( "r_rayTracedContactStrength", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Contact-shadow strength", 0, 1 );
 static idCVar r_rayTracingDebug( "r_rayTracingDebug", "0", CVAR_RENDERER | CVAR_INTEGER, "0=shaded scene, 1=AO visibility, 2=contact-shadow visibility, 3=indirect material lighting, 4=ray-scene diffuse albedo, 5=reflections, 6=reflection receiver roughness", 0, 6 );
 static idCVar r_rayTracedGI( "r_rayTracedGI", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Experimental material-aware single-bounce diffuse lighting for static opaque world geometry" );
-static idCVar r_rayTracedGIStrength( "r_rayTracedGIStrength", "1.125", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Indirect material lighting intensity (25 percent lower default)", 0, 4 );
+static idCVar r_rayTracedGIStrength( "r_rayTracedGIStrength", "1.125", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Indirect material lighting intensity", 0, 4 );
 static idCVar r_rayTracedGIRadius( "r_rayTracedGIRadius", "384", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Maximum diffuse bounce distance in Doom world units", 16, 2048 );
 static idCVar r_rayTracedGISamples( "r_rayTracedGISamples", "4", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "Diffuse bounce samples per full-resolution pixel", 1, 16 );
 static idCVar r_rayTracedGIEmissive( "r_rayTracedGIEmissive", "2", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Emissive material contribution to indirect lighting", 0, 8 );
 
-static idCVar r_rayTracedReflections( "r_rayTracedReflections", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Full-resolution static-world reflections using native material roughness and normal maps" );
+static idCVar r_rayTracedReflections( "r_rayTracedReflections", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Full-resolution reflections using native material roughness and normal maps" );
 static idCVar r_rayTracedReflectionStrength( "r_rayTracedReflectionStrength", "0.65", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Blend from native probe specular to traced reflections", 0, 1 );
 static idCVar r_rayTracedReflectionSamples( "r_rayTracedReflectionSamples", "4", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "Reflection rays per full-resolution eligible pixel", 1, 16 );
 static idCVar r_rayTracedReflectionRoughness( "r_rayTracedReflectionRoughness", "0.7", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Maximum reflection roughness, with a 0.15 fade into native probes", 0.1, 1 );
@@ -1876,10 +1876,12 @@ CONSOLE_COMMAND_SHIP( neuralReconstructionToggle, "Switch native-resolution TAA/
 {
 	if( cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) || !R_StreamlineIsDLSSSupported() )
 	{
-		common->Printf( "Reconstruction unchanged: NR requires DLAA input; otherwise use a DLAA-capable build.\n" );
+		common->Printf( "Reconstruction unchanged: NR uses DLAA input; otherwise select a DLAA-capable launch.\n" );
 		return;
 	}
 	const bool enable = cvarSystem->GetCVarInteger( "r_neuralBackend" ) != 2;
+	cvarSystem->SetCVarBool( "r_useTemporalAA", true );
+	cvarSystem->SetCVarInteger( "r_antiAliasing", ANTI_ALIASING_TAA );
 	cvarSystem->SetCVarInteger( "r_neuralBackend", enable ? 2 : 0 );
 	cvarSystem->SetCVarInteger( "r_neuralReconstructionMode", enable ? 1 : 0 );
 	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "neuralHistoryReset\n" );

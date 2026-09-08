@@ -35,6 +35,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 idCVar ui_skinIndex( "ui_skinIndex", "0", CVAR_ARCHIVE, "Selected skin index" );
+static idCVar com_startInDoom3( "com_startInDoom3", "1", CVAR_SYSTEM | CVAR_BOOL | CVAR_INIT, "start at the Doom 3 menu; 0 keeps the classic game selector" );
 idCVar ui_autoSwitch( "ui_autoSwitch", "1", CVAR_ARCHIVE | CVAR_BOOL, "auto switch weapon" );
 idCVar ui_autoReload( "ui_autoReload", "1", CVAR_ARCHIVE | CVAR_BOOL, "auto reload weapon" );
 
@@ -195,6 +196,7 @@ idSessionLocal::InitBaseState
 */
 void idSessionLocal::InitBaseState()
 {
+	startInDoom3Pending = false;
 
 	//assert( mem.IsGlobalHeap() );
 
@@ -1677,6 +1679,7 @@ idSessionLocal::Initialize
 */
 void idSessionLocal::Initialize()
 {
+	startInDoom3Pending = com_startInDoom3.GetBool();
 }
 
 /*
@@ -2587,6 +2590,17 @@ void idSessionLocal::UpdateSignInManager()
 	if( net_headlessServer.GetBool() )
 	{
 		return;
+	}
+	if( startInDoom3Pending )
+	{
+		startInDoom3Pending = false;
+#if defined( USE_DOOMCLASSIC )
+		// Use normal profile loading and save enumeration, once at startup only.
+		if( localState == STATE_PRESS_START && signInManager->GetMasterLocalUser() == NULL )
+		{
+			signInManager->RegisterLocalUser( 0 );
+		}
+#endif
 	}
 
 	// FIXME: We need to ask the menu system for this info.  Just making a best guess for now

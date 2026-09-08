@@ -1,18 +1,16 @@
 # neuralDoom
 
-Latest development update: [graphics controls and moving ray geometry](docs/neural-rendering/GRAPHICS_AND_DYNAMIC_RAYS.md), with a [short playtest checklist](docs/neural-rendering/DOGFOOD_CHECKLIST.md).
+Start with the [installer and controls](INTERNAL_TESTING.md), [playtest checklist](docs/neural-rendering/DOGFOOD_CHECKLIST.md), or [build instructions](docs/neural-rendering/WINDOWS_SETUP.md).
 
-neuralDoom modernizes Doom 3 BFG on the RBDOOM-3-BFG source port. It adds full-resolution ray-traced material reflections, diffuse bounce, contact shadows and AO, native DX12 HDR, optional native DLAA, and ultrawide HUD/FOV controls. Active development is on `codex/rt-foundation`.
+neuralDoom modernizes Doom 3 BFG on the RBDOOM-3-BFG source port. It adds ray-traced material reflections, diffuse bounce, contact shadows and AO, native DX12 HDR, optional DLAA / DLSS reconstruction, and ultrawide HUD/FOV controls. DLAA and NR use native resolution; DLSS presets optionally reduce the rendering resolution. Active development is on `codex/rt-foundation`.
 
-The new [material reflection pass](docs/neural-rendering/RAY_TRACED_REFLECTIONS.md) adds normal-mapped, rough reflections and reduces the default diffuse bounce intensity by 25%. The earlier [review](docs/neural-rendering/REVIEW_2026-09-06.md) records the preceding fixes. See the [current checkpoint](docs/neural-rendering/CHECKPOINT.md) for validation limits.
-
-**Start here:** [RTX lighting and keybinds](docs/neural-rendering/RTX_LIGHTING.md), [quick playtest](docs/neural-rendering/DOGFOOD_CHECKLIST.md), [build instructions](docs/neural-rendering/WINDOWS_SETUP.md).
+See [ray-traced lighting](docs/neural-rendering/RTX_LIGHTING.md), [material reflections](docs/neural-rendering/RAY_TRACED_REFLECTIONS.md), and [validation results](docs/neural-rendering/TEST_RESULTS.md) for implementation details and limits.
 
 For internal testers, run the **neuralDoom Setup EXE**. It detects BFG and existing neuralDoom installations, offers upgrade/repair, a separate copy or uninstall, and installs lighting and prerequisites automatically. Choose **NR + DLAA**, **DLAA / DLSS**, or **Native RTX**. Neural components download automatically; optional file pickers accept a signed DLSS SR DLL or the exact validated NR DLL. F6 compares NR against full-resolution DLAA. See [installation and exact controls](INTERNAL_TESTING.md). The package contains both engine configurations and matching source; game data and vendor runtimes are obtained separately during setup.
 
-There are two supported local development launchers: `Launch-NeuralDoom.cmd` preserves saved settings; `Launch-NeuralDoom-RTX.cmd` seeds all four ray-traced lighting effects on first use and preserves subsequent lighting/HDR choices. Both honor Next Launch Profile from System Options, or offer Native, DLAA, or NR when no preference is saved, and select the manifest-verified build. The NR option uses the already-installed engine-loaded compatibility stack without a DXGI proxy; F6 toggles NR and F4 toggles bounce. Its output remains the existing SDR compatibility path. The older NR/mod launchers are in [tools/neural-rendering/legacy](tools/neural-rendering/legacy/README.md). Existing playtest saves and display preferences remain in the same folder.
+The installed shortcut opens a mode picker with quality/performance explanations, then goes directly to the Doom 3 menu. NR is the initial default when installed; later choices are remembered. The development launchers use the same picker: `Launch-NeuralDoom.cmd` preserves saved settings; `Launch-NeuralDoom-RTX.cmd` also seeds missing RTX lighting preferences. Explicit `-Profile` or `-NoLauncher` bypasses the picker. Older NR/mod launchers remain in [tools/neural-rendering/legacy](tools/neural-rendering/legacy/README.md).
 
-**Settings > System Options** provides automatic ultrawide HUD layout and size controls. **Settings > Game Options > Field of View** supports 60–100, including narrower base FOVs for 5120×1440. Native HDR uses Windows HDR and separate scene/UI brightness controls.
+**Settings > System Options** provides automatic ultrawide HUD layout, FPS Counter (top-right, on for fresh settings), Filmic Intensity, and DLAA / DLSS Quality. **Settings > Game Options > Field of View** supports 60–100, including narrower base FOVs for 5120×1440. Native HDR uses Windows HDR and separate scene/UI brightness controls. [Compare rendering modes and controls](INTERNAL_TESTING.md).
 
 ## Local installation and readiness
 

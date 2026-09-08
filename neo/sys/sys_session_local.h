@@ -697,6 +697,7 @@ protected:
 	static const char* 		stateToString[ NUM_STATES ];
 
 	state_t					localState;
+	bool					startInDoom3Pending;
 	uint32					sessionOptions;
 
 	connectType_t			connectType;

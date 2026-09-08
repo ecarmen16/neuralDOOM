@@ -87,6 +87,7 @@ void idRenderBackend::InvalidateTemporalHistory()
 	neuralPreviousMVP[0] = renderMatrix_identity;
 	neuralPreviousMVP[1] = renderMatrix_identity;
 	prevViewsValid = false;
+	motionViewsValid = false;
 	if( neuralTemporalBackend != NULL )
 	{
 		neuralTemporalBackend->ResetHistory( tr.GetTemporalHistoryEpoch() );
@@ -105,6 +106,10 @@ void idRenderBackend::PrintNeuralTemporalBackendStatus() const
 {
 	const char* mode = r_neuralBackend.GetInteger() == 3 ? "Streamline DLSS" : ( r_neuralBackend.GetInteger() == 2 ? "Streamline DLAA" : ( r_neuralBackend.GetInteger() == 1 ? "validate" : "disabled" ) );
 	common->Printf( "r_neuralBackend %d (%s)\n", r_neuralBackend.GetInteger(), mode );
+	int presentedMode, rw, rh, ow, oh;
+	R_GetNeuralPresentationStatus( presentedMode, rw, rh, ow, oh );
+	common->Printf( "Neural presentation: mode %d, render %dx%d, output %dx%d, motionHistory %d, taaHistory %d\n",
+		presentedMode, rw, rh, ow, oh, motionViewsValid, prevViewsValid );
 	common->Printf( "Neural object motion draws: rigid %llu, skinned %llu, viewmodel %llu\n",
 		neuralRigidMotionDraws, neuralSkinnedMotionDraws, neuralViewmodelMotionDraws );
 	if( neuralTemporalBackend != NULL )
@@ -5082,13 +5087,13 @@ void idRenderBackend::DrawTemporalMasks()
 
 void idRenderBackend::DrawMotionVectors()
 {
-	if( !viewDef->viewEntitys )
+	if( !viewDef->viewEntitys || ( viewDef->renderView.rdflags & RDF_NO_TEMPORAL_HISTORY ) )
 	{
-		// 3D views only
+		// Auxiliary captures must not replace the primary camera's previous MVP.
 		return;
 	}
 
-	if( !R_UseTemporalAA() && r_motionBlur.GetInteger() <= 0 && r_neuralDebug.GetInteger() != 2 && !r_neuralBackend.GetBool() )
+	if( !viewDef->useTemporalAA && r_motionBlur.GetInteger() <= 0 && r_neuralDebug.GetInteger() != 2 && !viewDef->neuralBackendMode )
 	{
 		return;
 	}
@@ -5218,7 +5223,7 @@ void idRenderBackend::DrawMotionVectors()
 	windowCoordParm[3] = h;
 	SetFragmentParm( RENDERPARM_WINDOWCOORD, windowCoordParm ); // rpWindowCoord
 
-	if( ( r_taaMotionVectors.GetBool() || r_neuralBackend.GetBool() ) && prevViewsValid && cameraMoved )
+	if( ( r_taaMotionVectors.GetBool() || viewDef->neuralBackendMode ) && motionViewsValid && cameraMoved )
 	{
 		RB_SetMVP( motionMatrix );
 
@@ -5238,7 +5243,7 @@ void idRenderBackend::DrawMotionVectors()
 	const bool drawRigidMotionVectors = r_neuralRigidMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2 || r_neuralBackend.GetBool();
 	const bool drawSkinnedMotionVectors = r_neuralSkinnedMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2 || r_neuralBackend.GetBool();
 	const bool drawViewmodelMotionVectors = r_neuralViewmodelMotionVectors.GetBool() || r_neuralBackend.GetBool();
-	if( ( r_taaMotionVectors.GetBool() || r_neuralBackend.GetBool() ) && prevViewsValid && ( drawRigidMotionVectors || drawSkinnedMotionVectors || drawViewmodelMotionVectors ) )
+	if( ( r_taaMotionVectors.GetBool() || viewDef->neuralBackendMode ) && motionViewsValid && ( drawRigidMotionVectors || drawSkinnedMotionVectors || drawViewmodelMotionVectors ) )
 	{
 		renderLog.OpenBlock( "Render_ObjectMotionVectors" );
 
@@ -5318,6 +5323,7 @@ void idRenderBackend::DrawMotionVectors()
 	}
 
 	prevMVP[mvpIndex] = viewDef->worldSpace.unjitteredMVP;
+	motionViewsValid = true;
 
 	renderLog.CloseBlock();
 	renderLog.CloseMainBlock();
@@ -5401,16 +5407,13 @@ void idRenderBackend::TemporalAAPass( const viewDef_t* _viewDef )
 		return;
 	}
 
-	if( !R_UseTemporalAA() )
+	if( !_viewDef->useTemporalAA )
 	{
+		prevViewsValid = false;
 		return;
 	}
 
 	if( viewDef->isSubview )
-	{
-		return;
-	}
-	if( viewDef->renderView.rdflags & RDF_NO_TEMPORAL_HISTORY )
 	{
 		return;
 	}
@@ -6059,6 +6062,7 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 		_viewDef->temporalHistoryResetReasons != NTRR_NONE )
 	{
 		prevViewsValid = false;
+		motionViewsValid = false;
 		const int mvpIndex = ( _viewDef->renderView.viewEyeBuffer == 1 ) ? 1 : 0;
 		prevMVP[mvpIndex] = _viewDef->worldSpace.unjitteredMVP;
 		renderLog.OpenBlock( "Neural_TemporalHistoryReset", colorYellow );
@@ -6480,6 +6484,11 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	{
 		TemporalAAPass( _viewDef );
 	}
+	else
+	{
+		// DLSS supplies this frame's output but does not write native TAA feedback.
+		prevViewsValid = false;
+	}
 
 	//-------------------------------------------------
 	// tonemapping: convert back from HDR to LDR range
@@ -6493,7 +6502,7 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 		renderLog.OpenBlock( "Render_ToneMapPass", colorBlue );
 
 		ToneMappingParameters parms;
-		if( R_UseTemporalAA() )
+		if( _viewDef->useTemporalAA && !_viewDef->isSubview )
 		{
 			// DLSS writes an output-sized image. Do not tone-map just the
 			// smaller input rectangle or stretch a cropped corner afterward.
@@ -7023,7 +7032,7 @@ void idRenderBackend::PostProcess( const void* data )
 	}
 #endif
 
-	if( !R_UseHDRToneMapping() && ( r_useFilmicPostFX.GetBool() || r_renderMode.GetInteger() > 0 ) )
+	if( !R_UseHDRToneMapping() && ( ( r_useFilmicPostFX.GetBool() && r_filmicPostFXIntensity.GetFloat() > 0 ) || r_renderMode.GetInteger() > 0 ) )
 	{
 		OPTICK_GPU_EVENT( "Render_FilmicPostFX" );
 
@@ -7161,6 +7170,7 @@ void idRenderBackend::PostProcess( const void* data )
 		}
 
 		jitterTexScale[1] = r_retroDitherScale.GetFloat();
+		jitterTexScale[2] = r_filmicPostFXIntensity.GetFloat();
 		SetFragmentParm( RENDERPARM_JITTERTEXSCALE, jitterTexScale ); // rpJitterTexScale
 
 		float jitterTexOffset[4];

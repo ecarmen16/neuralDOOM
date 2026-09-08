@@ -1387,6 +1387,7 @@ public:
 			SYSTEM_FIELD_VOLUME,
 			SYSTEM_FIELD_RECONSTRUCTION,
 			SYSTEM_FIELD_RENDER_STATUS,
+			SYSTEM_FIELD_FPS_COUNTER,
 			SYSTEM_FIELD_RT_FIRST,
 			SYSTEM_FIELD_RT_LAST = SYSTEM_FIELD_RT_FIRST + 8,
 			SYSTEM_FIELD_RT_QUALITY,
@@ -1434,6 +1435,7 @@ public:
 		float originalRaySettings[9];
 		int originalReconstruction;
 		int originalLaunchProfile;
+		int originalFPSCounter;
 		int originalRaySamples[3];
 		// RB begin
 		//int originalShadowMapping; // TODO use for quality of shadowmaps?
@@ -1442,6 +1444,7 @@ public:
 		int originalSSAO;
 		int originalBloodReflections;
 		int originalPostProcessing;
+		float originalFilmicIntensity;
 		int originalCRTPostFX;
 		// RB end
 

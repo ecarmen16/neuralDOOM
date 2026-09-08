@@ -273,7 +273,7 @@ if (-not (Test-Path -LiteralPath $destinationBase)) {
 }
 Write-SetupStep 'Copying missing files from the locally owned Doom 3 BFG installation'
 if ([IO.Path]::GetFullPath($sourceBase).TrimEnd('\') -ine [IO.Path]::GetFullPath($destinationBase).TrimEnd('\')) {
-    & robocopy $sourceBase $destinationBase /E /XC /XN /XO /XJ /R:2 /W:1 /NFL /NDL /NP
+    & robocopy $sourceBase $destinationBase /E /XC /XN /XO /XJ /R:2 /W:1 /NFL /NDL /NP /NJH /NJS
     $robocopyExit = $LASTEXITCODE
     if ($robocopyExit -gt 7) { throw "robocopy failed with exit code $robocopyExit" }
 }

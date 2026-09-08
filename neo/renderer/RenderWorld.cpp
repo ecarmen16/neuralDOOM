@@ -1040,7 +1040,8 @@ void idRenderWorldLocal::RenderScene( const renderView_t* renderView )
 	viewDef_t* parms = ( viewDef_t* )R_ClearedFrameAlloc( sizeof( *parms ), FRAME_ALLOC_VIEW_DEF );
 	parms->renderView = *renderView;
 	parms->targetRender = nullptr;
-	parms->neuralBackendMode = r_neuralBackend.GetInteger();
+	parms->useTemporalAA = R_UseTemporalAA() && !( renderView->rdflags & ( RDF_NOAMBIENT | RDF_IRRADIANCE ) );
+	parms->neuralBackendMode = parms->useTemporalAA && !( renderView->rdflags & RDF_NO_TEMPORAL_HISTORY ) ? r_neuralBackend.GetInteger() : 0;
 	parms->neuralDLSSQuality = R_StreamlineDLSSQuality();
 
 	if( tr.takingScreenshot )
@@ -1061,8 +1062,7 @@ void idRenderWorldLocal::RenderScene( const renderView_t* renderView )
 	}
 	else
 	{
-		// Neural presets own their input extent. DLAA and the NR bridge stay
-		// native; legacy fill-rate/dynamic controls cannot silently reduce them.
+		// DLAA and NR retain native input; explicit DLSS presets own their input extent.
 		if( parms->neuralBackendMode == 3 && !cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) )
 		{
 			R_StreamlineDLSSRenderSize( tr.GetWidth(), tr.GetHeight(), windowWidth, windowHeight, parms->neuralDLSSQuality );

@@ -56,6 +56,29 @@ try {
         }
     }
     Write-Host 'PASS: repeated action, existing-install and renderer choices, dismissal and page recreation.'
+    $null = $windowType.GetMethod('ShowPage', $flags).Invoke($choices, @(7))
+    $operation = $windowType.GetField('operation', $flags).GetValue($choices)
+    $operation.GetType().GetProperty('SelectedIndex', $flags).SetValue($operation, 2, $null)
+    if (-not $windowType.GetMethod('ReadManagement', $flags).Invoke($choices, @())) { throw 'New-install selection failed.' }
+    $null = $windowType.GetMethod('ShowPage', $flags).Invoke($choices, @(1))
+    $customPath = Join-Path ([IO.Path]::GetTempPath()) ('neuralDoom-navigation-' + [guid]::NewGuid().ToString('N'))
+    $windowType.GetField('destination', $flags).GetValue($choices).Text = $customPath
+    $windowType.GetField('back', $flags).GetValue($choices).PerformClick()
+    if (-not $windowType.GetMethod('ReadManagement', $flags).Invoke($choices, @()) -or $windowType.GetField('installPath', $flags).GetValue($choices) -ne $customPath) { throw 'Back navigation discarded the custom destination.' }
+    $null = $windowType.GetMethod('ShowPage', $flags).Invoke($choices, @(6))
+    $renderer = $windowType.GetField('renderer', $flags).GetValue($choices)
+    $renderer.GetType().GetProperty('SelectedIndex', $flags).SetValue($renderer, 0, $null)
+    $windowType.GetField('dlssFile', $flags).GetValue($choices).Text = 'fixture.dll'
+    $windowType.GetField('back', $flags).GetValue($choices).PerformClick()
+    $null = $windowType.GetMethod('ShowPage', $flags).Invoke($choices, @(6))
+    if ($windowType.GetField('dlssFile', $flags).GetValue($choices).Text -ne 'fixture.dll') { throw 'Back navigation discarded the optional DLL choice.' }
+    New-Item -ItemType Directory -Path (Join-Path $customPath '.neuraldoom-cache') -Force | Out-Null
+    'cached download' | Set-Content -LiteralPath (Join-Path $customPath '.neuraldoom-cache/download.zip')
+    $hasContent = $windowType.GetMethod('HasInstallContent', $flags)
+    if ($hasContent.Invoke($null, @([string]$customPath))) { throw 'A cached failed installation cannot be retried.' }
+    'unrelated file' | Set-Content -LiteralPath (Join-Path $customPath 'keep.txt')
+    if (-not $hasContent.Invoke($null, @([string]$customPath))) { throw 'A nonempty unrelated destination was accepted.' }
+    Write-Host 'PASS: Back preserves destination/component choices; cache-only retry is accepted and unrelated content is rejected.'
 } finally { $choices.Dispose() }
 $root = Join-Path ([IO.Path]::GetTempPath()) ('neuralDoom-wizard-test-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $root | Out-Null

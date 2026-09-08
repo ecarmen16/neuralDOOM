@@ -356,6 +356,7 @@ private:
 	idRenderMatrix		prevMVP[2];				// world MVP from previous frame for motion blur
 	idRenderMatrix		neuralPreviousMVP[2];		// previous matrices consumed by the most recent velocity pass
 	bool				prevViewsValid;
+	bool				motionViewsValid;
 	viewLight_t*		prevViewLight;			// SRS - for AMD shadow mapping fix in ShadowMapPassFast()
 
 	// RB begin

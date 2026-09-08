@@ -479,6 +479,7 @@ void main( PS_IN fragment, out PS_OUT result )
 
 	// base color with tone mapping and other post processing applied
 	float4 color = t_BaseColor.Sample( samp0, tCoords );
+	const float4 original = color;
 
 #if USE_CAS
 	ContrastAdaptiveSharpeningPass( color, fragment );
@@ -500,5 +501,5 @@ void main( PS_IN fragment, out PS_OUT result )
 	DitheringPass( color, fragment );
 #endif
 
-	result.color = color;
+	result.color = lerp( original, color, saturate( pc.rpJitterTexScale.z ) );
 }

@@ -6,9 +6,20 @@
 2. Select the destination and your owned **Doom 3 BFG Edition** installation. Upgrades replace program files in place with a rollback backup; a copy imports saves and settings into a separate folder. Your original BFG data remains unchanged.
 3. Choose **NR + DLAA**, **DLAA / DLSS**, or **Native RTX**. Leave DLL fields blank for automatic downloads, or select `nvngx_dlss.dll` / `nvngx_dlssnr.dll` locally. DLSS SR must have a valid NVIDIA x64 signature; NR must match the tested RHI 310.8.SF-v2 version. NR downloads the complete pinned compatibility stack, loads ReShade through the engine, and installs no `dxgi.dll` proxy.
 4. Review and install. Setup obtains Microsoft prerequisites, verified lighting data, and the chosen neural components. Up to 2.1 GB downloads and about 16 GB free space for a new install; allow 4 GB for an upgrade. No compiler, Git, Python or preinstalled archive tool is required. Windows may request permission for Microsoft prerequisites.
-5. Use the Start menu or desktop shortcut. Setup does not start the game. Its renderer selection applies on the first launch; afterward **Next Launch Profile** in System Options controls the same shortcut.
+5. Use the Start menu or desktop shortcut. The launcher shows the available rendering profiles and explains their tradeoffs. NR is the fresh-install default; setup and saved **Next Launch Profile** choices select the initial option. Choose a profile and click **Play Doom 3** to enter the Doom 3 menu directly. Setup does not start the game.
 
-**DLAA is native resolution (100%).** In the DLAA/DLSS profile, System Options > Reconstruction cycles Native TAA, DLAA, DLSS Quality, Balanced and Performance. The last three ask the SDK for input dimensions (approximately 67%, 58% and 50% per axis), preserving output resolution and HUD sharpness. Rendering Status shows actual input/output dimensions. Choices persist across launches. The experimental NR profile keeps full-resolution DLAA input and SDR compatibility output; F6 switches NR on/off. Native HDR is available outside the NR profile.
+**DLAA is native resolution (100%).** Choose reconstruction in the launcher or **System Options > DLAA / DLSS Quality**. Rendering Status shows actual input/output dimensions. Choices persist after a normal game exit. Lighting controls remain available in every profile.
+
+| Mode | Rendering input | Main tradeoff |
+|---|---|---|
+| NR + DLAA (default) | Native resolution | Experimental neural appearance processing adds cost and can change brightness/detail. F6 compares NR with direct DLAA passthrough. Native HDR and reduced-resolution DLSS are unavailable. |
+| DLAA | Native resolution | NVIDIA anti-aliasing prioritizes edge stability and detail without reducing rendering resolution. Native HDR is available; NR is not loaded. |
+| DLSS Quality | About 67% per axis, 44% of native pixels | Upscaling favors detail; may improve FPS when GPU limited. |
+| DLSS Balanced | About 58% per axis, 34% of native pixels | Lower rendering cost with more loss of fine detail and stability in motion. |
+| DLSS Performance | About 50% per axis, 25% of native pixels | Largest rendering reduction; more visible softness or instability in thin details and motion. |
+| Native RTX | Native resolution | Engine TAA without NVIDIA reconstruction/NR; useful for baseline comparisons. Native HDR is available. |
+
+DLSS keeps output resolution and HUD native. The SDK selects exact input dimensions; performance gains depend on the scene and GPU load. Its profile also offers Native TAA for in-game comparison with DLAA. F6 only affects the NR profile. NVIDIA Reflex is not integrated.
 
 Cancel stops between operations and retains verified downloads. A failed upgrade restores replaced application files. Saves and settings remain under `captures/dogfood`; `reshade.ini` appearance controls are preserved. Backups/downloads remain in `.neuraldoom-cache`. Uninstall removes only recorded unchanged application files, keeping saves, settings, modified files and cache. Legacy installs have no full ownership record, so their separately copied game data is retained. Each new installation is listed separately in Windows Installed Apps.
 
@@ -40,14 +51,16 @@ These defaults occupy keys unused by the normal game. Custom bindings are preser
 
 System Options also has all four individual lighting toggles, moving/animated geometry, independent reflection/bounce/emissive strengths, Ray Quality, All RTX Lighting, Diagnostic View and Install Free RTX Keys. The latter fills empty keys without replacing custom choices. HDR calibration, HUD/FOV and resolution are in the existing menus. **Doom Lighting Defaults** restores conservative contrast without resetting the rest of your preferences.
 
-**Next Launch Profile** controls the installed shortcut after quitting/reopening. Native/DLAA/NR initialization is a startup choice. Run setup in Upgrade mode to install a neural component set omitted during the initial install. NR status describes the selected compatibility profile, not whether the external add-on is currently applying its effect.
+**FPS Counter** defaults to **Top right** for fresh settings and follows window resizing, including ultrawide. Toggle it in System Options or use `com_showFPS 1` / `0`; existing saved choices are preserved. **Filmic Intensity** blends the SDR postprocessing effect from 0% (off) to 100% (original effect), in 5% steps. Native HDR bypasses this effect.
+
+**Next Launch Profile** preselects the launcher after quitting/reopening. Native/DLAA/NR initialization is a startup choice. Run setup in Upgrade mode to install omitted neural components. NR status describes the selected compatibility profile, not whether the external add-on is applying its effect. Advanced launches can pass `-NoLauncher` to use saved selections or `-Profile DLAA -Reconstruction Quality` (also TAA, DLAA, Balanced, Performance). `+set com_startInDoom3 0` restores the classic game selector when launching the engine directly.
 
 ## Five-minute test
 
 1. Start/load a map. Set your native resolution; verify Rendering Status. Enable Windows HDR before starting if testing native HDR.
 2. Compare F3 reflections and F4 bounce near screens/metal floors. Watch for excessive brightness. Compare F7 corners and F8 contact shadows separately.
 3. Watch a door or character move; compare F2. Off-screen dynamic objects, glass, particles and the weapon are not included in this pass. Dynamic reflections can be noisier because secondary-hit temporal history is not implemented yet.
-4. Scroll the settings and key-binding menus; try mouse and keyboard. Quit/relaunch to confirm settings persist. Test F5/F9 only where saving/loading is safe for your current playthrough.
+4. Scroll the settings and key-binding menus; try mouse and keyboard, FPS Counter and Filmic Intensity. Resize and check the counter stays top-right. Quit/relaunch to confirm settings and launch quality persist. Test F5/F9 only where saving/loading is safe for your current playthrough.
 5. Report the ZIP/version, GPU/driver, resolution/HDR state, map/location, exact key or setting, and whether the issue disappears when that feature is off. Include the newest `captures/dogfood/base/dogfood-*.log`; review logs before sharing.
 
 ## Maintainer packaging

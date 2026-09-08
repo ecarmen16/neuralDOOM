@@ -51,7 +51,8 @@ void main(uint3 tid : SV_DispatchThreadID)
     while (surface.Proceed()) {}
     if (surface.CommittedStatus() != COMMITTED_TRIANGLE_HIT ||
         abs(surface.CommittedRayT() - distance) > max(0.5, distance * 0.001)) return;
-    uint index = surface.CommittedPrimitiveIndex() * 3;
+    // Dynamic BLAS primitives follow the static triangles in the shared buffers.
+    uint index = (surface.CommittedInstanceID() + surface.CommittedPrimitiveIndex()) * 3;
     float3 a = Positions[Indices[index]];
     float3 b = Positions[Indices[index + 1]];
     float3 c = Positions[Indices[index + 2]];

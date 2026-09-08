@@ -41,7 +41,7 @@ void main(uint3 tid : SV_DispatchThreadID)
     if (surface.CommittedStatus() != COMMITTED_TRIANGLE_HIT) return;
     // Reject weapon depth hacks, animated/rigid receivers and omitted cutouts.
     if (abs(surface.CommittedRayT() - distance) > max(0.5, distance * 0.001)) return;
-    uint triangleIndex = surface.CommittedPrimitiveIndex() * 3;
+    uint triangleIndex = (surface.CommittedInstanceID() + surface.CommittedPrimitiveIndex()) * 3;
     float3 a = Positions[Indices[triangleIndex]];
     float3 b = Positions[Indices[triangleIndex + 1]];
     float3 c = Positions[Indices[triangleIndex + 2]];

@@ -101,7 +101,7 @@ if ($next -match 'set r_forceAmbient|set r_hdrAutoExposure|set r_rayTracedReflec
 if ([IO.File]::ReadAllText($playerConfig) -ne $playerText) { throw 'Preparation edited the saved config.' }
 Write-Host 'PASS: automatic contrast migration, preparation retry, exact config backup, and preservation of later tuning.'
 
-# Saved reconstruction is honored in DLAA, while NR always retains its DLAA input.
+# The SDK profile honors saved reconstruction; NR keeps native DLAA input.
 [IO.File]::WriteAllText($playerConfig, 'set r_neuralReconstructionMode "0"' + "`r`n")
 $preparedTAA = (& $launcher -RepoRoot $fixture -Profile DLAA -PrepareOnly 6>&1 | Out-String)
 if ($preparedTAA -notmatch 'Reconstruction: Native TAA') { throw 'DLAA profile ignored saved TAA preference.' }
@@ -116,8 +116,17 @@ foreach ($mode in @(2,3,4)) {
     $preparedDLSS = (& $launcher -RepoRoot $fixture -Profile DLAA -PrepareOnly 6>&1 | Out-String)
     $expected = @('Quality','Balanced','Performance')[$mode - 2]
     if ($preparedDLSS -notmatch "Reconstruction: DLSS $expected") { throw 'Saved DLSS preset was not restored.' }
+    $preparedNR = (& $launcher -RepoRoot $fixture -Profile NR -PrepareOnly 6>&1 | Out-String)
+    if ($preparedNR -notmatch 'Reconstruction: DLAA') { throw 'NR inherited a reduced-resolution DLSS preset.' }
 }
 Write-Host 'PASS: saved DLSS Quality/Balanced/Performance presets survive preparation.'
+foreach ($mode in 0..4) {
+    $name = @('TAA','DLAA','Quality','Balanced','Performance')[$mode]
+    $null = & $launcher -RepoRoot $fixture -Profile DLAA -Reconstruction $name -PrepareOnly 6>$null
+    $generated = Get-Content -LiteralPath (Join-Path $fixture 'captures/dogfood/base/neural_dogfood.cfg') -Raw
+    if ($generated -notmatch "(?m)^set r_neuralReconstructionMode $mode\r?$") { throw 'Launch quality was not persisted for the menu.' }
+}
+Write-Host 'PASS: explicit launch quality selections are written to the game session config.'
 
 # Inspect the actual prepared argv without starting a process.
 $disabledRays = "set r_rayTracedAO 0`nset r_rayTracedContactShadows 0`nset r_rayTracedGI 0`nset r_rayTracedReflections 0`n"
@@ -141,3 +150,15 @@ Write-Host 'PASS: saved RTX off choices survive relaunch; missing preferences ar
 $menuProfile = (& $launcher -RepoRoot $fixture -PrepareOnly 6>&1 | Out-String)
 if ($menuProfile -notmatch 'Profile:    DLAA') { throw 'Menu launch preference was not honored.' }
 Write-Host 'PASS: menu-selected launch profile requires no launcher prompt.'
+
+'{"profile":"Native"}' | Set-Content -LiteralPath (Join-Path $fixture '.neuraldoom-install.json')
+[IO.File]::WriteAllText($playerConfig, 'set r_neuralLaunchProfile "-1"' + "`n")
+$promptCalls = New-Object 'Collections.Generic.List[string]'
+function Read-Host { $promptCalls.Add('prompt'); return '2' }
+$askProfile = (& $launcher -RepoRoot $fixture -PrepareOnly 6>&1 | Out-String)
+$askConfig = Get-Content -LiteralPath (Join-Path $fixture 'captures/dogfood/base/neural_dogfood.cfg') -Raw
+if ($promptCalls.Count -ne 1 -or $askProfile -notmatch 'Profile:    DLAA' -or $askConfig -notmatch '(?m)^set r_neuralLaunchProfile -1\r?$') { throw 'Ask at launch was overridden or not preserved.' }
+'NR' | Set-Content -LiteralPath (Join-Path $fixture 'captures/dogfood/installed-profile.pending')
+$pendingProfile = (& $launcher -RepoRoot $fixture -PrepareOnly 6>&1 | Out-String)
+if ($promptCalls.Count -ne 1 -or $pendingProfile -notmatch 'Profile:    NR') { throw 'Pending installer selection did not take precedence.' }
+Write-Host 'PASS: Ask at launch survives the installer default and preserves prompting; pending setup selection takes precedence.'

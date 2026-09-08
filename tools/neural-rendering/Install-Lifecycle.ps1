@@ -178,7 +178,7 @@ function Invoke-SetupDeployment {
             if (Test-Path -LiteralPath $saveSource) {
                 # Inspect save links as well; robocopy is not allowed to follow them.
                 $null = @(Get-SetupFiles $saveSource)
-                & robocopy $saveSource $saveTarget /E /XJ /R:1 /W:1 /NFL /NDL /NP | Out-Host
+                & robocopy $saveSource $saveTarget /E /XJ /R:1 /W:1 /NFL /NDL /NP /NJH /NJS | Out-Host
                 if ($LASTEXITCODE -gt 7) { throw 'Could not copy existing saves.' }
             }
             $sourceIni = Get-SetupSafePath $ExistingPath 'reshade.ini'

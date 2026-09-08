@@ -94,7 +94,7 @@ class SetupWindow : Form {
     ProgressBar progress;
     int page;
     bool running, cancelRequested, showDetails, restartRequired;
-    string installPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "neuralDoom", "Internal"), gamePath = "", logPath, cancelPath;
+    string installPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "neuralDoom", "Game"), gamePath = "", logPath, cancelPath;
     bool desktopShortcut = true;
     bool neuralAvailable;
     string profile = "Native", installMode = "New", existingPath = "", dlssPath = "", nrPath = "";
@@ -125,7 +125,11 @@ class SetupWindow : Form {
             else if (page == 6) { if (ReadRenderer()) ShowPage(2); }
             else ShowPage(7);
         };
-        back.Click += delegate { ShowPage(page == 1 ? 7 : page == 6 ? 1 : page == 2 ? (installMode == "Uninstall" ? 7 : 6) : page == 5 ? 7 : 0); };
+        back.Click += delegate {
+            if (page == 1) { installPath = destination.Text.Trim(); gamePath = game.Text.Trim(); desktopShortcut = shortcut.Checked; }
+            if (page == 6) { profile = neuralAvailable ? new [] { "NR", "DLAA", "Native" }[renderer.SelectedIndex] : "Native"; dlssPath = dlssFile.Text.Trim(); nrPath = nrFile.Text.Trim(); }
+            ShowPage(page == 1 ? 7 : page == 6 ? 1 : page == 2 ? (installMode == "Uninstall" ? 7 : 6) : page == 5 ? 7 : 0);
+        };
         cancel.Click += delegate { Close(); };
         FormClosing += delegate(object sender, FormClosingEventArgs e) {
             if (!running) return;
@@ -274,16 +278,27 @@ class SetupWindow : Form {
             bool reuseInstalledData = installMode == "Upgrade" && String.Equals(installPath.TrimEnd('\\'), gamePath.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
             if (!reuseInstalledData && (String.Equals(installPath.TrimEnd('\\'), gamePath.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) || installPath.StartsWith(gamePath.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase) || gamePath.StartsWith(installPath.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase))) throw new Exception("Choose a separate folder for neuralDoom, outside your owned game installation.");
             if (installMode == "Upgrade" && !String.Equals(installPath, existingPath, StringComparison.OrdinalIgnoreCase)) throw new Exception("Select a different existing installation on the previous page.");
-            if (Directory.Exists(installPath) && Directory.GetFileSystemEntries(installPath).Length > 0 && (installMode != "Upgrade" || !File.Exists(Path.Combine(installPath, "internal-package.json")))) throw new Exception("Choose an empty folder for a new copy, or select Upgrade on the previous page.");
+            if (HasInstallContent(installPath) && (installMode != "Upgrade" || !File.Exists(Path.Combine(installPath, "internal-package.json")))) throw new Exception("Choose an empty folder for a new copy, or select Upgrade on the previous page.");
             string root = Path.GetPathRoot(installPath);
             if (new DriveInfo(root).AvailableFreeSpace < (installMode == "Upgrade" ? 4L : 16L) * 1024 * 1024 * 1024) throw new Exception("Allow 16 GB for a new installation or 4 GB for an upgrade and its backup.");
             return true;
         } catch (Exception error) { MessageBox.Show(this, error.Message, "Check your folders", MessageBoxButtons.OK, MessageBoxIcon.Information); return false; }
     }
+    internal static bool HasInstallContent(string path) {
+        if (!Directory.Exists(path)) return false;
+        foreach (string entry in Directory.GetFileSystemEntries(path)) {
+            string name = Path.GetFileName(entry);
+            if ((name.Equals(".neuraldoom-cache", StringComparison.OrdinalIgnoreCase) || name.Equals("captures", StringComparison.OrdinalIgnoreCase)) && Directory.Exists(entry) && (File.GetAttributes(entry) & FileAttributes.ReparsePoint) == 0) continue;
+            return true;
+        }
+        return false;
+    }
     bool ReadManagement() {
-        installMode = new [] { "Upgrade", "Copy", "New", "Uninstall" }[operation.SelectedIndex];
-        existingPath = existing.SelectedItem as string ?? "";
-        if (installMode != "New" && !File.Exists(Path.Combine(existingPath, "internal-package.json"))) { MessageBox.Show(this, "Select or browse to the existing installation first."); return false; }
+        string selectedMode = new [] { "Upgrade", "Copy", "New", "Uninstall" }[operation.SelectedIndex];
+        string selectedPath = selectedMode == "New" ? "" : existing.SelectedItem as string ?? "";
+        if (selectedMode != "New" && !File.Exists(Path.Combine(selectedPath, "internal-package.json"))) { MessageBox.Show(this, "Select or browse to the existing installation first."); return false; }
+        if (installMode == selectedMode && String.Equals(existingPath, selectedPath, StringComparison.OrdinalIgnoreCase)) return true;
+        installMode = selectedMode; existingPath = selectedPath;
         if (installMode == "Upgrade" || installMode == "Uninstall") installPath = existingPath;
         else if (installMode == "Copy") { installPath = existingPath.TrimEnd('\\') + "-copy"; gamePath = existingPath; }
         else installPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "neuralDoom", "Game");

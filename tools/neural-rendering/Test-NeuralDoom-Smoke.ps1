@@ -6,6 +6,8 @@ param(
     [string]$Configuration = 'RelWithDebInfo',
     [ValidateSet('Native', 'Validate', 'DLAA')][string]$Profile = 'Native',
     [switch]$DLSSPresetMatrix,
+    [switch]$TemporalTransitions,
+    [switch]$FilmicBlendMatrix,
     [ValidateRange(640, 7680)][int]$Width = 1280,
     [ValidateRange(360, 4320)][int]$Height = 720,
     [switch]$Borderless,
@@ -86,6 +88,16 @@ $result.rayTracedAOStatus = @()
 if ($RayTracedAO -and ($manifest.features.rayTracing -ne 'ON' -or $LightingVariant -eq 'NoSSAO')) { throw 'RTAO requires a ray-tracing build with SSAO enabled.' }
 if (-not $GpuProfile -and $LightingVariant -ne 'Baseline') { throw 'Lighting variants require -GpuProfile.' }
 $process = $null
+$transitionCases = @(
+    @{ name = 'DLAA'; commands = @('set r_neuralBackend 2'); mode = 2; scaled = $false; taa = 0 },
+    @{ name = 'DLSS'; commands = @('set r_neuralBackend 3', 'set r_neuralDLSSQuality 0'); mode = 3; scaled = $true; taa = 0 },
+    @{ name = 'AA_OFF'; commands = @('set r_antiAliasing 0'); mode = 0; scaled = $false; taa = 0 },
+    @{ name = 'TAA_OFF'; commands = @('set r_antiAliasing 2', 'set r_useTemporalAA 0'); mode = 0; scaled = $false; taa = 0 },
+    @{ name = 'DLSS_RETURN'; commands = @('set r_useTemporalAA 1'); mode = 3; scaled = $true; taa = 0 },
+    @{ name = 'NATIVE_TAA'; commands = @('set r_neuralBackend 0'); mode = 0; scaled = $false; taa = 1 }
+)
+if ($TemporalTransitions -and ($Profile -ne 'DLAA' -or $DLSSPresetMatrix)) { throw 'Temporal transitions require DLAA and a separate run from the preset matrix.' }
+if ($FilmicBlendMatrix -and ($Profile -ne 'Native' -or $DisplayOutput -ne 'SDR' -or $LegacyRenderMode -ne 0 -or $RayTracedAO -or $RayTracedContactShadows -or $RayTracedGI -or $RayTracedReflections)) { throw 'Filmic blend validation requires native SDR with ray effects off.' }
 try {
     if ($Profile -eq 'DLAA' -and $manifest.features.streamline -ne 'ON') {
         $result.status = 'SKIP'; $result.reason = 'Selected build has USE_STREAMLINE=OFF.'
@@ -123,6 +135,8 @@ try {
         ('set swf_hudMaxAspect ' + $HudMaxAspect.ToString($culture))
     )
     if ($RayTracedAO) { $scriptLines += @('set r_useSSAO 1', 'set r_useNewSSAOPass 1') }
+    # Console wait counts simulation ticks; hold one tick per rendered frame for transitions.
+    if ($DLSSPresetMatrix -or $TemporalTransitions) { $scriptLines += 'set com_fixedTic 1' }
     if ($GpuProfile) {
         # Bypass the background 15-Hz sleep using the engine's existing debug mode.
         # One simulation tick per render frame is a throughput workload, not normal play.
@@ -154,6 +168,19 @@ try {
             $scriptLines += @("echo DLSS_PRESET_$quality", "set r_neuralDLSSQuality $quality", 'set r_neuralBackend 3', 'neuralHistoryReset', 'wait 90', 'neuralBackendStatus', "screenshot screenshots/dlss_$quality.png")
         }
         $scriptLines += @('set r_neuralBackend 2', 'neuralHistoryReset', 'wait 90', 'neuralBackendStatus')
+    }
+    if ($TemporalTransitions) {
+        foreach ($case in $transitionCases) {
+            $scriptLines += $case.commands + @('wait 60', "echo TEMPORAL_$($case.name)", 'neuralBackendStatus')
+        }
+        $scriptLines += @('set r_neuralBackend 2', 'wait 60', 'neuralBackendStatus')
+    }
+    if ($FilmicBlendMatrix) {
+        $scriptLines += @('set g_stopTime 1', 'set r_shadowMapRandomizeJitter 0', 'set r_antiAliasing 0', 'set r_motionBlur 0',
+            'set r_useFilmicPostFX 0', 'wait 30', 'screenshot screenshots/filmic_off.png',
+            'set r_useFilmicPostFX 1', 'set r_filmicPostFXIntensity 0', 'wait 30', 'screenshot screenshots/filmic_zero.png',
+            'set r_filmicPostFXIntensity 0.5', 'wait 30', 'screenshot screenshots/filmic_half.png',
+            'set r_filmicPostFXIntensity 1', 'wait 30', 'screenshot screenshots/filmic_full.png', 'set g_stopTime 0')
     }
     $scriptLines += @('rayTracingContactStatus', 'rayTracingGIStatus', 'rayTracingReflectionStatus')
     if ($GpuProfile) {
@@ -195,6 +222,13 @@ try {
         $scriptLines += @("set r_windowWidth $ResizeWidth", "set r_windowHeight $ResizeHeight", 'vid_restart', 'wait 90', 'hdrStatus', 'neuralHistoryStatus', 'screenshot screenshots/resized.png')
     }
     $scriptLines += @('rayTracingAOStatus', 'rayTracingContactStatus', 'rayTracingGIStatus', 'rayTracingReflectionStatus', 'rayTracingDynamicStatus', 'echo NEURAL_SMOKE_COMPLETE', 'quit')
+    # Screenshot renders a primary view synchronously, so queries cannot outrun
+    # the frontend while shaders or GPU readbacks stall the normal frame loop.
+    $historyCapture = 0
+    $scriptLines = @(foreach ($line in $scriptLines) {
+        if ($line -like 'echo RT_HISTORY_*') { "screenshot screenshots/history_$historyCapture.png"; $historyCapture++ }
+        $line
+    })
     $scriptLines | Set-Content -LiteralPath (Join-Path $saveBase.FullName 'neural_smoke.cfg') -Encoding ASCII
     # Values are scalar/validated; quote filesystem paths explicitly for Windows argv.
     # Win32 stores the command line in MAX_STRING_CHARS (1024 bytes).
@@ -222,6 +256,7 @@ try {
     $log = Get-Content -LiteralPath (Join-Path $saveBase.FullName 'smoke.log') -Raw
     if ($log -notmatch 'NEURAL_SMOKE_COMPLETE') { throw 'Gameplay script did not complete.' }
     if ($log -match '(?im)FATAL ERROR|D3D12 device removed|Unknown command') { throw 'Engine log contains fatal/device/command errors.' }
+    if ($FilmicBlendMatrix) { & (Join-Path $PSScriptRoot 'Test-FilmicBlend.ps1') -ScreenshotDirectory (Join-Path $saveBase.FullName 'screenshots') }
     if ($DLSSPresetMatrix) {
         $modes = [regex]::Matches($log, 'Neural temporal backend: Streamline DLSS, initialized yes, evaluated \d+, presented (\d+), rejected (\d+), epoch \d+, render (\d+)x(\d+), output (\d+)x(\d+), last (Quality|Balanced|Performance)')
         if ($modes.Count -ne 3) { throw 'Missing successful DLSS preset evaluation evidence.' }
@@ -230,6 +265,18 @@ try {
             if ([int]$mode.Groups[1].Value -le $previousFrames -or [int]$mode.Groups[2].Value -ne 0 -or [int]$mode.Groups[3].Value -ge $previousWidth -or [int]$mode.Groups[5].Value -ne $Width -or [int]$mode.Groups[6].Value -ne $Height) { throw 'DLSS presets did not lower input resolution while preserving output and successful presentation.' }
             $previousFrames = [int]$mode.Groups[1].Value; $previousWidth = [int]$mode.Groups[3].Value
         }
+    }
+    if ($TemporalTransitions) {
+        foreach ($case in $transitionCases) {
+            $state = [regex]::Match($log, ('TEMPORAL_' + $case.name + '[ \t]*\r?\n[^\r\n]*\r?\nNeural presentation: mode (\d+), render (\d+)x(\d+), output (\d+)x(\d+), motionHistory (\d), taaHistory (\d)'))
+            if (-not $state.Success) { throw "Missing temporal transition: $($case.name)" }
+            $rw = [int]$state.Groups[2].Value; $rh = [int]$state.Groups[3].Value
+            $motionRequired = $case.name -notin @('AA_OFF','TAA_OFF')
+            if ([int]$state.Groups[1].Value -ne $case.mode -or [int]$state.Groups[4].Value -ne $Width -or [int]$state.Groups[5].Value -ne $Height -or ($motionRequired -and [int]$state.Groups[6].Value -ne 1) -or [int]$state.Groups[7].Value -ne $case.taa) { throw "Incorrect history or presentation after $($case.name)." }
+            if ($case.scaled) { if ($rw -ge $Width -or $rh -ge $Height) { throw 'DLSS did not resume scaled input.' } }
+            elseif ($rw -ne $Width -or $rh -ne $Height) { throw 'Disabling reconstruction left a reduced viewport.' }
+        }
+        $result.temporalTransitions = $transitionCases.Count
     }
     # Frontend-thread Printf goes to OutputDebugString on Windows, not the file log.
     # Query the actual epoch from the main-thread console after each lighting edit.

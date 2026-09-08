@@ -53,8 +53,11 @@ compile_time_assert( sizeof( neuralMenuSettings ) / sizeof( neuralMenuSettings[0
 static const char* neuralSampleSettings[] = { "r_rayTracedReflectionSamples", "r_rayTracedGISamples", "r_rayTracedAOSamples" };
 
 extern idCVar r_graphicsAPI;
+extern idCVar com_showFPS;
 extern idCVar r_antiAliasing;
+extern bool R_UseTemporalAA();
 extern idCVar r_useFilmicPostFX;
+extern idCVar r_filmicPostFXIntensity;
 extern idCVar r_swapInterval;
 extern idCVar s_volume_dB;
 extern idCVar r_exposure; // RB: use this to control HDR exposure or brightness in LDR mode
@@ -241,8 +244,9 @@ void idMenuScreen_Shell_SystemOptions::Initialize( idMenuHandler* data )
 	options->AddChild( control );*/
 
 	control = new( TAG_SWF ) idMenuWidget_ControlButton();
-	control->SetOptionType( OPTION_SLIDER_TEXT );
-	control->SetLabel( "Filmic Post FX" );
+	control->SetOptionType( OPTION_SLIDER_BAR );
+	control->SetLabel( "Filmic Intensity" );
+	control->SetDescription( "Blend chromatic aberration and film grain from 0 to 100%. Native HDR bypasses this SDR effect." );
 	control->SetDataSource( &systemData, idMenuDataSource_SystemSettings::SYSTEM_FIELD_FILMIC_POSTFX );
 	control->SetupEvents( DEFAULT_REPEAT_TIME, options->GetChildren().Num() );
 	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_COMMAND, idMenuDataSource_SystemSettings::SYSTEM_FIELD_FILMIC_POSTFX );
@@ -280,8 +284,9 @@ void idMenuScreen_Shell_SystemOptions::Initialize( idMenuHandler* data )
 		control->SetOptionType( OPTION_SLIDER_TEXT );
 		const int rayIndex = field - idMenuDataSource_SystemSettings::SYSTEM_FIELD_RT_FIRST;
 		if( rayIndex >= 0 && rayIndex < 9 ) { control->SetLabel( neuralMenuSettings[rayIndex].label ); }
-		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RECONSTRUCTION ) { control->SetLabel( "Reconstruction" ); control->SetDescription( "TAA / DLAA at 100%, or DLSS Quality (~67%), Balanced (~58%), Performance (50%) per dimension. Requires DLAA/DLSS launch profile; NR keeps native DLAA input." ); }
+		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RECONSTRUCTION ) { control->SetLabel( "DLAA / DLSS Quality" ); control->SetDescription( "DLAA at 100%, or DLSS Quality (~67%), Balanced (~58%), Performance (50%) per dimension. Select DLAA / DLSS in Next Launch Profile for these choices. NR keeps native DLAA input." ); }
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RENDER_STATUS ) { control->SetLabel( "Rendering Status" ); }
+		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_FPS_COUNTER ) { control->SetLabel( "FPS Counter" ); control->SetDescription( "Compact frames-per-second display in the top-right corner. Follows window resizing and ultrawide resolutions." ); }
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RT_QUALITY ) { control->SetLabel( "Ray Quality" ); control->SetDescription( "Changes ray samples, not rendering resolution or lighting strength." ); }
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_DOOM_DEFAULTS ) { control->SetLabel( "Doom Lighting Defaults" ); control->SetDescription( "Restore contrast and lighting strengths; preserve HDR calibration, feature toggles and resolution." ); }
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_LAUNCH_PROFILE ) { control->SetLabel( "Next Launch Profile" ); control->SetDescription( "Applies after quitting and reopening the launcher. DLAA/NR require separately installed local components." ); }
@@ -545,6 +550,7 @@ void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::LoadData
 	for( int i = 0; i < 3; i++ ) { originalRaySamples[i] = cvarSystem->GetCVarInteger( neuralSampleSettings[i] ); }
 	originalReconstruction = r_neuralReconstructionMode.GetInteger();
 	originalLaunchProfile = r_neuralLaunchProfile.GetInteger();
+	originalFPSCounter = com_showFPS.GetInteger();
 	originalRenderAPI = r_graphicsAPI.GetString();
 	originalFramerate = com_engineHz.GetInteger();
 	originalAntialias = r_antiAliasing.GetInteger();
@@ -563,6 +569,7 @@ void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::LoadData
 	originalSSAO = r_useSSAO.GetInteger();
 	originalBloodReflections = r_useSSR.GetInteger();
 	originalPostProcessing = r_useFilmicPostFX.GetInteger();
+	originalFilmicIntensity = r_filmicPostFXIntensity.GetFloat();
 	originalCRTPostFX = r_useCRTPostFX.GetInteger();
 	// RB end
 
@@ -659,6 +666,7 @@ idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustField
 */
 void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustField( const int fieldIndex, const int adjustAmount )
 {
+	if( fieldIndex == SYSTEM_FIELD_FPS_COUNTER ) { com_showFPS.SetInteger( com_showFPS.GetInteger() == 0 ? 1 : 0 ); return; }
 	if( fieldIndex == SYSTEM_FIELD_LAUNCH_PROFILE )
 	{
 #if defined( USE_STREAMLINE )
@@ -688,6 +696,8 @@ void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustFi
 		{
 			const int mode = ( r_neuralReconstructionMode.GetInteger() + ( adjustAmount > 0 ? 1 : 4 ) ) % 5;
 			r_neuralReconstructionMode.SetInteger( mode );
+			cvarSystem->SetCVarBool( "r_useTemporalAA", true );
+			r_antiAliasing.SetInteger( ANTI_ALIASING_TAA );
 			cvarSystem->SetCVarInteger( "r_neuralBackend", mode == 0 ? 0 : mode == 1 ? 2 : 3 );
 			if( mode >= 2 ) { cvarSystem->SetCVarInteger( "r_neuralDLSSQuality", mode - 2 ); }
 			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "neuralHistoryReset\n" );
@@ -824,9 +834,10 @@ void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustFi
 		}
 		case SYSTEM_FIELD_FILMIC_POSTFX:
 		{
-			static const int numValues = 2;
-			static const int values[numValues] = { 0, 1 };
-			r_useFilmicPostFX.SetInteger( AdjustOption( r_useFilmicPostFX.GetInteger(), values, numValues, adjustAmount ) );
+			const float current = r_useFilmicPostFX.GetBool() ? r_filmicPostFXIntensity.GetFloat() : 0;
+			const float intensity = idMath::ClampFloat( 0, 1, current + adjustAmount * 0.05f );
+			r_filmicPostFXIntensity.SetFloat( intensity );
+			r_useFilmicPostFX.SetBool( intensity > 0 );
 			break;
 		}
 		case SYSTEM_FIELD_CRT_POSTFX:
@@ -899,9 +910,10 @@ idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::GetField
 */
 idSWFScriptVar idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::GetField( const int fieldIndex ) const
 {
+	if( fieldIndex == SYSTEM_FIELD_FPS_COUNTER ) { return com_showFPS.GetInteger() == 0 ? "Off" : com_showFPS.GetInteger() == 1 ? "Top right" : "Detailed (console)"; }
 	if( fieldIndex == SYSTEM_FIELD_LAUNCH_PROFILE )
 	{
-		const char* names[] = { "Ask on launch", "Native RTX", "DLAA (local SDK)", "NR (local add-on)" };
+		const char* names[] = { "Ask on launch", "Native RTX", "DLAA / DLSS", "NR + DLAA" };
 		return names[r_neuralLaunchProfile.GetInteger() + 1];
 	}
 	if( fieldIndex == SYSTEM_FIELD_NR_STATUS ) { return cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) ? "NR profile; add-on F6" : "Not loaded"; }
@@ -929,7 +941,8 @@ idSWFScriptVar idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings
 	}
 	if( fieldIndex == SYSTEM_FIELD_RECONSTRUCTION )
 	{
-		if( cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) ) { return "DLAA (NR input)"; }
+		if( !R_UseTemporalAA() ) { return "Temporal AA inactive"; }
+		if( cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) ) { return "NR uses DLAA (100%)"; }
 		if( !R_StreamlineIsDLSSSupported() ) { return "TAA (DLAA unavailable)"; }
 		if( cvarSystem->GetCVarInteger( "r_neuralBackend" ) == 3 ) { return va( "DLSS %s", R_StreamlineDLSSQualityName() ); }
 		return cvarSystem->GetCVarInteger( "r_neuralBackend" ) == 2 ? "DLAA (100%)" : "Native TAA (100%)";
@@ -1099,14 +1112,7 @@ idSWFScriptVar idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings
 			return values[ r_renderMode.GetInteger() ];
 		}
 		case SYSTEM_FIELD_FILMIC_POSTFX:
-			if( r_useFilmicPostFX.GetInteger() > 0 )
-			{
-				return "#str_swf_enabled";
-			}
-			else
-			{
-				return "#str_swf_disabled";
-			}
+			return r_useFilmicPostFX.GetBool() ? r_filmicPostFXIntensity.GetFloat() * 100.0f : 0.0f;
 
 		case SYSTEM_FIELD_CRT_POSTFX:
 		{
@@ -1166,6 +1172,7 @@ idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsDataChanged
 */
 bool idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsDataChanged() const
 {
+	if( originalFPSCounter != com_showFPS.GetInteger() ) { return true; }
 	for( int i = 0; i < 9; i++ ) { if( originalRaySettings[i] != cvarSystem->GetCVarFloat( neuralMenuSettings[i].name ) ) { return true; } }
 	for( int i = 0; i < 3; i++ ) { if( originalRaySamples[i] != cvarSystem->GetCVarInteger( neuralSampleSettings[i] ) ) { return true; } }
 	if( originalLaunchProfile != r_neuralLaunchProfile.GetInteger() ) { return true; }
@@ -1211,7 +1218,7 @@ bool idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsDataCh
 		return true;
 	}
 
-	if( originalPostProcessing != r_useFilmicPostFX.GetInteger() )
+	if( originalPostProcessing != r_useFilmicPostFX.GetInteger() || originalFilmicIntensity != r_filmicPostFXIntensity.GetFloat() )
 	{
 		return true;
 	}
