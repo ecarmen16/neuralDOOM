@@ -9,10 +9,10 @@ Build a reversible, optional, well-instrumented temporal input path around the e
 ## Non-negotiable legal and repository constraints
 
 - Never add or commit Doom 3/BFG assets, `.resources` files, videos, retail maps, or other proprietary game data.
-- Never download, add, copy, package, or redistribute leaked, extracted, private, or user-supplied NVIDIA Neural Rendering runtimes.
+- Never commit or bundle NVIDIA Neural Rendering runtimes. The internal installer may download the pinned public RHI components or import a locally selected validated DLL, as documented in THIRD_PARTY_AND_LEGAL.md. This installation-time workflow does not approve binary redistribution or an official NR engine API.
 - Never commit ReShade, RenoDX, DLSS5-Feeder, NVIDIA redistributables, or SDK binary blobs unless a later task has verified both the license and the intended distribution mechanism.
 - Do not put credentials, tokens, machine-specific absolute paths, or personal data in tracked files.
-- Treat experimental feeder/RenoDX testing as a manual local validation layer, not an engine dependency.
+- Treat experimental feeder/RenoDX testing as an optional local compatibility layer, not a required engine dependency. The internal installer may automate its documented setup.
 - Preserve RBDOOM's GPL and additional-license obligations. Record every new dependency and its license in `THIRD_PARTY_AND_LEGAL.md` before integrating it.
 
 ## Phase gates

@@ -5,6 +5,7 @@ param(
     [ValidateSet('Debug', 'Release', 'RelWithDebInfo', 'MinSizeRel')]
     [string]$Configuration = 'RelWithDebInfo',
     [ValidateSet('Native', 'Validate', 'DLAA')][string]$Profile = 'Native',
+    [switch]$DLSSPresetMatrix,
     [ValidateRange(640, 7680)][int]$Width = 1280,
     [ValidateRange(360, 4320)][int]$Height = 720,
     [switch]$Borderless,
@@ -147,6 +148,13 @@ try {
     if ($RayTracingDiagnostics -in @('Synthetic', 'Scene')) { $scriptLines += @('rayTracingTest', 'rayTracingDynamicTest', 'rayTracingDynamicStatus') }
     if ($RayTracingDiagnostics -eq 'Scene') { $scriptLines += @('rayTracingScene', 'rayTracingTest') }
     $scriptLines += @('rayTracingAOStatus', 'hdrStatus', 'neuralHistoryStatus', 'neuralBackendStatus', 'probeLightingStatus', 'screenshot screenshots/before.png')
+    if ($DLSSPresetMatrix) {
+        if ($Profile -ne 'DLAA') { throw 'DLSS preset matrix requires the DLAA profile.' }
+        foreach ($quality in @(0,1,2)) {
+            $scriptLines += @("echo DLSS_PRESET_$quality", "set r_neuralDLSSQuality $quality", 'set r_neuralBackend 3', 'neuralHistoryReset', 'wait 90', 'neuralBackendStatus', "screenshot screenshots/dlss_$quality.png")
+        }
+        $scriptLines += @('set r_neuralBackend 2', 'neuralHistoryReset', 'wait 90', 'neuralBackendStatus')
+    }
     $scriptLines += @('rayTracingContactStatus', 'rayTracingGIStatus', 'rayTracingReflectionStatus')
     if ($GpuProfile) {
         # Let the screenshot stall and its queued frames drain before requesting samples.
@@ -214,6 +222,15 @@ try {
     $log = Get-Content -LiteralPath (Join-Path $saveBase.FullName 'smoke.log') -Raw
     if ($log -notmatch 'NEURAL_SMOKE_COMPLETE') { throw 'Gameplay script did not complete.' }
     if ($log -match '(?im)FATAL ERROR|D3D12 device removed|Unknown command') { throw 'Engine log contains fatal/device/command errors.' }
+    if ($DLSSPresetMatrix) {
+        $modes = [regex]::Matches($log, 'Neural temporal backend: Streamline DLSS, initialized yes, evaluated \d+, presented (\d+), rejected (\d+), epoch \d+, render (\d+)x(\d+), output (\d+)x(\d+), last (Quality|Balanced|Performance)')
+        if ($modes.Count -ne 3) { throw 'Missing successful DLSS preset evaluation evidence.' }
+        $previousWidth = $Width + 1; $previousFrames = 0
+        foreach ($mode in $modes) {
+            if ([int]$mode.Groups[1].Value -le $previousFrames -or [int]$mode.Groups[2].Value -ne 0 -or [int]$mode.Groups[3].Value -ge $previousWidth -or [int]$mode.Groups[5].Value -ne $Width -or [int]$mode.Groups[6].Value -ne $Height) { throw 'DLSS presets did not lower input resolution while preserving output and successful presentation.' }
+            $previousFrames = [int]$mode.Groups[1].Value; $previousWidth = [int]$mode.Groups[3].Value
+        }
+    }
     # Frontend-thread Printf goes to OutputDebugString on Windows, not the file log.
     # Query the actual epoch from the main-thread console after each lighting edit.
     $resetStates = [regex]::Matches($log, 'RT_HISTORY_r_rayTraced\w+_[01][ \t]*\r?\nNeural temporal history: epoch (\d+), pending none, lastReset ([^\r\n]+)')

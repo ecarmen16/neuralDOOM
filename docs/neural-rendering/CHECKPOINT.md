@@ -2,19 +2,19 @@
 
 ## Current package
 
-The internal native RTX Release ships as a graphical setup wizard. It detects
-owned BFG data, verifies and extracts supporting downloads, checks Microsoft
-prerequisites, and creates a Start menu entry and optional desktop shortcut.
-The package includes corresponding source. DLAA and external NR components are
-not included. See [INTERNAL_TESTING.md](../../INTERNAL_TESTING.md) for installation
-and the exact comparison keys.
+The graphical internal setup offers Native RTX, DLAA/DLSS and experimental NR,
+with automatic verified downloads or local signed DLL selection. It detects
+existing installs and supports upgrades with rollback, separate copies and
+uninstall while preserving saves/settings. Both engine configurations and their
+corresponding source are packaged; third-party runtimes are acquired at install
+time. See [INTERNAL_TESTING.md](../../INTERNAL_TESTING.md) for exact controls.
 
 ## Renderer state
 
 - Full-resolution ray-traced material reflections, diffuse bounce, contact
   shadows and ambient occlusion, with independent settings and comparison keys.
 - Supported visible opaque rigid and animated geometry in the ray scene.
-- Native HDR, optional DLAA, automatic ultrawide HUD placement and FOV controls.
+- Native HDR, DLAA and DLSS Quality/Balanced/Performance, ultrawide HUD/FOV controls.
 - Conservative lighting defaults; display calibration remains independent.
 - Full path tracing, off-screen dynamic coverage and secondary-hit history
   remain future work.

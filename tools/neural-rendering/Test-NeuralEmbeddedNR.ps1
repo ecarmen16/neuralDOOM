@@ -71,7 +71,7 @@ Expect-NRFailure '*Duplicate NR setting*'
 & $launcher -RepoRoot $fixture -Profile NR -PrepareOnly
 if ((Get-FileHash -LiteralPath (Join-Path $fixture 'neuralDoom.exe')).Hash -ne $manifest.sha256) { throw 'NR selected a stale engine.' }
 $prepared = [IO.File]::ReadAllText($ini)
-if ($prepared -ne $config.Replace('NeuralUplift=0', 'NeuralUplift=1').Replace('NREnableUpscaling=1', 'NREnableUpscaling=0')) {
+if ($prepared -ne $config.Replace('NeuralUplift=0', 'NeuralUplift=1').Replace('NREnableUpscaling=1', 'NREnableUpscaling=0').Replace('[OTHER]', "EnableHooks=1`r`nNRToggleKey=117`r`n[OTHER]")) {
     throw 'NR configuration changed unrelated tuning or did not disable upscaling.'
 }
 $saved = Get-Content -LiteralPath (Join-Path $fixture 'captures/dogfood/base/neural_dogfood.cfg') -Raw
@@ -111,6 +111,13 @@ if ($preparedNR -notmatch 'Reconstruction: DLAA') { throw 'NR no longer has DLAA
 $preparedDLAA = (& $launcher -RepoRoot $fixture -Profile DLAA -PrepareOnly 6>&1 | Out-String)
 if ($preparedDLAA -notmatch 'Reconstruction: DLAA') { throw 'DLAA preference was not restored.' }
 Write-Host 'PASS: saved TAA/DLAA selection, NR input isolation, and no process launch.'
+foreach ($mode in @(2,3,4)) {
+    [IO.File]::WriteAllText($playerConfig, "set r_neuralReconstructionMode $mode`r`n")
+    $preparedDLSS = (& $launcher -RepoRoot $fixture -Profile DLAA -PrepareOnly 6>&1 | Out-String)
+    $expected = @('Quality','Balanced','Performance')[$mode - 2]
+    if ($preparedDLSS -notmatch "Reconstruction: DLSS $expected") { throw 'Saved DLSS preset was not restored.' }
+}
+Write-Host 'PASS: saved DLSS Quality/Balanced/Performance presets survive preparation.'
 
 # Inspect the actual prepared argv without starting a process.
 $disabledRays = "set r_rayTracedAO 0`nset r_rayTracedContactShadows 0`nset r_rayTracedGI 0`nset r_rayTracedReflections 0`n"

@@ -71,3 +71,7 @@ neo/bin/
 *.rdc
 __pycache__/
 *.pyc
+/.neuraldoom-install.json
+/internal-package.json
+/SOURCE_REVISION.txt
+/third-party-notices/

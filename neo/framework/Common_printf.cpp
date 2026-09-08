@@ -226,12 +226,12 @@ void idCommonLocal::VPrintf( const char* fmt, va_list args )
 			if( !logFile )
 			{
 				logFileFailed = true;
-				FatalError( "failed to open log file '%s'\n", fileName );
+				Warning( "Cannot open log file '%s'; file logging disabled for this session", fileName );
 			}
 
 			recursing = false;
 
-			if( com_logFile.GetInteger() > 1 )
+			if( logFile && com_logFile.GetInteger() > 1 )
 			{
 				// force it to not buffer so we get valid
 				// data even if we are crashing
@@ -241,7 +241,7 @@ void idCommonLocal::VPrintf( const char* fmt, va_list args )
 			time_t aclock;
 			time( &aclock );
 			struct tm* newtime = localtime( &aclock );
-			Printf( "log file '%s' opened on %s\n", fileName, asctime( newtime ) );
+			if( logFile ) { Printf( "log file '%s' opened on %s\n", fileName, asctime( newtime ) ); }
 
 			// print engine version
 			Printf( "%s\n", com_version.GetString() );

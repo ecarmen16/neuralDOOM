@@ -199,7 +199,13 @@ void TemporalAntiAliasingPass::TemporalResolve(
 								   viewDef->viewport.zmin,
 								   viewDef->viewport.zmax };
 
-	const nvrhi::Viewport viewportOutput = viewportInput;
+	// DLSS failure still needs a complete output-sized TAA image this frame.
+	// The resolve shader already maps distinct input/output view sizes.
+	nvrhi::Viewport viewportOutput = viewportInput;
+	if( viewDef->neuralBackendMode == 3 )
+	{
+		viewportOutput = nvrhi::Viewport( 0.f, float( renderSystem->GetWidth() - 1 ), 0.f, float( renderSystem->GetHeight() - 1 ), viewportInput.minZ, viewportInput.maxZ );
+	}
 
 	TemporalAntiAliasingConstants taaConstants = {};
 	const float marginSize = 1.f;

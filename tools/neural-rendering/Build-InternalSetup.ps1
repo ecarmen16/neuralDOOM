@@ -24,11 +24,13 @@ try {
 } finally { $zip.Dispose() }
 $hashFile = Join-Path $stage 'checksum.txt'
 $versionFile = Join-Path $stage 'version.txt'
+$neuralFile = Join-Path $stage 'neural.txt'
+$(if ($manifest.PSObject.Properties['neuralBuild']) { '1' } else { '0' }) | Set-Content -LiteralPath $neuralFile -Encoding ASCII
 $manifest.commit.Substring(0, 8) | Set-Content -LiteralPath $versionFile -Encoding ASCII
 (Get-FileHash -LiteralPath $PackagePath).Hash | Set-Content -LiteralPath $hashFile -Encoding ASCII
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
 if (-not (Test-Path -LiteralPath $compiler)) { throw 'Windows .NET Framework C# compiler is missing.' }
-& $compiler /nologo /target:winexe /platform:x64 /optimize+ /reference:System.Windows.Forms.dll /reference:System.Drawing.dll ("/out:" + $OutputPath) ("/resource:" + $PackagePath + ',Payload') ("/resource:" + (Join-Path $stage 'Bootstrap-InternalSetup.ps1') + ',Bootstrap') ("/resource:" + $hashFile + ',Checksum') ("/resource:" + $versionFile + ',Version') (Join-Path $stage 'InternalSetup.cs')
+& $compiler /nologo /target:winexe /platform:x64 /optimize+ /reference:System.Windows.Forms.dll /reference:System.Drawing.dll ("/out:" + $OutputPath) ("/resource:" + $PackagePath + ',Payload') ("/resource:" + (Join-Path $stage 'Bootstrap-InternalSetup.ps1') + ',Bootstrap') ("/resource:" + $hashFile + ',Checksum') ("/resource:" + $versionFile + ',Version') ("/resource:" + $neuralFile + ',Neural') (Join-Path $stage 'InternalSetup.cs')
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $OutputPath)) { throw 'Setup bootstrap compilation failed.' }
 $verification = Start-Process -FilePath $OutputPath -ArgumentList '--verify' -WindowStyle Hidden -Wait -PassThru
 if ($verification.ExitCode -ne 0) { throw 'Setup payload self-verification failed.' }

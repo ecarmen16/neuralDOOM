@@ -637,3 +637,45 @@ Implemented both approved tasks. See [GRAPHICS_AND_DYNAMIC_RAYS.md](GRAPHICS_AND
 ## 2026-09-07 - Automatic supporting downloads and one-file setup
 
 `Setup-Dependencies.ps1` implements HTTPS retry/cache checks, pinned RBDOOM archive/extractor download, single-member extraction/hash verification, Microsoft runtime signature/install handling and Steam BFG detection. `Install-InternalTest.ps1` uses it instead of requesting a manually collected pack, then creates the desktop shortcut (optional suppression for tests). `Bootstrap-InternalSetup.ps1` verifies/extracts the embedded package to a versioned per-user folder and preserves other installations. `InternalSetup.cs` / `Build-InternalSetup.ps1` create a one-file Windows .NET bootstrap whose embedded scripts match the package source. Verify-only paths perform no downloads, install or game launch. No renderer/build/shader changes. Next: verify the fully automated installer on a friend's machine; the actual public archive download/extraction and local install path are exercised here.
+# 2026-09-07 - Neural setup, install management and DLSS presets
+
+`InternalSetup.cs`, `Bootstrap-InternalSetup.ps1`, `Install-InternalTest.ps1` and
+`Install-Lifecycle.ps1` now support renderer selection, pinned installation-time
+component downloads, optional local DLL selection (signed DLSS SR or the exact validated NR pin), existing-install
+detection, upgrade/rollback, separate copy and ownership-based uninstall.
+`Setup-NeuralComponents.ps1` extracts only allowlisted members; the ReShade SFX
+is read as a ZIP, never executed. The engine loads the renamed runtime without
+a DXGI proxy. `EmbeddedNR.ps1` establishes full-resolution DLAA input, Streamline
+hooks and F6 (virtual key 117), preserving appearance controls. Binary archives
+and user data remain excluded from the source/package. Exact pins and provenance
+are in `neural-components.json` and THIRD_PARTY_AND_LEGAL.md.
+
+`StreamlineIntegration.cpp::R_StreamlineDLSSRenderSize` queries the official SDK
+for Quality, Balanced and Performance extents after output/preset changes.
+`RenderWorld.cpp::RenderScene` snapshots backend/preset into `viewDef_t` beside
+the input dimensions. `RenderBackend.cpp::EvaluateNeuralTemporalBackend` carries
+them through `neuralTemporalFrame_t`; `NeuralTemporalStreamline.cpp::Evaluate`
+uses those frame-local settings, avoiding an old frame being evaluated with a
+new menu selection. Quality/Balanced use model K; Performance uses model M.
+SDK-independent code has no vendor type or new dependency.
+
+`MenuScreen_Shell_SystemOptions.cpp` exposes five saved reconstruction modes:
+TAA, DLAA, Quality, Balanced, Performance. `r_neuralDLSSQuality` is 0/1/2 for the
+three DLSS presets; `r_neuralBackend 3` selects scaling. `r_neuralReconstructionMode`
+is 0..4 for the saved launcher/menu choice. The launcher restores these choices
+and keeps NR's DLAA input at 100%. F1 remains the explicit native TAA/DLAA toggle.
+
+Resource formats/conventions are unchanged: RGBA16F linear-HDR input/output,
+RG16F current-to-previous pixel motion (+Y down), R8 masks, normal 0..1 device
+depth. Inputs occupy the render-sized viewport in output-sized allocations;
+DLSS output, tone mapping and HUD retain output resolution. The TAA fallback
+uses its existing cross-resolution shader mapping to fill the entire output
+when a DLSS frame is declined. Viewport changes and backend option changes reset
+history. No automatic half-resolution mode was introduced.
+
+`Start-NeuralDoom-Dogfood.ps1` probes writable save/log storage and creates unique
+session logs. `Common_printf.cpp::VPrintf` treats failure to open an optional log
+as a warning and guards the subsequent flush, avoiding a fatal startup error.
+
+Validation details and remaining manual acceptance are recorded in TEST_RESULTS.md.
+Next task: compare the new presets, resize and NR F6 behavior in a real play session.

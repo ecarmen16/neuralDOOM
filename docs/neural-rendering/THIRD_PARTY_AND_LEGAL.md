@@ -2,6 +2,21 @@
 
 This file is an engineering checklist, not legal advice.
 
+## Current internal installer scope (2026-09-07)
+
+The internal installer now offers separate Native, DLAA and experimental NR profiles. It contains our two engine configurations and their corresponding source, but no third-party runtime DLLs or add-ons. Components are obtained on the tester's machine, with explicit profile selection and optional local DLL selection (signed DLSS SR or the exact validated NR pin). This supersedes older notes below that describe a Native-only installer or prohibit all acquisition. Public redistribution of proprietary runtime binaries remains unapproved.
+
+Reference: RHI `1402548741014161400929e7ee1a2a5de121af05`, especially [Renodx5AddonService.cs](https://github.com/RankFTW/RHI/blob/1402548741014161400929e7ee1a2a5de121af05/RenoDXCommander/Services/Renodx5AddonService.cs) and its `dlss_manifest.json`. RHI's GPL-3.0 source was inspected; no implementation code was copied. Our installer pins archives and exact extracted members in `tools/neural-rendering/neural-components.json`.
+
+| Component | Acquisition and terms | Removal / updates |
+|---|---|---|
+| Streamline 2.12.0 | Official NVIDIA-RTX GitHub SDK. MIT-style framework `license.txt`; separate NVIDIA RTX terms for NGX/DLSS. Setup extracts three framework plugins and retains the included notices. | Optional SDK build; Native has no dependency. Version/hash updates require review. |
+| DLSS SR 310.8.0 | Public RankFTW/rhi-repo release used by RHI, or locally selected NVIDIA-signed x64 DLL. Mirror archive has no bundled license; NVIDIA's RTX terms remain applicable, and mirror availability is not license verification. | Locally installed DLL only; no runtime in our package. |
+| NR 310.8.SF-v2 and consumer add-on 4.70 | Public RankFTW/rhi-repo releases used by RHI, or the same hash-verified NR DLL selected locally. NR is a community-patched, unsigned runtime. The archives do not establish NR/add-on redistribution rights. The generic consumer's exact source/license correspondence remains unresolved. | Experimental internal compatibility option; no binary rebundling, no vendor support claim. |
+| ReShade 6.8.0 add-on runtime | Official reshade.me installer, extracted without executing it. BSD-3-Clause upstream license. Renamed `neuraldoom-reshade64.dll`; no DXGI proxy. | Optional engine-loaded compatibility layer. |
+
+Local installed notices include this record and the Streamline SDK's framework and NVIDIA terms. Hashes establish byte identity, and signatures establish the publisher; neither establishes permission to redistribute. Qualification for a public combined release remains outstanding. Disabling NR retains native DLAA at full resolution; switching to Native removes the runtime dependency altogether.
+
 ## RBDOOM-3-BFG and Doom 3 BFG data
 
 - RBDOOM-3-BFG source is published under GPLv3 with project-specific exceptions/additional terms described by its repository.

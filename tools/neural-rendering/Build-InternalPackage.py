@@ -71,6 +71,7 @@ def main():
     ap.add_argument('--game', type=pathlib.Path, required=True)
     ap.add_argument('--output', type=pathlib.Path, required=True)
     ap.add_argument('--build-directory', type=pathlib.Path, help='Native Release build directory (defaults to <game>/build-rt)')
+    ap.add_argument('--neural-build-directory', type=pathlib.Path, help='Optional SDK-enabled Release engine; runtime DLLs are downloaded by setup')
     args = ap.parse_args()
     source, game = args.source.resolve(), args.game.resolve()
     revision = git(source, 'rev-parse', 'HEAD').decode().strip()
@@ -103,6 +104,22 @@ def main():
         for path, data in source_entries(game / name, commit):
             files[f'{name}/{path}'] = data
     files['build-rt/Release/neuralDoom.exe'] = exe
+    neural = None
+    if args.neural_build_directory:
+        neural = json.loads((args.neural_build_directory / 'neuraldoom-build-Release.json').read_text(encoding='utf-8-sig'))
+        if (neural['commit'] != revision or neural['dirty'] or neural['configuration'] != 'Release' or
+                neural['features']['streamline'] != 'ON' or neural['features']['rayTracing'] != 'ON' or
+                neural['features']['dx12'] != 'ON' or neural['shaders'] != manifest['shaders']):
+            raise RuntimeError('Neural engine must match clean source and native shader set')
+        neural_exe = pathlib.Path(neural['executable']).read_bytes()
+        if digest(neural_exe) != neural['sha256'].upper():
+            raise RuntimeError('Neural executable differs from build manifest')
+        neural['imports'] = pe_imports(neural_exe)
+        if any(name.lower() in {'msvcp140d.dll', 'vcruntime140d.dll', 'vcruntime140_1d.dll', 'ucrtbased.dll'} for name in neural['imports']):
+            raise RuntimeError('Debug CRT in neural executable')
+        neural.pop('builtAt', None)
+        neural['executable'] = 'build-streamline/Release/neuralDoom.exe'
+        files[neural['executable']] = neural_exe
     for shader in manifest['shaders']:
         path = pathlib.PurePosixPath(shader['path'])
         if path.is_absolute() or '..' in path.parts or path.parts[:3] != ('base', 'renderprogs2', 'dxil') or path.suffix not in {'.dxil', '.bin'}:
@@ -121,6 +138,8 @@ def main():
     portable['executable'] = 'build-rt/Release/neuralDoom.exe'
     portable['submodules'] = submodules
     portable['imports'] = imports
+    if neural:
+        portable['neuralBuild'] = neural
     portable['files'] = [{'path': name, 'sha256': digest(data)} for name, data in sorted(files.items())]
     files['internal-package.json'] = (json.dumps(portable, indent=2) + '\n').encode()
     for name, data in files.items():

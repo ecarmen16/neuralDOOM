@@ -72,7 +72,7 @@ public:
 		rejectedFrames++;
 		return false;
 #else
-		const int requestedMode = r_neuralBackend.GetInteger();
+		const int requestedMode = frame.backendMode;
 		const bool nativeDLAA = requestedMode == 2;
 		const bool qualityDLSS = requestedMode == 3;
 		const char* contractError = R_ValidateNeuralTemporalFrame( frame );
@@ -94,7 +94,8 @@ public:
 		{
 			resetPending = true;
 		}
-		if( configuredMode != requestedMode || outputWidth != frame.outputWidth || outputHeight != frame.outputHeight )
+		const int requestedQuality = idMath::ClampInt( 0, 2, frame.dlssQuality );
+		if( configuredMode != requestedMode || configuredQuality != requestedQuality || renderWidth != frame.renderWidth || renderHeight != frame.renderHeight || outputWidth != frame.outputWidth || outputHeight != frame.outputHeight )
 		{
 			optionsDirty = true;
 			resetPending = true;
@@ -104,7 +105,8 @@ public:
 		if( optionsDirty || configuredExposureScale != frame.exposureScale )
 		{
 			sl::DLSSOptions options = {};
-			options.mode = nativeDLAA ? sl::DLSSMode::eDLAA : sl::DLSSMode::eMaxQuality;
+			const sl::DLSSMode modes[] = { sl::DLSSMode::eMaxQuality, sl::DLSSMode::eBalanced, sl::DLSSMode::eMaxPerformance };
+			options.mode = nativeDLAA ? sl::DLSSMode::eDLAA : modes[requestedQuality];
 			options.outputWidth = frame.outputWidth;
 			options.outputHeight = frame.outputHeight;
 			options.preExposure = 1.0f;
@@ -112,6 +114,8 @@ public:
 			options.colorBuffersHDR = sl::Boolean::eTrue;
 			options.dlaaPreset = sl::DLSSPreset::ePresetK;
 			options.qualityPreset = sl::DLSSPreset::ePresetK;
+			options.balancedPreset = sl::DLSSPreset::ePresetK;
+			options.performancePreset = sl::DLSSPreset::ePresetM;
 			options.useAutoExposure = sl::Boolean::eTrue;
 			options.alphaUpscalingEnabled = sl::Boolean::eFalse;
 			const sl::Result optionsResult = slDLSSSetOptions( sl::ViewportHandle( 0 ), options );
@@ -121,6 +125,7 @@ public:
 			}
 			optionsDirty = false;
 			configuredMode = requestedMode;
+			configuredQuality = requestedQuality;
 			configuredExposureScale = frame.exposureScale;
 		}
 		renderWidth = frame.renderWidth;
@@ -236,7 +241,8 @@ public:
 		resetPending = false;
 		lastFrameIndex = frame.frameIndex;
 		presentedFrames++;
-		lastResult = nativeDLAA ? "DLAA evaluated" : "DLSS Quality evaluated";
+		const char* qualityNames[] = { "Quality", "Balanced", "Performance" };
+		lastResult = nativeDLAA ? "DLAA evaluated" : qualityNames[requestedQuality];
 		return true;
 #endif
 	}
@@ -270,6 +276,7 @@ private:
 	bool Reject( const char* operation, sl::Result result )
 	{
 		rejectedFrames++;
+		resetPending = true;
 		lastResult = sl::getResultAsStr( result );
 		if( rejectedFrames == 1 )
 		{
@@ -288,6 +295,7 @@ private:
 	uint64		lastEpoch;
 	uint32		lastFrameIndex;
 	int			configuredMode;
+	int			configuredQuality = -1;
 	float		configuredExposureScale;
 	int			renderWidth;
 	int			renderHeight;

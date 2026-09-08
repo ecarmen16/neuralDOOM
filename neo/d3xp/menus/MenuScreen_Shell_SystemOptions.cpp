@@ -36,7 +36,7 @@ If you have questions concerning this license or the applicable additional terms
 const static int NUM_SYSTEM_OPTIONS_OPTIONS = 8;
 
 static idCVar r_neuralLaunchProfile( "r_neuralLaunchProfile", "-1", CVAR_ARCHIVE | CVAR_INTEGER, "launcher preference: -1 ask, 0 Native, 1 DLAA, 2 local NR; next launch", -1, 2 );
-static idCVar r_neuralReconstructionMode( "r_neuralReconstructionMode", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "saved reconstruction preference in the DLAA launch profile: 0 TAA, 1 DLAA", 0, 1 );
+static idCVar r_neuralReconstructionMode( "r_neuralReconstructionMode", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "saved reconstruction: 0 TAA, 1 DLAA, 2 DLSS Quality, 3 Balanced, 4 Performance", 0, 4 );
 struct neuralMenuSetting_t { const char* label; const char* name; float step, maximum; };
 static const neuralMenuSetting_t neuralMenuSettings[] = {
 	{ "RTX Reflections", "r_rayTracedReflections", 1, 1 },
@@ -280,7 +280,7 @@ void idMenuScreen_Shell_SystemOptions::Initialize( idMenuHandler* data )
 		control->SetOptionType( OPTION_SLIDER_TEXT );
 		const int rayIndex = field - idMenuDataSource_SystemSettings::SYSTEM_FIELD_RT_FIRST;
 		if( rayIndex >= 0 && rayIndex < 9 ) { control->SetLabel( neuralMenuSettings[rayIndex].label ); }
-		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RECONSTRUCTION ) { control->SetLabel( "Reconstruction" ); control->SetDescription( "Native resolution TAA or DLAA. DLAA requires the DLAA launch profile; NR keeps DLAA as its input." ); }
+		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RECONSTRUCTION ) { control->SetLabel( "Reconstruction" ); control->SetDescription( "TAA / DLAA at 100%, or DLSS Quality (~67%), Balanced (~58%), Performance (50%) per dimension. Requires DLAA/DLSS launch profile; NR keeps native DLAA input." ); }
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RENDER_STATUS ) { control->SetLabel( "Rendering Status" ); }
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RT_QUALITY ) { control->SetLabel( "Ray Quality" ); control->SetDescription( "Changes ray samples, not rendering resolution or lighting strength." ); }
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_DOOM_DEFAULTS ) { control->SetLabel( "Doom Lighting Defaults" ); control->SetDescription( "Restore contrast and lighting strengths; preserve HDR calibration, feature toggles and resolution." ); }
@@ -686,8 +686,10 @@ void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustFi
 	{
 		if( !cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) && R_StreamlineIsDLSSSupported() )
 		{
-			r_neuralReconstructionMode.SetInteger( 1 - r_neuralReconstructionMode.GetInteger() );
-			cvarSystem->SetCVarInteger( "r_neuralBackend", r_neuralReconstructionMode.GetInteger() ? 2 : 0 );
+			const int mode = ( r_neuralReconstructionMode.GetInteger() + ( adjustAmount > 0 ? 1 : 4 ) ) % 5;
+			r_neuralReconstructionMode.SetInteger( mode );
+			cvarSystem->SetCVarInteger( "r_neuralBackend", mode == 0 ? 0 : mode == 1 ? 2 : 3 );
+			if( mode >= 2 ) { cvarSystem->SetCVarInteger( "r_neuralDLSSQuality", mode - 2 ); }
 			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "neuralHistoryReset\n" );
 		}
 		return;
@@ -929,7 +931,8 @@ idSWFScriptVar idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings
 	{
 		if( cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) ) { return "DLAA (NR input)"; }
 		if( !R_StreamlineIsDLSSSupported() ) { return "TAA (DLAA unavailable)"; }
-		return cvarSystem->GetCVarInteger( "r_neuralBackend" ) == 2 ? "DLAA" : "Native TAA";
+		if( cvarSystem->GetCVarInteger( "r_neuralBackend" ) == 3 ) { return va( "DLSS %s", R_StreamlineDLSSQualityName() ); }
+		return cvarSystem->GetCVarInteger( "r_neuralBackend" ) == 2 ? "DLAA (100%)" : "Native TAA (100%)";
 	}
 	if( fieldIndex == SYSTEM_FIELD_RENDER_STATUS )
 	{

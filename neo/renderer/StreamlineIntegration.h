@@ -20,4 +20,7 @@ void R_StreamlineShutdown();
 bool R_StreamlineIsInitialized();
 bool R_StreamlineIsDLSSRequested();
 bool R_StreamlineIsDLSSSupported();
+int R_StreamlineDLSSQuality();
+const char* R_StreamlineDLSSQualityName();
+bool R_StreamlineDLSSRenderSize( int outputWidth, int outputHeight, int& renderWidth, int& renderHeight, int quality );
 void R_StreamlineStatus_f( const idCmdArgs& args );

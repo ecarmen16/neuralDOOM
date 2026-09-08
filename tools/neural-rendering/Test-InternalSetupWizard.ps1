@@ -10,7 +10,7 @@ $root = Join-Path ([IO.Path]::GetTempPath()) ('neuralDoom-wizard-test-' + [guid]
 New-Item -ItemType Directory -Path $root | Out-Null
 $worker = Join-Path $root 'fixture-worker.ps1'
 @'
-param($PackagePath, $Sha256, $Destination, $GamePath, [switch]$NonInteractive, [switch]$SkipShortcut)
+param($PackagePath, $Sha256, $Destination, $GamePath, $Profile, $Mode, $ExistingPath, $DlssDllPath, $NRDllPath, [switch]$NonInteractive, [switch]$SkipShortcut)
 Write-Host '@@SETUP|Fixture installation stage'
 if ($env:NEURALDOOM_WIZARD_TEST_EXIT -eq '1') { Write-Error 'Fixture installation failure'; exit 1 }
 exit 0

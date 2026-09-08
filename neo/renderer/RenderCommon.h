@@ -670,6 +670,8 @@ struct viewDef_t
 	Framebuffer*		targetRender;				// SP: The framebuffer to render to
 
 	int					taaFrameCount;				// RB: so we have the same frame index in frontend and backend
+	int					neuralBackendMode;			// snapshot alongside this view's input resolution
+	int					neuralDLSSQuality;
 	uint64				temporalHistoryEpoch;		// engine-owned generation shared by all temporal inputs
 	int					temporalHistoryResetReasons;	// neuralTemporalResetReason_t bits active for this view
 };

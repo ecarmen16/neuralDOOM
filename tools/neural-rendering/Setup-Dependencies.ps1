@@ -9,7 +9,7 @@ function Write-SetupStatus {
 }
 
 function Get-SetupDownload {
-    param([string]$Uri, [string]$Destination, [string]$Sha256, [long]$Bytes = 0)
+    param([string]$Uri, [string]$Destination, [string]$Sha256, [long]$Bytes = 0, [hashtable]$Headers = @{})
     if ([uri]::new($Uri).Scheme -ne 'https') { throw 'Setup downloads require HTTPS.' }
     if (Test-Path -LiteralPath $Destination) {
         if ($Sha256 -and (Get-FileHash -LiteralPath $Destination).Hash -eq $Sha256 -and
@@ -26,8 +26,11 @@ function Get-SetupDownload {
             Write-Host "Downloading $(Split-Path -Leaf $Destination) (attempt $attempt/3)..."
             if (Test-Path -LiteralPath $partial) { Remove-Item -LiteralPath $partial -Force }
             # BITS supplies transfer progress on Windows; web download is the fallback.
-            try { Start-BitsTransfer -Source $Uri -Destination $partial -ErrorAction Stop }
-            catch { Invoke-WebRequest -Uri $Uri -OutFile $partial -UseBasicParsing -ErrorAction Stop }
+            if ($Headers.Count) { Invoke-WebRequest -Uri $Uri -Headers $Headers -OutFile $partial -UseBasicParsing -ErrorAction Stop }
+            else {
+                try { Start-BitsTransfer -Source $Uri -Destination $partial -ErrorAction Stop }
+                catch { Invoke-WebRequest -Uri $Uri -OutFile $partial -UseBasicParsing -ErrorAction Stop }
+            }
             if ($Bytes -gt 0 -and (Get-Item -LiteralPath $partial).Length -ne $Bytes) { throw 'Downloaded size does not match the pinned release.' }
             if ($Sha256 -and (Get-FileHash -LiteralPath $partial).Hash -ne $Sha256) { throw 'Downloaded SHA-256 does not match the pinned release.' }
             Move-Item -LiteralPath $partial -Destination $Destination -Force

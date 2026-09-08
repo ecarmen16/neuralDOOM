@@ -31,6 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 #pragma hdrstop
 
 #include "RenderCommon.h"
+#include "StreamlineIntegration.h"
 
 #include <sys/DeviceManager.h>
 extern DeviceManager* deviceManager;
@@ -1039,6 +1040,8 @@ void idRenderWorldLocal::RenderScene( const renderView_t* renderView )
 	viewDef_t* parms = ( viewDef_t* )R_ClearedFrameAlloc( sizeof( *parms ), FRAME_ALLOC_VIEW_DEF );
 	parms->renderView = *renderView;
 	parms->targetRender = nullptr;
+	parms->neuralBackendMode = r_neuralBackend.GetInteger();
+	parms->neuralDLSSQuality = R_StreamlineDLSSQuality();
 
 	if( tr.takingScreenshot )
 	{
@@ -1058,13 +1061,20 @@ void idRenderWorldLocal::RenderScene( const renderView_t* renderView )
 	}
 	else
 	{
-		tr.PerformResolutionScaling( windowWidth, windowHeight );
-
-		// screenFraction is just for quickly testing fill rate limitations
-		if( r_screenFraction.GetInteger() != 100 )
+		// Neural presets own their input extent. DLAA and the NR bridge stay
+		// native; legacy fill-rate/dynamic controls cannot silently reduce them.
+		if( parms->neuralBackendMode == 3 && !cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) )
 		{
-			windowWidth = ( windowWidth * r_screenFraction.GetInteger() ) / 100;
-			windowHeight = ( windowHeight * r_screenFraction.GetInteger() ) / 100;
+			R_StreamlineDLSSRenderSize( tr.GetWidth(), tr.GetHeight(), windowWidth, windowHeight, parms->neuralDLSSQuality );
+		}
+		else if( parms->neuralBackendMode != 2 && !cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) )
+		{
+			tr.PerformResolutionScaling( windowWidth, windowHeight );
+			if( r_screenFraction.GetInteger() != 100 )
+			{
+				windowWidth = ( windowWidth * r_screenFraction.GetInteger() ) / 100;
+				windowHeight = ( windowHeight * r_screenFraction.GetInteger() ) / 100;
+			}
 		}
 		tr.CropRenderSize( windowWidth, windowHeight );
 		tr.GetCroppedViewport( &parms->viewport );

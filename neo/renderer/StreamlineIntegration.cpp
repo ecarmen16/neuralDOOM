@@ -24,6 +24,7 @@ This file is part of the Doom 3 BFG Edition Source Code ("Doom 3 BFG Edition Sou
 
 idCVar r_streamlineEnable( "r_streamlineEnable", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_INIT | CVAR_NEW, "initialize the optional local NVIDIA Streamline runtime at startup" );
 idCVar r_streamlineApplicationId( "r_streamlineApplicationId", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_INIT | CVAR_NEW, "optional NVIDIA-issued application ID; 0 uses the experimental custom-engine identity" );
+idCVar r_neuralDLSSQuality( "r_neuralDLSSQuality", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_ARCHIVE, "DLSS scaling preset: 0 Quality, 1 Balanced, 2 Performance; only with r_neuralBackend 3", 0, 2 );
 
 namespace
 {
@@ -161,6 +162,44 @@ bool R_StreamlineIsDLSSRequested()
 bool R_StreamlineIsDLSSSupported()
 {
 	return streamlineState.dlssSupported;
+}
+
+int R_StreamlineDLSSQuality()
+{
+	return idMath::ClampInt( 0, 2, r_neuralDLSSQuality.GetInteger() );
+}
+
+const char* R_StreamlineDLSSQualityName()
+{
+	const char* names[] = { "Quality", "Balanced", "Performance" };
+	return names[R_StreamlineDLSSQuality()];
+}
+
+bool R_StreamlineDLSSRenderSize( int outputWidth, int outputHeight, int& renderWidth, int& renderHeight, int quality )
+{
+#if USE_STREAMLINE
+	if( !R_StreamlineIsDLSSSupported() || outputWidth <= 0 || outputHeight <= 0 ) { return false; }
+	// Frontend-owned cache: query the SDK again when the window or preset changes.
+	static int cachedWidth = 0, cachedHeight = 0, cachedQuality = -1, width = 0, height = 0;
+	quality = idMath::ClampInt( 0, 2, quality );
+	if( cachedWidth != outputWidth || cachedHeight != outputHeight || cachedQuality != quality )
+	{
+		sl::DLSSOptions options = {};
+		const sl::DLSSMode modes[] = { sl::DLSSMode::eMaxQuality, sl::DLSSMode::eBalanced, sl::DLSSMode::eMaxPerformance };
+		options.mode = modes[quality];
+		options.outputWidth = outputWidth;
+		options.outputHeight = outputHeight;
+		sl::DLSSOptimalSettings settings = {};
+		if( slDLSSGetOptimalSettings( options, settings ) != sl::Result::eOk || settings.optimalRenderWidth == 0 || settings.optimalRenderHeight == 0 || settings.optimalRenderWidth > uint32( outputWidth ) || settings.optimalRenderHeight > uint32( outputHeight ) ) { return false; }
+		cachedWidth = outputWidth; cachedHeight = outputHeight; cachedQuality = quality;
+		width = settings.optimalRenderWidth; height = settings.optimalRenderHeight;
+	}
+	renderWidth = width; renderHeight = height;
+	return true;
+#else
+	(void)outputWidth; (void)outputHeight; (void)renderWidth; (void)renderHeight; (void)quality;
+	return false;
+#endif
 }
 
 void R_StreamlineStatus_f( const idCmdArgs& args )

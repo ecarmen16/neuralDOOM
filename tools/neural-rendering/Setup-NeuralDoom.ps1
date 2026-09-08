@@ -219,7 +219,7 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
     $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 }
 $RepoRoot = (Resolve-Path -LiteralPath $RepoRoot).Path
-if ($IncludeLegacyNR -or $NRRuntimePath -or $NRRuntimeUrl -or $ForceNRRuntime) { throw 'NR runtime installation is not supported. Native RTX needs no NR runtime; existing local compatibility components are not distributed or copied by setup.' }
+if ($IncludeLegacyNR -or $NRRuntimePath -or $NRRuntimeUrl -or $ForceNRRuntime) { throw 'These legacy NR options were replaced by the complete internal installer: select its NR profile and automatic download or local DLL options.' }
 if ($ValidateOnly) {
     if ($BuildEngine) { throw '-ValidateOnly does not build or install files; omit -BuildEngine.' }
     Test-SetupReady -Root $RepoRoot -RenderingProfile $Profile
@@ -272,10 +272,10 @@ if (-not (Test-Path -LiteralPath $destinationBase)) {
     New-Item -ItemType Directory -Path $destinationBase | Out-Null
 }
 Write-SetupStep 'Copying missing files from the locally owned Doom 3 BFG installation'
-& robocopy $sourceBase $destinationBase /E /XC /XN /XO /R:2 /W:1 /NFL /NDL /NP
-$robocopyExit = $LASTEXITCODE
-if ($robocopyExit -gt 7) {
-    throw "robocopy failed with exit code $robocopyExit"
+if ([IO.Path]::GetFullPath($sourceBase).TrimEnd('\') -ine [IO.Path]::GetFullPath($destinationBase).TrimEnd('\')) {
+    & robocopy $sourceBase $destinationBase /E /XC /XN /XO /XJ /R:2 /W:1 /NFL /NDL /NP
+    $robocopyExit = $LASTEXITCODE
+    if ($robocopyExit -gt 7) { throw "robocopy failed with exit code $robocopyExit" }
 }
 Write-Host "Retail data ready: $destinationBase" -ForegroundColor Green
 

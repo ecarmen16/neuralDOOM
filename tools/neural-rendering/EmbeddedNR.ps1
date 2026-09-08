@@ -39,7 +39,7 @@ function Get-NeuralNRFullResolutionConfig {
     $original = $sections[0].Value
     $section = $original
     $newline = if ($Text.Contains("`r`n")) { "`r`n" } else { "`n" }
-    foreach ($entry in @(@('NeuralUplift', '1'), @('NREnableUpscaling', '0'))) {
+    foreach ($entry in @(@('NeuralUplift', '1'), @('NREnableUpscaling', '0'), @('EnableHooks', '1'), @('NRToggleKey', '117'))) {
         $pattern = '(?m)^' + $entry[0] + '[ \t]*=[^\r\n]*'
         $keyMatches = [regex]::Matches($section, $pattern)
         if ($keyMatches.Count -gt 1) { throw "Duplicate NR setting: $($entry[0])" }

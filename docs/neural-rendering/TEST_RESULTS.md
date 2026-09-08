@@ -1167,3 +1167,51 @@ personal profile paths, including ISPC assertion strings. No renderer sources,
 shader algorithms or output formats changed, and no game was launched. The
 refreshed package must pass the same privacy gate and setup payload verification
 before handoff. Existing Git history has not been rewritten.
+# 2026-09-07 - Installer management and DLSS preset validation
+
+- Native SDK-OFF Release and SDK-ON Release/RelWithDebInfo builds succeeded using
+  `Build-RBDOOM.ps1` from a neutral mapped build path. Both retain DX12/RTX.
+- `Test-NeuralDoom-Smoke.ps1 -Profile DLAA -DLSSPresetMatrix -Configuration Release
+  -Frames 60 -WarmupFrames 180 -ExpectedProbeLighting Local -ValidationLayers 1
+  -RayTracedAO -RayTracedContactShadows -RayTracedGI -RayTracedReflections` passed.
+  At 1280x720 output, SDK-selected inputs were Quality 853x480, Balanced 742x418
+  and Performance 640x360. Returning to DLAA restored 1280x720. All 597 evaluated
+  frames presented, zero rejected; lighting toggles/history and local probes
+  passed. Artifacts remain under ignored `captures/neural/installer-runtime`.
+- The Native SDK-OFF Release smoke passed with all optional lighting effects off,
+  valid local probe lighting, primary-view progress, history resets and no device
+  failure. This confirms the independent Native installation remains functional.
+- The first preset run caught a one-frame DLSS-to-DLAA extent mismatch. Pairing
+  mode/quality with each frontend view fixed it; the repeat above had no rejected
+  frames. An incomplete hand-assembled test folder initially omitted tracked
+  `base/def` files; adding the same definitions already included by the packager
+  restored probe population. This was a fixture defect, not missing package data.
+- `Test-InstallLifecycle.ps1` passed failure rollback, successful replacement,
+  obsolete-file cleanup, separate-copy save preservation, ownership-based
+  uninstall, modified/unrelated-file preservation and traversal rejection.
+- `Test-NeuralInstallerComponents.ps1` passed against the real hash-pinned five
+  archives, including official ReShade SFX extraction and local NVIDIA-signed DLL
+  selection. It confirms no Native download, no DXGI proxy, NR full-resolution
+  settings, Streamline hooks, F6 key 117 and preserved appearance tuning.
+- Wizard compilation, all-page render inspection and redirected worker
+  success/failure tests passed. Download retry/cache/publisher/cancellation and
+  public-source privacy fixtures passed. Full installer artifact checks follow
+  the committed source identity recorded in its manifest.
+
+Visual acceptance remains manual: compare presets and F6 in motion, use the
+ultrawide display, resize, visit menus and relaunch with saved preferences. This
+does not certify NR model output or public redistribution rights. Next task:
+the short installer/profile playtest in INTERNAL_TESTING.md.
+
+NR startup validation selected consumer 4.70 with RHI NR 310.8.SF-v2, matching
+all runtime DLL hashes from the working local setup. With hooks enabled, all
+117 DLAA frames presented without rejection; the consumer separately confirmed
+successful feature-18 NR evaluations at native 1280x720. Hooks disabled only
+bypassed NR and was not counted as a pass. Signed NR 310.8.0, the older SF
+revision and consumer 4.5 combinations failed or rejected evaluation; setup now
+pins the successful combination and rejects different locally selected NR DLLs.
+This does not expand binary redistribution approval.
+
+A bounded Native Release test deliberately made the logfile target a directory.
+The game still executed its config, wrote the completion config and exited 0.
+The optional-log failure no longer terminates startup.

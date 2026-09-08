@@ -3,9 +3,13 @@ param(
     [string]$RepoRoot,
     [string]$GamePath,
     [string]$LightingPackPath,
+    [ValidateSet('Native','DLAA','NR')][string]$Profile = 'Native',
+    [string]$DlssDllPath,
+    [string]$NRDllPath,
     [switch]$VerifyOnly,
     [switch]$SkipShortcut,
     [switch]$SkipStartMenu,
+    [switch]$ManagedDeployment,
     [switch]$NonInteractive
 )
 Set-StrictMode -Version Latest
@@ -34,7 +38,23 @@ if (-not $exe.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -or -no
     -not $seen.ContainsKey((Join-Path $RepoRoot 'LICENSE.md')) -or
     (Get-Content -LiteralPath (Join-Path $RepoRoot 'SOURCE_REVISION.txt') -First 1) -ne $package.commit) { throw 'Invalid package executable/source identity.' }
 Write-Host "PASS: package hashes and corresponding source ($($package.commit))."
+$neural = if ($package.PSObject.Properties['neuralBuild']) { $package.neuralBuild } else { $null }
+if ($neural) {
+    $neuralExe = [IO.Path]::GetFullPath((Join-Path $RepoRoot $neural.executable))
+    if ($neural.executable -ne 'build-streamline/Release/neuralDoom.exe' -or -not $seen.ContainsKey($neuralExe) -or
+        $neural.configuration -ne 'Release' -or $neural.commit -ne $package.commit -or $neural.dirty -or
+        $neural.features.streamline -ne 'ON' -or $neural.features.dx12 -ne 'ON' -or $neural.features.rayTracing -ne 'ON' -or
+        (Get-FileHash -LiteralPath $neuralExe).Hash -ne $neural.sha256) { throw 'Invalid neural build identity.' }
+}
+if ($Profile -ne 'Native' -and -not $neural) { throw 'This package lacks the optional neural engine. Use the complete installer for DLAA/NR.' }
 if ($VerifyOnly) { return }
+. (Join-Path $PSScriptRoot 'Install-Lifecycle.ps1')
+Assert-SetupInstallRoot $RepoRoot -Existing
+$initialFiles = @(); $initialState = $null
+if (-not $ManagedDeployment) {
+    $initialFiles = @(Get-SetupFiles $RepoRoot)
+    if (Test-Path -LiteralPath (Join-Path $RepoRoot '.neuraldoom-install.json')) { $initialState = Get-Content -LiteralPath (Join-Path $RepoRoot '.neuraldoom-install.json') -Raw | ConvertFrom-Json }
+}
 . (Join-Path $PSScriptRoot 'Setup-Dependencies.ps1')
 Write-SetupStatus 'Checking your Doom 3 BFG installation...'
 if (-not $GamePath) { $GamePath = Find-SetupBFG }
@@ -59,11 +79,24 @@ $package.executable = $exe
 $package.PSObject.Properties.Remove('files')
 $package | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $RepoRoot 'build-rt/neuraldoom-build-Release.json') -Encoding UTF8
 $exe | Set-Content -LiteralPath (Join-Path $RepoRoot 'build-rt/neuraldoom-artifact-Release.txt') -Encoding UTF8
+if ($neural) {
+    $neural.executable = $neuralExe
+    $neural | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $RepoRoot 'build-streamline/neuraldoom-build-Release.json') -Encoding UTF8
+    $neuralExe | Set-Content -LiteralPath (Join-Path $RepoRoot 'build-streamline/neuraldoom-artifact-Release.txt') -Encoding UTF8
+}
 & (Join-Path $PSScriptRoot 'Setup-NeuralDoom.ps1') -RepoRoot $RepoRoot -GamePath $GamePath -LightingPackPath $LightingPackPath -Profile Native -Configuration Release -SkipD3HDP -SkipNRRuntime -NonInteractive:$NonInteractive
+. (Join-Path $PSScriptRoot 'Setup-NeuralComponents.ps1')
+Install-SetupNeuralComponents -RepoRoot $RepoRoot -Profile $Profile -DlssDllPath $DlssDllPath -NRDllPath $NRDllPath
+& (Join-Path $PSScriptRoot 'Start-NeuralDoom-Dogfood.ps1') -RepoRoot $RepoRoot -Profile $Profile -Configuration Release -PrepareOnly -RayTracedAO -RayTracedContactShadows -RayTracedGI -RayTracedReflections
+$shortcutName = 'neuralDoom Internal Test (' + (Get-SetupInstallId $RepoRoot).Substring(0,6) + ').lnk'
+if (-not $ManagedDeployment) {
+    Register-SetupInstallation -Root $RepoRoot -Profile $Profile -GamePath $GamePath -Before $initialFiles -OldState $initialState
+    $Profile | Set-Content -LiteralPath (Join-Path $RepoRoot 'captures/dogfood/installed-profile.pending') -Encoding ASCII
+}
 if (-not $SkipShortcut) {
 Write-SetupStatus 'Creating your desktop shortcut...'
 $shell = New-Object -ComObject WScript.Shell
-$shortcut = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'neuralDoom Internal Test.lnk'))
+$shortcut = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) $shortcutName))
 $shortcut.TargetPath = Join-Path $RepoRoot 'Play-InternalTest.cmd'
 $shortcut.WorkingDirectory = $RepoRoot
 $shortcut.IconLocation = "$exe,0"
@@ -74,7 +107,7 @@ Write-SetupStatus 'Adding neuralDoom to your Start menu...'
 $startFolder = Join-Path ([Environment]::GetFolderPath('Programs')) 'neuralDoom'
 New-Item -ItemType Directory -Path $startFolder -Force | Out-Null
 $shell = New-Object -ComObject WScript.Shell
-$shortcut = $shell.CreateShortcut((Join-Path $startFolder 'neuralDoom Internal Test.lnk'))
+$shortcut = $shell.CreateShortcut((Join-Path $startFolder $shortcutName))
 $shortcut.TargetPath = Join-Path $RepoRoot 'Play-InternalTest.cmd'
 $shortcut.WorkingDirectory = $RepoRoot
 $shortcut.IconLocation = "$exe,0"

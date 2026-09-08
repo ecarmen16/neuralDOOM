@@ -58,6 +58,8 @@ struct neuralTemporalFrame_t
 	int						outputWidth;
 	int						outputHeight;
 	int						stereoEye;
+	int						backendMode;
+	int						dlssQuality;
 	uint64					historyEpoch;
 	neuralMotionVectorConvention_t motionVectorConvention;
 	neuralDepthConvention_t	depthConvention;

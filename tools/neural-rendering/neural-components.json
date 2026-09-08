@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "referenceCommit": "1402548741014161400929e7ee1a2a5de121af05",
+  "components": [
+    {
+      "id": "streamline", "file": "streamline-sdk-v2.12.0.zip",
+      "url": "https://github.com/NVIDIA-RTX/Streamline/releases/download/v2.12.0/streamline-sdk-v2.12.0.zip",
+      "bytes": 231958617, "sha256": "f5c0a3d870707dddc3570fb4bcd3655cf48a8a68c3a9d342910cfa21b77dcf48",
+      "members": [
+        {"path": "bin/x64/sl.interposer.dll", "name": "sl.interposer.dll", "sha256": "2a79db6857ae8c75bbd871a9489c48bc6a39f7fcc88b9b02afd53d0376cbec66"},
+        {"path": "bin/x64/sl.common.dll", "name": "sl.common.dll", "sha256": "c57930ef5a8a3fe9be85efdf71a61d8107c1148e8a6aed456464547128f7f4ae"},
+        {"path": "bin/x64/sl.dlss.dll", "name": "sl.dlss.dll", "sha256": "a997022d2b93601e0eefc3ddb3067c36df386dd3163ae71e11095191fb14f8e4"},
+        {"path": "license.txt", "name": "streamline-license.txt"},
+        {"path": "bin/x64/nvngx_dlss.license.txt", "name": "nvidia-rtx-sdk-license.txt"}
+      ]
+    },
+    {
+      "id": "dlss", "file": "nvngx_dlss_310.8.0.zip",
+      "url": "https://github.com/RankFTW/rhi-repo/releases/download/dlss-310.8.0/nvngx_dlss_310.8.0.zip",
+      "bytes": 30265760, "sha256": "fb481660f7e952b87f91760e3afd7f9dc14cd2c3361b470e948d6346e4323009",
+      "members": [{"path": "nvngx_dlss.dll", "name": "nvngx_dlss.dll", "sha256": "c85f971ce023c9f3492fc7455f0b01a24ba18ea39636407a846902c4360b0b7e"}]
+    },
+    {
+      "id": "nr", "file": "nvngx_dlssnr_310.8.SF-v2.zip",
+      "url": "https://github.com/RankFTW/rhi-repo/releases/download/dlssnr-310.8.SF-v2/nvngx_dlssnr_310.8.SF-v2.zip",
+      "bytes": 116693212, "sha256": "1da35941894994eb087e017577829e492454e9bae3a6a9397027069ceb74955c",
+      "members": [{"path": "nvngx_dlssnr.dll", "name": "nvngx_dlssnr.dll", "sha256": "6eb209e764f39872625debd6abaf45e2bb6322f6f270f781f70c059ae30b3927"}]
+    },
+    {
+      "id": "consumer", "file": "renodx-dlss5_4.70.zip",
+      "url": "https://github.com/RankFTW/rhi-repo/releases/download/renodx-dlss5-4.70/renodx-dlss5_4.70.zip",
+      "bytes": 632174, "sha256": "d6e356d01b429af6288f488a4926c44f1d779a7d4586ee8c79d04d3a09a536e6",
+      "members": [{"path": "renodx-dlss5.addon64", "name": "renodx-dlss5.addon64", "sha256": "d5adf82eb44b065f4c590ac91fe824bab07afea0eb9f994bde936710c8593952"}]
+    },
+    {
+      "id": "reshade", "file": "ReShade_Setup_6.8.0_Addon.exe",
+      "url": "https://reshade.me/downloads/ReShade_Setup_6.8.0_Addon.exe", "referer": "https://reshade.me/",
+      "bytes": 4318424, "sha256": "afe4c8f13048306307983b8b3d41d5bf00a86820440b0e57dea10950e1176445", "zipOffset": 153088,
+      "members": [{"path": "ReShade64.dll", "name": "neuraldoom-reshade64.dll", "sha256": "0cee63f9c9f13f3ac909c5b4903f4dbb4b719a7ab3b4f13b0deaf83c814b94f7"}]
+    }
+  ]
+}

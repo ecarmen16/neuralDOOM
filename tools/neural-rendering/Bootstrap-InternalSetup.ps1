@@ -4,6 +4,12 @@ param(
     [Parameter(Mandatory)][ValidatePattern('^[0-9A-Fa-f]{64}$')][string]$Sha256,
     [string]$Destination,
     [string]$GamePath,
+    [ValidateSet('Native','DLAA','NR')][string]$Profile = 'Native',
+    [ValidateSet('New','Upgrade','Copy','Uninstall')][string]$Mode = 'New',
+    [string]$ExistingPath,
+    [string]$DlssDllPath,
+    [string]$NRDllPath,
+    [switch]$SkipRegistration,
     [switch]$SkipShortcut,
     [switch]$SkipStartMenu,
     [switch]$NonInteractive,
@@ -37,19 +43,28 @@ try {
     }
     $Destination = [IO.Path]::GetFullPath($Destination)
     $prefix = $Destination.TrimEnd('\') + '\'
+    $seen = @{}
     foreach ($entry in $archive.Entries) {
         $path = [IO.Path]::GetFullPath((Join-Path $Destination $entry.FullName))
-        if (-not $path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) { throw 'Unsafe setup archive path.' }
+        if (-not $path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -or $entry.FullName -match ':|(^|[/\\])\.\.([/\\]|$)' -or $seen.ContainsKey($path)) { throw 'Unsafe setup archive path.' }
+        $seen[$path] = $true
     }
 } finally { $archive.Dispose() }
-if ((Test-Path -LiteralPath $Destination) -and @(Get-ChildItem -LiteralPath $Destination -Force).Count -gt 0) {
-    $marker = Join-Path $Destination 'internal-package.json'
-    if (-not (Test-Path -LiteralPath $marker) -or (Get-Content -LiteralPath $marker -Raw | ConvertFrom-Json).commit -ne $manifest.commit) {
-        throw 'Choose an empty destination. Setup preserves other installations and their saves.'
-    }
+if ($ExtractOnly) {
+    if ((Test-Path -LiteralPath $Destination) -and @(Get-ChildItem -LiteralPath $Destination -Force).Count) { throw 'Extraction requires an empty destination.' }
+    Expand-Archive -LiteralPath $PackagePath -DestinationPath $Destination
+    return
 }
-Write-Host "Installing neuralDoom to $Destination"
-Write-Host '@@SETUP|Extracting neuralDoom...'
-Expand-Archive -LiteralPath $PackagePath -DestinationPath $Destination -Force
-if ($ExtractOnly) { return }
-& (Join-Path $Destination 'tools/neural-rendering/Install-InternalTest.ps1') -RepoRoot $Destination -GamePath $GamePath -NonInteractive:$NonInteractive -SkipShortcut:$SkipShortcut -SkipStartMenu:$SkipStartMenu
+$stage = Join-Path ([IO.Path]::GetTempPath()) ('neuralDoom-payload-' + [guid]::NewGuid().ToString('N'))
+try {
+    Write-Host '@@SETUP|Extracting verified setup content...'
+    Expand-Archive -LiteralPath $PackagePath -DestinationPath $stage
+    & (Join-Path $stage 'tools/neural-rendering/Install-InternalTest.ps1') -RepoRoot $stage -VerifyOnly -Profile $Profile
+    . (Join-Path $stage 'tools/neural-rendering/Install-Lifecycle.ps1')
+    if ($Mode -eq 'Uninstall') { Remove-SetupInstallation -Root $Destination -SkipRegistration:$SkipRegistration; return }
+    Invoke-SetupDeployment -Stage $stage -Destination $Destination -Mode $Mode -ExistingPath $ExistingPath -GamePath $GamePath -Profile $Profile -DlssDllPath $DlssDllPath -NRDllPath $NRDllPath -SkipShortcut:$SkipShortcut -SkipStartMenu:$SkipStartMenu -SkipRegistration:$SkipRegistration
+} finally {
+    $tempPrefix = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
+    $resolvedStage = [IO.Path]::GetFullPath($stage)
+    if ($resolvedStage.StartsWith($tempPrefix, [StringComparison]::OrdinalIgnoreCase) -and (Split-Path -Leaf $resolvedStage) -like 'neuralDoom-payload-*' -and (Test-Path -LiteralPath $resolvedStage)) { Remove-Item -LiteralPath $resolvedStage -Recurse -Force }
+}

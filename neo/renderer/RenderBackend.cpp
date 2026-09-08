@@ -65,7 +65,7 @@ void R_GetNeuralPresentationStatus( int& mode, int& rw, int& rh, int& ow, int& o
 	mode = neuralPresentationMode.load();
 }
 
-idCVar r_neuralBackend( "r_neuralBackend", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_NEW, "neutral temporal backend: 0 = disabled, 1 = validate frame contract, 2 = Streamline DLAA, 3 = Streamline DLSS Quality", 0, 3, idCmdSystem::ArgCompletion_Integer<0, 3> );
+idCVar r_neuralBackend( "r_neuralBackend", "0", CVAR_RENDERER | CVAR_INTEGER | CVAR_NEW, "neutral temporal backend: 0 = disabled, 1 = validate frame contract, 2 = Streamline DLAA, 3 = Streamline DLSS (r_neuralDLSSQuality)", 0, 3, idCmdSystem::ArgCompletion_Integer<0, 3> );
 idCVar r_forceZPassStencilShadows( "r_forceZPassStencilShadows", "0", CVAR_RENDERER | CVAR_BOOL, "force Z-pass rendering for performance testing" );
 idCVar r_useStencilShadowPreload( "r_useStencilShadowPreload", "0", CVAR_RENDERER | CVAR_BOOL, "use stencil shadow preload algorithm instead of Z-fail" );
 idCVar r_skipShaderPasses( "r_skipShaderPasses", "0", CVAR_RENDERER | CVAR_BOOL, "" );
@@ -103,7 +103,7 @@ void idRenderBackend::ResizeNeuralTemporalBackend()
 
 void idRenderBackend::PrintNeuralTemporalBackendStatus() const
 {
-	const char* mode = r_neuralBackend.GetInteger() == 3 ? "Streamline DLSS Quality" : ( r_neuralBackend.GetInteger() == 2 ? "Streamline DLAA" : ( r_neuralBackend.GetInteger() == 1 ? "validate" : "disabled" ) );
+	const char* mode = r_neuralBackend.GetInteger() == 3 ? "Streamline DLSS" : ( r_neuralBackend.GetInteger() == 2 ? "Streamline DLAA" : ( r_neuralBackend.GetInteger() == 1 ? "validate" : "disabled" ) );
 	common->Printf( "r_neuralBackend %d (%s)\n", r_neuralBackend.GetInteger(), mode );
 	common->Printf( "Neural object motion draws: rigid %llu, skinned %llu, viewmodel %llu\n",
 		neuralRigidMotionDraws, neuralSkinnedMotionDraws, neuralViewmodelMotionDraws );
@@ -5331,7 +5331,7 @@ bool idRenderBackend::EvaluateNeuralTemporalBackend( const viewDef_t* _viewDef, 
 		neuralPresentationExtent.store( ( rw << 48 ) | ( rh << 32 ) | ( uint64( renderSystem->GetWidth() ) << 16 ) | uint64( renderSystem->GetHeight() ) );
 	}
 
-	if( !r_neuralBackend.GetBool() || neuralTemporalBackend == NULL || _viewDef->viewEntitys == NULL || _viewDef->isSubview || ( _viewDef->renderView.rdflags & ( RDF_IRRADIANCE | RDF_NO_TEMPORAL_HISTORY ) ) )
+	if( !_viewDef->neuralBackendMode || neuralTemporalBackend == NULL || _viewDef->viewEntitys == NULL || _viewDef->isSubview || ( _viewDef->renderView.rdflags & ( RDF_IRRADIANCE | RDF_NO_TEMPORAL_HISTORY ) ) )
 	{
 		if( _viewDef->viewEntitys && !_viewDef->isSubview ) { neuralPresentationMode.store( 0 ); }
 		return false;
@@ -5369,6 +5369,8 @@ bool idRenderBackend::EvaluateNeuralTemporalBackend( const viewDef_t* _viewDef, 
 	frame.cameraAspectRatio = float( frame.renderWidth ) / float( frame.renderHeight );
 	frame.frameIndex = renderSystem->GetFrameCount();
 	frame.stereoEye = stereoEye;
+	frame.backendMode = _viewDef->neuralBackendMode;
+	frame.dlssQuality = _viewDef->neuralDLSSQuality;
 	frame.historyEpoch = _viewDef->temporalHistoryEpoch;
 	frame.motionVectorConvention = NMVC_PREVIOUS_MINUS_CURRENT_PIXELS;
 	frame.depthConvention = NDC_DEVICE_ZERO_TO_ONE_NON_REVERSED;
@@ -5386,7 +5388,7 @@ bool idRenderBackend::EvaluateNeuralTemporalBackend( const viewDef_t* _viewDef, 
 
 	renderLog.OpenBlock( "Neural_TemporalBackend", colorGreen );
 	const bool presented = neuralTemporalBackend->Evaluate( frame );
-	neuralPresentationMode.store( presented ? r_neuralBackend.GetInteger() : 0 );
+	neuralPresentationMode.store( presented ? frame.backendMode : 0 );
 	renderLog.CloseBlock();
 	return presented;
 }
@@ -6493,7 +6495,16 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 		ToneMappingParameters parms;
 		if( R_UseTemporalAA() )
 		{
-			toneMapPass->SimpleRender( commandList, parms, viewDef, globalImages->taaResolvedImage->GetTextureHandle(), globalFramebuffers.ldrFBO->GetApiObject() );
+			// DLSS writes an output-sized image. Do not tone-map just the
+			// smaller input rectangle or stretch a cropped corner afterward.
+			viewDef_t outputView = *viewDef;
+			if( neuralTemporalPresented || _viewDef->neuralBackendMode == 3 )
+			{
+				outputView.viewport.x1 = 0; outputView.viewport.y1 = 0;
+				outputView.viewport.x2 = renderSystem->GetWidth() - 1;
+				outputView.viewport.y2 = renderSystem->GetHeight() - 1;
+			}
+			toneMapPass->SimpleRender( commandList, parms, &outputView, globalImages->taaResolvedImage->GetTextureHandle(), globalFramebuffers.ldrFBO->GetApiObject() );
 		}
 		else
 		{
@@ -6904,7 +6915,13 @@ void idRenderBackend::PostProcess( const void* data )
 
 	// resolve the scaled rendering to a temporary texture
 	postProcessCommand_t* cmd = ( postProcessCommand_t* )data;
-	const idScreenRect& viewport = cmd->viewDef->viewport;
+	idScreenRect viewport = cmd->viewDef->viewport;
+	if( cmd->viewDef->neuralBackendMode == 3 )
+	{
+		viewport.x1 = 0; viewport.y1 = 0;
+		viewport.x2 = renderSystem->GetWidth() - 1;
+		viewport.y2 = renderSystem->GetHeight() - 1;
+	}
 
 	GL_State( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO | GLS_DEPTHMASK | GLS_DEPTHFUNC_ALWAYS |  GLS_CULL_TWOSIDED );
 

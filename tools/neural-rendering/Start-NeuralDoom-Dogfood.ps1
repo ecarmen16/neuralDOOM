@@ -18,6 +18,11 @@ param(
 . (Join-Path $PSScriptRoot 'EmbeddedNR.ps1')
 if ($ValidateOnly -and $PrepareOnly) { throw 'Choose either -ValidateOnly or -PrepareOnly.' }
 $RepoRoot = Resolve-NeuralRepoRoot $RepoRoot
+$pendingProfile = Join-Path $RepoRoot 'captures/dogfood/installed-profile.pending'
+if (-not $Profile -and (Test-Path -LiteralPath $pendingProfile)) {
+    $selectedProfile = (Get-Content -LiteralPath $pendingProfile -Raw).Trim()
+    if ($selectedProfile -in @('Native','DLAA','NR')) { $Profile = $selectedProfile }
+}
 # Resolve the menu preference before offering startup-only profile choices.
 $profileConfig = Join-Path $RepoRoot 'captures/dogfood/base/D3BFGConfig.cfg'
 if (-not $Profile -and (Test-Path -LiteralPath $profileConfig)) {
@@ -25,6 +30,10 @@ if (-not $Profile -and (Test-Path -LiteralPath $profileConfig)) {
     if ($profileText -match '(?m)^set\s+r_neuralLaunchProfile\s+"?([012])"?\s*$') {
         $Profile = @('Native', 'DLAA', 'NR')[[int]$Matches[1]]
     }
+}
+if (-not $Profile -and (Test-Path -LiteralPath (Join-Path $RepoRoot '.neuraldoom-install.json'))) {
+    $installed = Get-Content -LiteralPath (Join-Path $RepoRoot '.neuraldoom-install.json') -Raw | ConvertFrom-Json
+    if ($installed.profile -in @('Native', 'DLAA', 'NR')) { $Profile = $installed.profile }
 }
 if (-not $Profile) {
     if ($ValidateOnly) { throw '-ValidateOnly requires -Profile Native, DLAA or NR.' }
@@ -80,17 +89,23 @@ $saveBase = Join-Path $saveRoot 'base'
 $firstRun = -not (Test-Path -LiteralPath (Join-Path $saveBase 'D3BFGConfig.cfg'))
 [string]$savedConfig = if ($firstRun) { '' } else { Get-Content -LiteralPath (Join-Path $saveBase 'D3BFGConfig.cfg') -Raw }
 $backend = if ($Profile -ne 'Native') { 2 } else { 0 }
+$quality = 0
 # Keep the user's TAA/DLAA choice in this profile; NR always needs DLAA input.
 if ($Profile -eq 'DLAA' -and -not $firstRun) {
-    if ($savedConfig -match '(?m)^set\s+r_neuralReconstructionMode\s+"?0"?\s*$') { $backend = 0 }
+    if ($savedConfig -match '(?m)^set\s+r_neuralReconstructionMode\s+"?([0-4])"?\s*$') {
+        $mode = [int]$Matches[1]
+        if ($mode -eq 0) { $backend = 0 }
+        elseif ($mode -ge 2) { $backend = 3; $quality = $mode - 2 }
+    }
 }
+$sessionLog = "dogfood-$Profile-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 6) + '.log'
 $sdk = if ($Profile -ne 'Native') { 1 } else { 0 }
 $launchArgs = @(
     '+set', 'fs_basepath', ('"' + $RepoRoot + '"'), '+set', 'fs_savepath', ('"' + $saveRoot + '"'),
     '+set', 'r_graphicsAPI', 'dx12', '+set', 'r_neuralCompatibilityEnable', $(if ($Profile -eq 'NR') { '1' } else { '0' }),
     '+set', 'r_streamlineEnable', $sdk, '+set', 'r_streamlineApplicationId', '0',
     '+set', 'r_neuralBackend', $backend, '+set', 'com_allowConsole', '1',
-    '+set', 'logFileName', "dogfood-$Profile.log", '+set', 'logFile', '2',
+    '+set', 'logFileName', $sessionLog, '+set', 'logFile', '2',
     '+exec', 'neural_dogfood.cfg'
 )
 # Profile switches seed missing preferences; menu choices survive later launches.
@@ -117,7 +132,7 @@ if ([Text.Encoding]::UTF8.GetByteCount(($launchArgs -join ' ')) -ge 1024) {
     throw 'Launch arguments exceed the engine limit; use a shorter checkout path.'
 }
 Write-Host "Profile:    $Profile"
-Write-Host "Reconstruction: $(if ($backend -eq 2) { 'DLAA' } else { 'Native TAA' })"
+Write-Host "Reconstruction: $(if ($backend -eq 2) { 'DLAA' } elseif ($backend -eq 3) { 'DLSS ' + @('Quality','Balanced','Performance')[$quality] } else { 'Native TAA' })"
 if ($RayTracedAO) { Write-Host 'RTX AO:     Saved preference (enabled on first use; world and supported dynamic geometry). Toggle live with r_rayTracedAO 0 / 1.' }
 if ($RayTracedContactShadows) { Write-Host 'RTX contact shadows: Saved preference (enabled on first use). Toggle with r_rayTracedContactShadows 0 / 1.' }
 if ($RayTracedReflections) { Write-Host 'RTX reflections: Saved preference, full resolution. Toggle with r_rayTracedReflections 0 / 1.' }
@@ -145,7 +160,15 @@ if ($null -ne $existingGame) {
     throw 'Another Doom 3 instance is running. Close it before starting this playtest.'
 }
 New-Item -ItemType Directory -Path $saveBase -Force | Out-Null
+# Probe the actual target before starting the engine. Never truncate a previous
+# session log or fail because it is read-only/open in another application.
+try {
+    $probe = [IO.File]::Open((Join-Path $saveBase $sessionLog), [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+    $probe.Dispose()
+} catch { throw "Cannot write saves/logs in $saveBase. Choose a writable installation folder. $($_.Exception.Message)" }
 $playtestCommands = @(
+    ('set r_neuralLaunchProfile ' + [array]::IndexOf(@('Native', 'DLAA', 'NR'), $Profile)),
+    ('set r_neuralDLSSQuality ' + $quality),
     'set r_screenFraction 100', 'set r_renderMode 0', 'set r_useTemporalAA 1', 'set r_antiAliasing 2',
     'neuralInstallKeys startup', 'set com_fixedTic 0', 'set s_noSound 0', 'set r_hdrDiagnostic 0',
     'neuralBackendStatus', 'hdrStatus', 'rayTracingStatus'
@@ -179,7 +202,8 @@ if ($PrepareOnly) {
 $process = Start-Process -FilePath $exe -ArgumentList $launchArgs -WorkingDirectory $RepoRoot -WindowStyle Normal -PassThru
 $process.WaitForExit()
 $process.Refresh()
-if ($process.ExitCode -ne 0) { throw "Game exited with code $($process.ExitCode). See $saveBase/dogfood-$Profile.log" }
+if ($process.ExitCode -ne 0) { throw "Game exited with code $($process.ExitCode). See $saveBase/$sessionLog" }
+if (Test-Path -LiteralPath $pendingProfile) { Remove-Item -LiteralPath $pendingProfile }
 
 if ($settingsMigrationPending) {
     'Applied after successful game exit.' | Set-Content -LiteralPath $settingsMigrationMarker -Encoding ASCII
