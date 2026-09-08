@@ -11,15 +11,23 @@ namespace NeuralDoom
         readonly ComboBox reconstruction = new ComboBox();
         readonly Label details = new Label();
         readonly Label fixedMode = new Label();
+        int sdkMode;
+        int nrMode;
+        bool updatingModes;
 
         public string SelectedProfile
         {
-            get { return profiles.SelectedItem.ToString() == "NR + DLAA" ? "NR" : profiles.SelectedItem.ToString() == "DLAA / DLSS" ? "DLAA" : "Native"; }
+            get { return profiles.SelectedItem.ToString() == "NR + DLAA / DLSS" ? "NR" : profiles.SelectedItem.ToString() == "DLAA / DLSS" ? "DLAA" : "Native"; }
         }
-        public int SelectedReconstruction { get { return reconstruction.SelectedIndex; } }
+        public int SelectedReconstruction { get { return SelectedProfile == "NR" ? nrMode : SelectedProfile == "DLAA" ? sdkMode : 0; } }
 
         public LaunchPicker(bool sdkAvailable, bool nrAvailable, string preferredProfile, int preferredMode)
+            : this(sdkAvailable, nrAvailable, preferredProfile, preferredMode, 1) {}
+
+        public LaunchPicker(bool sdkAvailable, bool nrAvailable, string preferredProfile, int preferredMode, int preferredNRMode)
         {
+            sdkMode = Math.Max(0, Math.Min(4, preferredMode));
+            nrMode = Math.Max(1, Math.Min(4, preferredNRMode));
             Text = "neuralDoom";
             ClientSize = new Size(640, 530);
             StartPosition = FormStartPosition.CenterScreen;
@@ -36,7 +44,7 @@ namespace NeuralDoom
             profiles.SetBounds(30, 144, 280, 30);
             profiles.DropDownStyle = ComboBoxStyle.DropDownList;
             profiles.AccessibleName = "Rendering profile";
-            if (nrAvailable && sdkAvailable) profiles.Items.Add("NR + DLAA");
+            if (nrAvailable && sdkAvailable) profiles.Items.Add("NR + DLAA / DLSS");
             if (sdkAvailable) profiles.Items.Add("DLAA / DLSS");
             profiles.Items.Add("Native RTX");
             Controls.Add(profiles);
@@ -45,8 +53,6 @@ namespace NeuralDoom
             reconstruction.SetBounds(330, 144, 280, 30);
             reconstruction.DropDownStyle = ComboBoxStyle.DropDownList;
             reconstruction.AccessibleName = "DLAA / DLSS quality";
-            reconstruction.Items.AddRange(new object[] { "Native TAA (100%)", "DLAA (100%)", "DLSS Quality (~67%)", "DLSS Balanced (~58%)", "DLSS Performance (~50%)" });
-            reconstruction.SelectedIndex = Math.Max(0, Math.Min(4, preferredMode));
             Controls.Add(reconstruction);
             fixedMode.SetBounds(330, 148, 280, 30);
             Controls.Add(fixedMode);
@@ -62,23 +68,40 @@ namespace NeuralDoom
             AcceptButton = play;
             CancelButton = cancel;
 
-            profiles.SelectedIndexChanged += delegate { UpdateDetails(); };
-            reconstruction.SelectedIndexChanged += delegate { UpdateDetails(); };
-            string preferred = preferredProfile == "NR" ? "NR + DLAA" : preferredProfile == "DLAA" ? "DLAA / DLSS" : preferredProfile == "Native" ? "Native RTX" : "";
+            profiles.SelectedIndexChanged += delegate { UpdateModes(); };
+            reconstruction.SelectedIndexChanged += delegate {
+                if (updatingModes || reconstruction.SelectedIndex < 0) return;
+                if (SelectedProfile == "NR") nrMode = reconstruction.SelectedIndex + 1;
+                else if (SelectedProfile == "DLAA") sdkMode = reconstruction.SelectedIndex;
+                UpdateDetails();
+            };
+            string preferred = preferredProfile == "NR" ? "NR + DLAA / DLSS" : preferredProfile == "DLAA" ? "DLAA / DLSS" : preferredProfile == "Native" ? "Native RTX" : "";
             profiles.SelectedIndex = profiles.Items.Contains(preferred) ? profiles.Items.IndexOf(preferred) : 0;
+        }
+
+        void UpdateModes()
+        {
+            if (profiles.SelectedIndex < 0) return;
+            updatingModes = true;
+            reconstruction.Items.Clear();
+            if (SelectedProfile == "DLAA") reconstruction.Items.Add("Native TAA (100%)");
+            if (SelectedProfile != "Native")
+            {
+                reconstruction.Items.AddRange(new object[] { "DLAA (100%)", "DLSS Quality (~67%)", "DLSS Balanced (~58%)", "DLSS Performance (~50%)" });
+                reconstruction.SelectedIndex = SelectedProfile == "NR" ? nrMode - 1 : sdkMode;
+            }
+            reconstruction.Enabled = SelectedProfile != "Native";
+            reconstruction.Visible = reconstruction.Enabled;
+            fixedMode.Visible = !reconstruction.Enabled;
+            fixedMode.Text = "Native TAA (100%)";
+            updatingModes = false;
+            UpdateDetails();
         }
 
         void UpdateDetails()
         {
-            if (profiles.SelectedIndex < 0) return;
-            reconstruction.Enabled = SelectedProfile == "DLAA";
-            reconstruction.Visible = reconstruction.Enabled;
-            fixedMode.Visible = !reconstruction.Enabled;
-            fixedMode.Text = SelectedProfile == "NR" ? "DLAA (100%)" : "Native TAA (100%)";
             string text;
-            if (SelectedProfile == "NR")
-                text = "NR + DLAA: experimental neural appearance processing with full-resolution DLAA input. F6 switches between NR and direct DLAA passthrough.\n\nAdds processing cost and can alter lighting, brightness and fine detail. Uses the embedded compatibility add-on without a DXGI proxy. Native HDR and DLSS reduced-resolution presets are unavailable in this profile.";
-            else if (SelectedProfile == "DLAA")
+            if (SelectedProfile != "Native")
             {
                 string[] descriptions = {
                     "Native TAA: full-resolution engine anti-aliasing, with the SDK profile still loaded. Useful for an in-game comparison with DLAA.",
@@ -87,7 +110,10 @@ namespace NeuralDoom
                     "DLSS Balanced: about 58% resolution per axis (~34% of native pixels). Trades more fine detail and motion stability for lower rendering cost.",
                     "DLSS Performance: about 50% resolution per axis (~25% of native pixels). Greatest rendering reduction; thin details and motion can look softer or less stable."
                 };
-                text = descriptions[SelectedReconstruction] + "\n\nOutput resolution and HUD stay native. Native HDR is available on a compatible display; enable it in System Options. NR is not loaded, so F6 has no effect. Quality can be changed in-game.";
+                text = descriptions[SelectedReconstruction];
+                text += SelectedProfile == "NR"
+                    ? "\n\nExperimental NR appearance processing can change lighting and detail. NR + DLSS needs branch testing. F6 toggles NR, keeping this reconstruction; NR may still add substantial cost. Output/HUD stay native. Uses embedded compatibility components; native HDR is unavailable."
+                    : "\n\nOutput resolution and HUD stay native. Native HDR is available on a compatible display; enable it in System Options. NR is not loaded, so F6 has no effect. Quality can be changed in-game.";
             }
             else
                 text = "Native RTX: full-resolution engine TAA with our ray-traced lighting. No NVIDIA reconstruction or NR runtime is loaded. Useful as a baseline on supported DX12 ray-tracing hardware.\n\nNative HDR is available on a compatible display. F6 has no effect. Run setup in Upgrade / repair mode to add missing neural components.";

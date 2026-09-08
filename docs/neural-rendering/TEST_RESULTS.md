@@ -1321,3 +1321,29 @@ No installed player folder was modified. Visual acceptance remains manual,
 especially the reported F8 door angle, moving reflections, NR appearance and HDR.
 Next task: the five-minute check in `INTERNAL_TESTING.md`, using the rebuilt
 installer and its matching source revision.
+
+## 2026-09-07 - Milestone 1 source review; execution deferred
+
+NR-specific reconstruction choices and viewport routing are implemented for branch
+testing. Reviewed the changed source, preference isolation, menu/key control flow,
+input/output dimensions, existing temporal resets and fallback paths. Corrected
+the regression harness's fully qualified menu symbol during review.
+
+No configure/build command, test executable, game, runtime fixture, installer or
+benchmark was run for this checkpoint. RelWithDebInfo/Release compilation,
+control regressions and GPU validation are **PENDING**, as requested. Earlier
+release results above do not validate this feature. No performance gain or working
+NR + DLSS combination is claimed; reduced-input handling with the existing
+`NREnableUpscaling=0` consumer configuration is an unresolved runtime gate.
+
+Next checks (in a separate branch build/test installation):
+
+1. Build SDK-off/on RelWithDebInfo and SDK-on Release. Run
+   `Test-NeuralReconstruction.py`, `Test-LaunchPicker.ps1`,
+   `Test-NeuralEmbeddedNR.ps1`, and existing safe-key/menu regressions.
+2. Confirm unchanged NR + DLAA and SDK-only/native fallbacks, then test Quality
+   with actual input/output extents and successful consumer NR evaluations.
+3. Test Balanced/Performance individually, F1/F6, resize/FOV, moving scenes,
+   save/load and relaunch persistence. Obtain manual visual acceptance.
+4. Measure Release frame times against the DLAA baseline using the performance
+   plan. Keep the branch unmerged and the published installer unchanged meanwhile.

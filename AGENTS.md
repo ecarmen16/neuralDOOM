@@ -8,8 +8,8 @@ Build a reversible, optional, well-instrumented temporal input path around the e
 
 ## Milestone 1 workflow
 
-- The next optimization roadmap belongs on `codex/milestone-1`. Keep `main` at its reviewed checkpoint until the milestone PR is manually approved.
-- Prepare and update the milestone PR as a draft while work is incomplete. Require manual approval of the latest reviewed changes by `ecarmen16` or `eraser851`; new changes after approval require renewed review.
+- Implement and push optimization work on `codex/milestone-1`. Review and playtest branch builds before opening a PR; do not open a planning or tracking PR.
+- Keep `main` at its reviewed checkpoint. After branch testing, require manual approval of the latest PR changes by `ecarmen16` or `eraser851`; new changes after approval require renewed review.
 - Do not approve, merge, enable auto-merge, or push/cherry-pick milestone changes into `main` as an agent. Leave the final merge to either maintainer. Actions made by automation using a maintainer's credentials are not human approval.
 - Keep `core.hooksPath=.githooks`; the pre-push hook rejects direct pushes to `main`. Do not bypass it. This local guard is not server-side branch protection.
 

@@ -1,6 +1,6 @@
 function Show-NeuralLaunchPicker {
     param([string]$RepoRoot, [string]$BuildDirectory, [string]$Configuration,
-        [string]$PreferredProfile, [int]$PreferredMode = 1)
+        [string]$PreferredProfile, [int]$PreferredMode = 1, [int]$PreferredNRMode = 1)
 
     $sdkBuild = if ($BuildDirectory) { $BuildDirectory } else { Join-Path $RepoRoot 'build-streamline' }
     $sdkExe = $null
@@ -24,7 +24,7 @@ function Show-NeuralLaunchPicker {
     if (-not ('NeuralDoom.LaunchPicker' -as [type])) {
         Add-Type -Path (Join-Path $PSScriptRoot 'LaunchPicker.cs') -ReferencedAssemblies System.Windows.Forms, System.Drawing
     }
-    $picker = New-Object NeuralDoom.LaunchPicker($sdkAvailable, $nrAvailable, $PreferredProfile, $PreferredMode)
+    $picker = New-Object NeuralDoom.LaunchPicker($sdkAvailable, $nrAvailable, $PreferredProfile, $PreferredMode, $PreferredNRMode)
     try {
         if ($picker.ShowDialog() -ne [Windows.Forms.DialogResult]::OK) { return $null }
         return [pscustomobject]@{ Profile = $picker.SelectedProfile; Mode = $picker.SelectedReconstruction }

@@ -36,7 +36,6 @@ If you have questions concerning this license or the applicable additional terms
 const static int NUM_SYSTEM_OPTIONS_OPTIONS = 8;
 
 static idCVar r_neuralLaunchProfile( "r_neuralLaunchProfile", "-1", CVAR_ARCHIVE | CVAR_INTEGER, "launcher preference: -1 ask, 0 Native, 1 DLAA, 2 local NR; next launch", -1, 2 );
-static idCVar r_neuralReconstructionMode( "r_neuralReconstructionMode", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "saved reconstruction: 0 TAA, 1 DLAA, 2 DLSS Quality, 3 Balanced, 4 Performance", 0, 4 );
 struct neuralMenuSetting_t { const char* label; const char* name; float step, maximum; };
 static const neuralMenuSetting_t neuralMenuSettings[] = {
 	{ "RTX Reflections", "r_rayTracedReflections", 1, 1 },
@@ -284,7 +283,7 @@ void idMenuScreen_Shell_SystemOptions::Initialize( idMenuHandler* data )
 		control->SetOptionType( OPTION_SLIDER_TEXT );
 		const int rayIndex = field - idMenuDataSource_SystemSettings::SYSTEM_FIELD_RT_FIRST;
 		if( rayIndex >= 0 && rayIndex < 9 ) { control->SetLabel( neuralMenuSettings[rayIndex].label ); }
-		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RECONSTRUCTION ) { control->SetLabel( "DLAA / DLSS Quality" ); control->SetDescription( "DLAA at 100%, or DLSS Quality (~67%), Balanced (~58%), Performance (50%) per dimension. Select DLAA / DLSS in Next Launch Profile for these choices. NR keeps native DLAA input." ); }
+		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RECONSTRUCTION ) { control->SetLabel( "DLAA / DLSS Quality" ); control->SetDescription( "DLAA at 100%, or DLSS Quality (~67%), Balanced (~58%), Performance (50%) per dimension. NR + DLSS is experimental. F6 keeps the selected reconstruction. Each neural profile remembers its own choice." ); }
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RENDER_STATUS ) { control->SetLabel( "Rendering Status" ); }
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_FPS_COUNTER ) { control->SetLabel( "FPS Counter" ); control->SetDescription( "Compact frames-per-second display in the top-right corner. Follows window resizing and ultrawide resolutions." ); }
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RT_QUALITY ) { control->SetLabel( "Ray Quality" ); control->SetDescription( "Changes ray samples, not rendering resolution or lighting strength." ); }
@@ -548,7 +547,7 @@ void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::LoadData
 {
 	for( int i = 0; i < 9; i++ ) { originalRaySettings[i] = cvarSystem->GetCVarFloat( neuralMenuSettings[i].name ); }
 	for( int i = 0; i < 3; i++ ) { originalRaySamples[i] = cvarSystem->GetCVarInteger( neuralSampleSettings[i] ); }
-	originalReconstruction = r_neuralReconstructionMode.GetInteger();
+	originalReconstruction = R_NeuralReconstructionMode();
 	originalLaunchProfile = r_neuralLaunchProfile.GetInteger();
 	originalFPSCounter = com_showFPS.GetInteger();
 	originalRenderAPI = r_graphicsAPI.GetString();
@@ -692,16 +691,10 @@ void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustFi
 	}
 	if( fieldIndex == SYSTEM_FIELD_RECONSTRUCTION )
 	{
-		if( !cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) && R_StreamlineIsDLSSSupported() )
-		{
-			const int mode = ( r_neuralReconstructionMode.GetInteger() + ( adjustAmount > 0 ? 1 : 4 ) ) % 5;
-			r_neuralReconstructionMode.SetInteger( mode );
-			cvarSystem->SetCVarBool( "r_useTemporalAA", true );
-			r_antiAliasing.SetInteger( ANTI_ALIASING_TAA );
-			cvarSystem->SetCVarInteger( "r_neuralBackend", mode == 0 ? 0 : mode == 1 ? 2 : 3 );
-			if( mode >= 2 ) { cvarSystem->SetCVarInteger( "r_neuralDLSSQuality", mode - 2 ); }
-			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "neuralHistoryReset\n" );
-		}
+		const int first = cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) ? 1 : 0;
+		const int count = 5 - first;
+		const int mode = first + ( R_NeuralReconstructionMode() - first + ( adjustAmount > 0 ? 1 : count - 1 ) ) % count;
+		R_SetNeuralReconstructionMode( mode );
 		return;
 	}
 	if( fieldIndex == SYSTEM_FIELD_RT_QUALITY )
@@ -913,7 +906,7 @@ idSWFScriptVar idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings
 	if( fieldIndex == SYSTEM_FIELD_FPS_COUNTER ) { return com_showFPS.GetInteger() == 0 ? "Off" : com_showFPS.GetInteger() == 1 ? "Top right" : "Detailed (console)"; }
 	if( fieldIndex == SYSTEM_FIELD_LAUNCH_PROFILE )
 	{
-		const char* names[] = { "Ask on launch", "Native RTX", "DLAA / DLSS", "NR + DLAA" };
+		const char* names[] = { "Ask on launch", "Native RTX", "DLAA / DLSS", "NR + DLAA / DLSS" };
 		return names[r_neuralLaunchProfile.GetInteger() + 1];
 	}
 	if( fieldIndex == SYSTEM_FIELD_NR_STATUS ) { return cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) ? "NR profile; add-on F6" : "Not loaded"; }
@@ -942,7 +935,6 @@ idSWFScriptVar idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings
 	if( fieldIndex == SYSTEM_FIELD_RECONSTRUCTION )
 	{
 		if( !R_UseTemporalAA() ) { return "Temporal AA inactive"; }
-		if( cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) ) { return "NR uses DLAA (100%)"; }
 		if( !R_StreamlineIsDLSSSupported() ) { return "TAA (DLAA unavailable)"; }
 		if( cvarSystem->GetCVarInteger( "r_neuralBackend" ) == 3 ) { return va( "DLSS %s", R_StreamlineDLSSQualityName() ); }
 		return cvarSystem->GetCVarInteger( "r_neuralBackend" ) == 2 ? "DLAA (100%)" : "Native TAA (100%)";
@@ -1176,7 +1168,7 @@ bool idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsDataCh
 	for( int i = 0; i < 9; i++ ) { if( originalRaySettings[i] != cvarSystem->GetCVarFloat( neuralMenuSettings[i].name ) ) { return true; } }
 	for( int i = 0; i < 3; i++ ) { if( originalRaySamples[i] != cvarSystem->GetCVarInteger( neuralSampleSettings[i] ) ) { return true; } }
 	if( originalLaunchProfile != r_neuralLaunchProfile.GetInteger() ) { return true; }
-	if( originalReconstruction != r_neuralReconstructionMode.GetInteger() ) { return true; }
+	if( originalReconstruction != R_NeuralReconstructionMode() ) { return true; }
 
 	if( idStr::Icmp( r_graphicsAPI.GetString(), originalRenderAPI ) != 0 )
 	{

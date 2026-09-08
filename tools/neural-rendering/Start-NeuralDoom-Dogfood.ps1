@@ -44,15 +44,20 @@ if (-not $Profile -and -not $askAtLaunch -and (Test-Path -LiteralPath (Join-Path
 if ($showLauncher) {
     . (Join-Path $PSScriptRoot 'LaunchPicker.ps1')
     $preferredMode = 1
+    $preferredNRMode = 1
     if (Test-Path -LiteralPath $profileConfig) {
         $profileText = Get-Content -LiteralPath $profileConfig -Raw
         if ($profileText -match '(?m)^set\s+r_neuralReconstructionMode\s+"?([0-4])"?\s*$') { $preferredMode = [int]$Matches[1] }
+        if ($profileText -match '(?m)^set\s+r_neuralNRReconstructionMode\s+"?([1-4])"?\s*$') { $preferredNRMode = [int]$Matches[1] }
     }
-    if ($null -ne $selectedReconstruction) { $preferredMode = $selectedReconstruction }
-    $choice = Show-NeuralLaunchPicker -RepoRoot $RepoRoot -BuildDirectory $BuildDirectory -Configuration $Configuration -PreferredProfile $Profile -PreferredMode $preferredMode
+    if ($null -ne $selectedReconstruction) {
+        if ($Profile -eq 'NR') { $preferredNRMode = $selectedReconstruction }
+        else { $preferredMode = $selectedReconstruction }
+    }
+    $choice = Show-NeuralLaunchPicker -RepoRoot $RepoRoot -BuildDirectory $BuildDirectory -Configuration $Configuration -PreferredProfile $Profile -PreferredMode $preferredMode -PreferredNRMode $preferredNRMode
     if ($null -eq $choice) { return }
     $Profile = $choice.Profile
-    $selectedReconstruction = if ($Profile -eq 'DLAA') { $choice.Mode } else { $null }
+    $selectedReconstruction = if ($Profile -ne 'Native') { $choice.Mode } else { $null }
     $askAtLaunch = $false
 }
 if (-not $Profile) {
@@ -70,7 +75,8 @@ if (-not $Profile) {
         default { throw 'Choose 1, 2 or 3.' }
     }
 }
-if ($null -ne $selectedReconstruction -and $Profile -ne 'DLAA') { throw '-Reconstruction requires the DLAA / DLSS profile.' }
+if ($null -ne $selectedReconstruction -and $Profile -eq 'Native') { throw '-Reconstruction requires the DLAA / DLSS or NR profile.' }
+if ($Profile -eq 'NR' -and $null -ne $selectedReconstruction -and $selectedReconstruction -eq 0) { throw 'NR requires a DLAA or DLSS evaluation; TAA is only available in the DLAA / DLSS profile.' }
 if (-not $BuildDirectory) {
     $BuildDirectory = Join-Path $RepoRoot $(if ($Profile -ne 'Native') { 'build-streamline' } else { 'build-rt' })
 }
@@ -111,9 +117,11 @@ $firstRun = -not (Test-Path -LiteralPath (Join-Path $saveBase 'D3BFGConfig.cfg')
 [string]$savedConfig = if ($firstRun) { '' } else { Get-Content -LiteralPath (Join-Path $saveBase 'D3BFGConfig.cfg') -Raw }
 $backend = if ($Profile -ne 'Native') { 2 } else { 0 }
 $quality = 0
-# Preserve reconstruction choices in the SDK profile; NR uses native DLAA input.
-if ($Profile -eq 'DLAA' -and -not $firstRun) {
-    if ($savedConfig -match '(?m)^set\s+r_neuralReconstructionMode\s+"?([0-4])"?\s*$') {
+# A pre-existing SDK preset must not silently reduce a new NR profile's resolution.
+$reconstructionCvar = if ($Profile -eq 'NR') { 'r_neuralNRReconstructionMode' } else { 'r_neuralReconstructionMode' }
+if ($Profile -ne 'Native' -and -not $firstRun) {
+    $modeRange = if ($Profile -eq 'NR') { '[1-4]' } else { '[0-4]' }
+    if ($savedConfig -match ('(?m)^set\s+' + $reconstructionCvar + '\s+"?(' + $modeRange + ')"?\s*$')) {
         $mode = [int]$Matches[1]
         if ($mode -eq 0) { $backend = 0 }
         elseif ($mode -ge 2) { $backend = 3; $quality = $mode - 2 }
@@ -160,7 +168,8 @@ Write-Host "Profile:    $Profile"
 Write-Host "Reconstruction: $(if ($backend -eq 2) { 'DLAA' } elseif ($backend -eq 3) { 'DLSS ' + @('Quality','Balanced','Performance')[$quality] } else { 'Native TAA' })"
 Write-Host 'Rendering controls: System Settings. Remap toggles in Keyboard Bindings; console: ~.'
 if ($Profile -eq 'NR') {
-    Write-Host 'F6: NR on/off with native-resolution DLAA input. Native HDR is unavailable in this profile.'
+    Write-Host 'F6: NR on/off, retaining the selected DLAA/DLSS reconstruction. Native HDR is unavailable in this profile.'
+    if ($backend -eq 3) { Write-Host 'Experimental: NR + DLSS still requires branch runtime validation.' }
     Write-Verbose "NR executable: $($nrState.executable)"
 }
 Write-Host "Log: captures/dogfood/base/$sessionLog"
@@ -190,8 +199,9 @@ $playtestCommands = @(
     'set r_screenFraction 100', 'set r_renderMode 0', 'set r_useTemporalAA 1', 'set r_antiAliasing 2',
     'neuralInstallKeys startup', 'set com_fixedTic 0', 'set s_noSound 0', 'set r_hdrDiagnostic 0'
 )
-if ($Profile -eq 'DLAA' -and $null -ne $selectedReconstruction) {
-    $playtestCommands += 'set r_neuralReconstructionMode ' + $selectedReconstruction
+if ($Profile -ne 'Native') {
+    $effectiveMode = if ($backend -eq 0) { 0 } elseif ($backend -eq 2) { 1 } else { $quality + 2 }
+    $playtestCommands += 'set ' + $reconstructionCvar + ' ' + $effectiveMode
 }
 if ($VerbosePreference -ne 'SilentlyContinue') { $playtestCommands += @('neuralBackendStatus', 'hdrStatus', 'rayTracingStatus') }
 # Versioned migration: apply in the game after its saved config has loaded.

@@ -9,8 +9,9 @@ neuralDoom is the downstream project; RBDOOM-3-BFG remains its upstream source. 
 - `main`: reviewed downstream checkpoints.
 - `codex/…`: focused development branches. Do not rewrite upstream history to rename the project.
 
-Milestone 1 optimization work uses **`codex/milestone-1`**. Keep its PR in draft
-until review-ready. The latest changes require manual approval from `ecarmen16`
+Milestone 1 optimization work uses **`codex/milestone-1`**. Implement, review and
+playtest branch builds before opening a PR. Do not open a planning/tracking PR.
+The latest changes require manual approval from `ecarmen16`
 or `eraser851`; subsequent changes require another review. Those maintainers
 perform the final merge. Agents must not approve, merge, enable auto-merge or
 push milestone work directly to `main`, including through a maintainer's account.

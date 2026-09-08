@@ -93,4 +93,8 @@ const char* R_ValidateNeuralTemporalFrame( const neuralTemporalFrame_t& frame );
 
 void R_GetNeuralPresentationStatus( int& mode, int& renderWidth, int& renderHeight, int& outputWidth, int& outputHeight );
 
+// NR and SDK-only launches remember separate choices. NR requires DLAA or DLSS.
+int R_NeuralReconstructionMode();
+bool R_SetNeuralReconstructionMode( int mode );
+
 #endif

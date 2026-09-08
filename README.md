@@ -2,6 +2,8 @@
 
 neuralDoom modernizes **Doom 3 BFG Edition** on the RBDOOM-3-BFG source port, with optional ray-traced lighting, native HDR, neural reconstruction and ultrawide controls. It remains a hybrid renderer; full path tracing and NVIDIA Reflex are not implemented.
 
+**Milestone 1 development branch:** NR + DLSS controls are implemented in source but have not been built or runtime-tested. The published `internal-d16dab5e` build remains unchanged and uses NR + DLAA only. Branch testing precedes a PR and maintainer-approved merge.
+
 ## Install and play
 
 1. Download the setup EXE from [internal test releases](https://github.com/ecarmen16/neuralDoom/releases).
@@ -16,11 +18,11 @@ See [installation, mode tradeoffs and exact comparison keys](INTERNAL_TESTING.md
 
 | Profile | What it does |
 |---|---|
-| **NR + DLAA** (default) | Experimental neural appearance processing with native-resolution DLAA input. F6 compares NR against direct DLAA passthrough. Uses embedded compatibility components without a DXGI proxy; native HDR and DLSS upscaling are unavailable in this profile. |
+| **NR + DLAA / DLSS** | Defaults to native-resolution DLAA. This branch adds explicit DLSS Quality/Balanced/Performance choices, pending runtime validation. F6 toggles NR while preserving reconstruction. Uses embedded compatibility components without a DXGI proxy; native HDR is unavailable. |
 | **DLAA / DLSS** | Native-resolution DLAA, or DLSS Quality, Balanced and Performance for reduced rendering cost. Output/HUD stay native; native HDR is available. NR is not loaded. |
 | **Native RTX** | Engine TAA and our ray-traced lighting without NVIDIA reconstruction or NR. Native HDR is available. |
 
-All profiles retain the same lighting controls. NR and DLAA use **100% input resolution**; only explicit DLSS presets lower it. Exact dimensions appear in Rendering Status. Visual quality and performance depend on the scene; NR can change brightness and fine detail.
+All profiles retain the same lighting controls. DLAA uses **100% input resolution**; only explicit DLSS presets lower it. NR remembers its reconstruction separately from the SDK-only profile. Exact dimensions appear in Rendering Status. Visual quality and performance depend on the scene; NR can change brightness and fine detail.
 
 ## What neuralDoom adds
 
@@ -35,7 +37,7 @@ F3 toggles reflections, F4 bounce, F6 NR, F7 AO, F8 contacts, and F11 all four l
 
 ## Build from source
 
-Active development is on `codex/rt-foundation`; `main` tracks reviewed internal-test source. Start with the [Windows build guide](docs/neural-rendering/WINDOWS_SETUP.md). A native RTX build uses PowerShell:
+Active development is on `codex/milestone-1`; `main` tracks reviewed internal-test source. Start with the [Windows build guide](docs/neural-rendering/WINDOWS_SETUP.md). A native RTX build uses PowerShell:
 
 ```powershell
 git clone --recursive https://github.com/ecarmen16/neuralDoom.git

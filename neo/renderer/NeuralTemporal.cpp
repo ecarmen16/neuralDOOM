@@ -14,6 +14,31 @@ apply to this source tree.
 #pragma hdrstop
 
 #include "NeuralTemporal.h"
+#include "StreamlineIntegration.h"
+
+static idCVar r_neuralReconstructionMode( "r_neuralReconstructionMode", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "saved SDK reconstruction: 0 TAA, 1 DLAA, 2 DLSS Quality, 3 Balanced, 4 Performance", 0, 4 );
+static idCVar r_neuralNRReconstructionMode( "r_neuralNRReconstructionMode", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "saved NR reconstruction: 1 native DLAA (default), 2 DLSS Quality, 3 Balanced, 4 Performance; NR + DLSS is experimental", 1, 4 );
+
+int R_NeuralReconstructionMode()
+{
+	return cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) ? r_neuralNRReconstructionMode.GetInteger() : r_neuralReconstructionMode.GetInteger();
+}
+
+bool R_SetNeuralReconstructionMode( int mode )
+{
+	const bool nr = cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" );
+	if( !R_StreamlineIsDLSSSupported() || mode < ( nr ? 1 : 0 ) || mode > 4 )
+	{
+		return false;
+	}
+	( nr ? r_neuralNRReconstructionMode : r_neuralReconstructionMode ).SetInteger( mode );
+	cvarSystem->SetCVarBool( "r_useTemporalAA", true );
+	cvarSystem->SetCVarInteger( "r_antiAliasing", ANTI_ALIASING_TAA );
+	cvarSystem->SetCVarInteger( "r_neuralBackend", mode == 0 ? 0 : mode == 1 ? 2 : 3 );
+	cvarSystem->SetCVarInteger( "r_neuralDLSSQuality", mode >= 2 ? mode - 2 : 0 );
+	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "neuralHistoryReset\n" );
+	return true;
+}
 
 const char* R_ValidateNeuralTemporalFrame( const neuralTemporalFrame_t& frame )
 {

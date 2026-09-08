@@ -1062,8 +1062,9 @@ void idRenderWorldLocal::RenderScene( const renderView_t* renderView )
 	}
 	else
 	{
-		// DLAA and NR retain native input; explicit DLSS presets own their input extent.
-		if( parms->neuralBackendMode == 3 && !cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) )
+		// Explicit DLSS presets own the input extent, including experimental NR launches.
+		// DLAA stays native; output and HUD dimensions are unchanged.
+		if( parms->neuralBackendMode == 3 )
 		{
 			R_StreamlineDLSSRenderSize( tr.GetWidth(), tr.GetHeight(), windowWidth, windowHeight, parms->neuralDLSSQuality );
 		}

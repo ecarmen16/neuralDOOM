@@ -78,7 +78,7 @@ static bindInfo_t keyboardBinds[] =
 	{ "#str_02068",	"clientMessageMode"						},	// SCREENSHOT
 	{ "#str_02122",	"clientMessageMode 1"					},	// SCREENSHOT
 	{ "Renderer Comparisons", "" },
-	{ "TAA / DLAA (full resolution)", "neuralReconstructionToggle" },
+	{ "Reconstruction mode", "neuralReconstructionToggle" },
 	{ "Moving ray geometry", "rayTracingDynamicToggle" },
 	{ "Animated ray geometry", "rayTracingSkinnedToggle" },
 	{ "RTX reflections only", "rayTracingReflectionToggle" },

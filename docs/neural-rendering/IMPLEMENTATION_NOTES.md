@@ -689,3 +689,57 @@ uses `std::from_chars` with the default decimal base. Setting zero restores the
 consumer's F5 default, so an explicit separate key is necessary. Installer and
 launcher fixtures now verify both keys. The internal guide also distinguishes
 signed DLSS SR selection from the exact tested community NR runtime pin.
+
+## 2026-09-07 - Milestone 1 NR reconstruction source checkpoint
+
+Implemented on `codex/milestone-1`; build and test execution intentionally deferred.
+The published installer and installed player files are unchanged. This checkpoint
+is not a claim that the pinned NR consumer supports reduced-resolution inputs.
+
+- `RenderWorld.cpp::RenderScene` permits backend 3 to query existing
+  `R_StreamlineDLSSRenderSize` with NR loaded. Native DLAA remains the default;
+  legacy screen-fraction scaling remains disabled for NR. Main-view eligibility,
+  output/HUD sizing and native HDR restrictions retain their existing rules.
+- `NeuralTemporal.cpp/.h::R_NeuralReconstructionMode` and
+  `R_SetNeuralReconstructionMode` share menu/key policy. The existing archived
+  `r_neuralReconstructionMode` moves from the menu into the renderer; new
+  `r_neuralNRReconstructionMode` defaults to 1 (DLAA), with 2/3/4 selecting
+  Quality/Balanced/Performance. NR cannot select TAA through these controls.
+  Successful selections set backend/quality/AA together and request history reset;
+  unavailable SDK selections make no change.
+- `MenuScreen_Shell_SystemOptions.cpp::AdjustField/LoadData/IsDataChanged`
+  uses the active profile's preference, preserving normal save-on-exit behavior.
+  `RayTracingDiagnostic.cpp::neuralReconstructionToggle` cycles the four NR modes
+  on F1, retaining SDK-only TAA/DLAA behavior. `MenuScreen_Shell_Bindings.cpp`
+  labels that action accordingly. F6 remains owned by the external add-on.
+- `Start-NeuralDoom-Dogfood.ps1` restores/persists each profile independently,
+  accepts explicit NR reconstruction selections and rejects NR + TAA. An older
+  SDK-only Quality/Performance preference does not downscale a new NR launch.
+  `LaunchPicker.cs/.ps1` retains separate choices while switching profiles and
+  omits TAA from NR. Installer source text and current branch documentation describe
+  the experimental choices; no installer or executable was generated.
+
+The resource contract is unchanged: linear `RGBA16_FLOAT` scene/output,
+`D24_UNORM_S8_UINT` non-reversed device depth, `RG16_FLOAT` previous-minus-current
+pixel motion (+Y down, SDK scale 1/render extent), `R8_UNORM` masks and existing
+exposure storage/scalar. Inputs use the selected render viewport; reconstruction
+output and HUD use the full output extent. No shader formats, runtime pins,
+dependencies, NR strength settings or SDK resource lifetimes changed.
+
+Static review traced viewport-derived ray dispatches, motion/mask input tags,
+native output, full-output TAA fallback, viewport/FOV reset detection and reflection
+history invalidation. `NeuralTemporalStreamline.cpp::Evaluate` already handles
+preset/dimension resets. `NREnableUpscaling=0` remains untouched: consumer handling
+of mixed input/output extents and successful NR feature-18 evaluations must still
+be established in an isolated runtime test. Engine DLSS success alone is insufficient.
+
+Prepared, not run: `Test-NeuralReconstruction.py` (actual engine control bodies),
+updated `Test-LaunchPicker.ps1` and `Test-NeuralEmbeddedNR.ps1`. These cover profile
+isolation, menu/F1 cycles, unavailable-SDK no-op, explicit override precedence,
+launch arguments, NR TAA rejection and preservation of F6/add-on tuning.
+
+Next: use separate build/test directories for SDK-on/off RelWithDebInfo and
+SDK-on Release, run the prepared regressions, measure the unchanged DLAA baseline,
+then verify NR + Quality before Balanced/Performance. Test F6, resize, FOV,
+doors/characters, weapon effects, glass, save/load and persistence. Keep PR creation
+and any merge after branch playtesting; do not replace the published release.
