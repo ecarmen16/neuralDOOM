@@ -55,17 +55,26 @@ class InternalSetup {
 // Button menus stay legible in dark mode and Windows accessibility previews.
 class ChoiceButton : Button {
     internal readonly List<string> Items = new List<string>();
+    readonly ContextMenuStrip menu = new ContextMenuStrip();
     int selected = -1;
     internal int SelectedIndex { get { return selected; } set { selected = value; Text = value >= 0 && value < Items.Count ? Items[value] + "   v" : "Select an installation...   v"; } }
     internal object SelectedItem { get { return selected >= 0 && selected < Items.Count ? Items[selected] : null; } set { SelectedIndex = Items.IndexOf(value as string); } }
     protected override void OnClick(EventArgs e) {
         base.OnClick(e);
-        ContextMenuStrip menu = new ContextMenuStrip { BackColor = BackColor, ForeColor = ForeColor, Font = Font };
+        if (IsDisposed || Disposing || menu.Visible) return;
+        menu.BackColor = BackColor; menu.ForeColor = ForeColor; menu.Font = Font;
+        while (menu.Items.Count > 0) menu.Items[0].Dispose();
         for (int i = 0; i < Items.Count; i++) {
             int index = i; ToolStripMenuItem item = new ToolStripMenuItem(Items[i]) { Checked = index == selected };
             item.Click += delegate { SelectedIndex = index; }; menu.Items.Add(item);
         }
-        menu.Closed += delegate { menu.Dispose(); }; menu.Show(this, new Point(0, Height));
+        menu.Show(this, new Point(0, Height));
+    }
+    protected override void Dispose(bool disposing) {
+        // Closed runs before WinForms finishes dispatching the item click.
+        // Keep the menu alive between selections and release it with its owner.
+        if (disposing) menu.Dispose();
+        base.Dispose(disposing);
     }
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData) {
         if (Items.Count > 0 && (keyData == Keys.Left || keyData == Keys.Right)) { SelectedIndex = (selected + (keyData == Keys.Right ? 1 : Items.Count - 1)) % Items.Count; return true; }

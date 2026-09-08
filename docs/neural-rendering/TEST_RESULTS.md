@@ -1237,3 +1237,17 @@ number of rendered frames from console wait ticks; recorded counters establish
 the pass, since rendering and console ticks differ. A subsequent startup check
 confirmed the separate F6/virtual-key-124 bindings. These final helper/documentation
 changes are repackaged from their clean commit; engine binaries are unchanged.
+
+## 2026-09-07 - Installer dropdown disposal fix
+
+`InternalSetup.cs::ChoiceButton` disposed its ContextMenuStrip in the Closed
+callback, before WinForms finished its item-click cleanup. The menu now belongs
+to the button, is reused for selections, and is disposed with that button.
+`Test-InternalSetupWizard.ps1` reproduces the released 82adc605 exception through
+real ToolStripItem.PerformClick dispatch, then passes with the fix. It covers
+repeated action, existing-install and renderer selections, dismissal, page
+recreation, and the existing worker success/failure paths. No game, renderer,
+runtime pins, installation data or settings changed. The C# UI build passed;
+the complete installer is regenerated with matching committed source and the
+unchanged Native and neural Release engines. Next check: choose Upgrade / repair
+using the replacement installer.
