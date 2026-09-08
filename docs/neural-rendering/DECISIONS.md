@@ -135,3 +135,22 @@ Capture the native probe specular layer and its material response during IBL sha
 Share the existing static-world GI scene/material/light cache; do not duplicate its atlas or add a denoiser SDK. Filter incident radiance at full viewport resolution and apply current-pixel BRDF response afterward. Reuse engine temporal epochs with explicit normal/distance/roughness rejection. Keep compiled-out and feature-off fallbacks, and require offline shader permutation/output/binding checks alongside builds with separate manual visual validation.
 
 Reduce default diffuse bounce strength 1.5 to 1.125 in response to the contrast review. Do not reduce render resolution. Rigid dynamic geometry is the next bounded scene-coverage task after reflection playtesting.
+
+## D-016 - Recover NR rendering headroom before full path tracing
+
+**Status:** Accepted optimization direction, 2026-09-07; implementation pending.
+
+**Reasoning:** A reported 30–40% NR performance loss warrants a controlled
+baseline and an NR + DLSS Quality experiment before adding substantial tracing
+cost. D-012's native-DLAA-first policy established a stable baseline, not a universal
+NR dependency. Existing DLSS presets are validated in the separate SDK profile;
+combining them with the pinned NR consumer still requires input/evaluation proof.
+
+**Consequence:** Follow [NEURAL_PERFORMANCE_PLAN.md](NEURAL_PERFORMANCE_PLAN.md).
+Keep NR + DLAA as the initial default and make reduced input resolution an explicit,
+persisted quality choice only after validation. F6 must retain the selected
+reconstruction when compatible modes arrive. Measure external overhead separately
+from engine GPU timers, optimize observed costs, then integrate Reflex/frame timing
+before Frame Generation. Full path tracing waits for headroom, complete scene
+coverage and denoising. No runtime pins, installed settings, renderer behavior or
+distribution permissions change in this planning checkpoint.

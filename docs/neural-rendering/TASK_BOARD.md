@@ -4,7 +4,31 @@ Statuses: `BLOCKED`, `READY`, `IN PROGRESS`, `VERIFY`, `DONE`, `DEFERRED`.
 
 ## Current focus
 
-### Modernization implementation / 2026-09-06
+### Neural performance / 2026-09-07
+
+The next work is [NEURAL_PERFORMANCE_PLAN.md](NEURAL_PERFORMANCE_PLAN.md): measure
+the reported NR slowdown, prove NR + DLSS Quality, then optimize measured costs
+before Reflex, frame generation and full path tracing. Baseline installer:
+`internal-d16dab5e`. Suggested implementation branch: `codex/neural-performance`
+from reviewed `main`; this planning update does not create or enable that work.
+Use [PERFORMANCE_FEEDBACK.md](PERFORMANCE_FEEDBACK.md) for current-release feedback.
+
+| ID | Status | Task | Next evidence / dependency |
+|---|---|---|---|
+| OPT-001 | READY | Isolate NR, reconstruction and RTX cost | Repeated Release frame-time measurements, pass/dispatch dimensions and timer coverage |
+| OPT-010 | DEFERRED | Guarded NR + DLSS Quality experiment | OPT-001; prove actual NR evaluations and correct mixed input/output dimensions |
+| OPT-020 | DEFERRED | Persist validated NR reconstruction choices in launcher/menu | OPT-010; Quality first, then Balanced/Performance; F6 retains reconstruction |
+| OPT-030 | DEFERRED | Optimize measured rendering hot spots | OPT-001 identifies work worth changing; no hidden quality reduction |
+| OPT-040 | DEFERRED | Shared frame identity and Reflex | Initial NR/DLSS result; independent fallback work if its compatibility is blocked |
+| OPT-050 | DEFERRED | Frame Generation and supported MFG modes | OPT-040 and valid frame/UI/presentation lifetime |
+| OPT-060 | DEFERRED | Validate NR with Frame Generation | OPT-050; same-frame NR processing and hook/composition order |
+| OPT-070 | DEFERRED | Optional full path-tracing slice | Measured headroom, complete ray-scene coverage and denoising gates |
+
+The 2026-09-07 entries in [TEST_RESULTS.md](TEST_RESULTS.md) supersede older
+pending automated-validation statements below. Current visual acceptance remains
+open. The older tables retain implementation history and broader unfinished gates.
+
+### Earlier modernization implementation / 2026-09-06
 
 Working branch: `codex/rt-foundation`, prepared from the completed `codex/probe-lighting` checkpoint. See [PROBE_LIGHTING.md](PROBE_LIGHTING.md) for the lighting-pack investigation and empty-grid fix, and [RAY_TRACING_PLAN.md](RAY_TRACING_PLAN.md) for the next implementation gates. [LIGHTING_BASELINE.md](LIGHTING_BASELINE.md) retains the earlier missing-pack GPU measurements; [NATIVE_HDR.md](NATIVE_HDR.md) retains the HDR implementation and validation boundary.
 
@@ -76,7 +100,7 @@ Planning checkpoint: development branch is `codex/modernization-foundation`, bas
 | ND3-300 | DONE | Re-verify current Streamline/DLSS docs and license | Official v2.12.0 pinned; local development allowed; GPL binary redistribution explicitly blocked pending legal review |
 | ND3-310 | DONE | Add OFF-by-default SDK build option | Default DX12 and isolated Streamline 2.12.0 configurations built successfully; SDK-enabled executable hash recorded |
 | ND3-320 | DONE | Integrate native DLAA | SDK evaluated 597 native-resolution frames with zero rejects; saved-game A/B showed no visible regression and only subtle/no readily discernible change from native TAA |
-| ND3-330 | DEFERRED | Add full DLSS quality-mode/resolution plumbing | Preliminary 67%-to-native Quality mode evaluated 153 frames with zero rejects; deferred while native-resolution reconstruction is validated |
+| ND3-330 | DONE | Add DLSS quality-mode/resolution plumbing in the SDK profile | Quality/Balanced/Performance, menu/launcher persistence and viewport/history transitions passed in the 2026-09-07 review; NR combinations are OPT-010/020 |
 | ND3-340 | DONE | Validate RenoDX interception compatibility | Local ReShade log: feature 18 evaluated at 5120x1440; corrected launch produced a user-confirmed visible neural image; no external binaries tracked |
 | ND3-350 | DONE | Start local NR compatibility stack from NeuralDoom | SDK-OFF/ON builds pass; renamed ReShade runtime was explicitly loaded by the engine, API 18 add-on registered, NR runtime preloaded at D3D12 device init, and user confirmed visible gameplay NR/F6 behavior |
 | ND3-400 | DEFERRED | Implement official DLSS 5 backend | Public SDK and legal path required |

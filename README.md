@@ -47,6 +47,8 @@ cd neuralDoom
 
 The optional SDK build is separate and disabled by default. Use the [development plan](docs/neural-rendering/DEV_PLAN.md), [architecture](docs/neural-rendering/ARCHITECTURE.md), and [validation results](docs/neural-rendering/TEST_RESULTS.md) for implementation details. [Maintainer packaging](INTERNAL_TESTING.md#maintainer-packaging) covers the versioned ZIP, single-file EXE and verification steps. Releases are currently built and verified locally, then uploaded; GitHub does not automatically build the installer.
 
+Next focus: [NR + DLSS and rendering performance](docs/neural-rendering/NEURAL_PERFORMANCE_PLAN.md), before full path tracing. Testers can use the [short performance feedback checklist](docs/neural-rendering/PERFORMANCE_FEEDBACK.md).
+
 ## Attribution and licenses
 
 Built on [RBDOOM-3-BFG](https://github.com/RobertBeckebans/RBDOOM-3-BFG) and id Software's GPL source release. [Upstream documentation](README-UPSTREAM.md), [GPL and additional terms](LICENSE.md), [license exceptions](LICENSE_EXCEPTIONS.md), and [dependency provenance](docs/neural-rendering/THIRD_PARTY_AND_LEGAL.md) are preserved. Experimental NR compatibility is not an official NVIDIA engine integration.

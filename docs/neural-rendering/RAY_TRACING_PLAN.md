@@ -1,12 +1,16 @@
 # Native ray tracing and path tracing
 
-Current implementation: [RTX_LIGHTING.md](RTX_LIGHTING.md) covers static-world
-AO, contact shadows and diffuse material bounce; [RAY_TRACED_REFLECTIONS.md](RAY_TRACED_REFLECTIONS.md)
-adds full-resolution native-material reflections. The new reflection pass has
-build/offline contract validation and awaits manual GPU testing. Dynamic
-instance/material/motion gates below remain open. The following reconnaissance
-records the earlier capability baseline; `sceneImplemented=0` describes the
-incomplete full scene, not the absence of these optional static-world effects.
+Current implementation: [RTX_LIGHTING.md](RTX_LIGHTING.md) covers AO, contact
+shadows and diffuse material bounce; [RAY_TRACED_REFLECTIONS.md](RAY_TRACED_REFLECTIONS.md)
+covers native-material reflections. Supported visible opaque doors, props and
+characters participate. The 2026-09-07 [validation results](TEST_RESULTS.md)
+record automated RTX and reconstruction checks; broader visual acceptance and
+complete ray-scene coverage remain open.
+
+Next priority is [NR/DLSS performance](NEURAL_PERFORMANCE_PLAN.md), before full
+path tracing. The reconnaissance and capability table below record the earlier
+baseline; they are not a current feature inventory. The full-scene and path-tracing
+correctness gates remain relevant after the optimization milestones.
 
 Source review and capability check: 2026-09-06, starting at `5ca342cf` on `codex/probe-lighting`. The modernization scope was extended to investigate native ray tracing and path tracing. This extends the initial project's scope; it does not claim a ray-traced renderer is implemented.
 
