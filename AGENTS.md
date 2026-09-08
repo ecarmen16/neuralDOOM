@@ -6,6 +6,13 @@ This repository is an RBDOOM-3-BFG renderer-development branch prepared for Code
 
 Build a reversible, optional, well-instrumented temporal input path around the existing DX12/NVRHI renderer. First prove a clean upstream baseline; then expose reliable scene color, depth, motion vectors, jitter, exposure, reset state, masks, and UI separation. Integrate only official, redistributable SDK components in tracked source.
 
+## Milestone 1 workflow
+
+- The next optimization roadmap belongs on `codex/milestone-1`. Keep `main` at its reviewed checkpoint until the milestone PR is manually approved.
+- Prepare and update the milestone PR as a draft while work is incomplete. Require manual approval of the latest reviewed changes by `ecarmen16` or `eraser851`; new changes after approval require renewed review.
+- Do not approve, merge, enable auto-merge, or push/cherry-pick milestone changes into `main` as an agent. Leave the final merge to either maintainer. Actions made by automation using a maintainer's credentials are not human approval.
+- Keep `core.hooksPath=.githooks`; the pre-push hook rejects direct pushes to `main`. Do not bypass it. This local guard is not server-side branch protection.
+
 ## Non-negotiable legal and repository constraints
 
 - Never add or commit Doom 3/BFG assets, `.resources` files, videos, retail maps, or other proprietary game data.

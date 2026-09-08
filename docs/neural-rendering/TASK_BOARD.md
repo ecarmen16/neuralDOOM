@@ -9,8 +9,10 @@ Statuses: `BLOCKED`, `READY`, `IN PROGRESS`, `VERIFY`, `DONE`, `DEFERRED`.
 The next work is [NEURAL_PERFORMANCE_PLAN.md](NEURAL_PERFORMANCE_PLAN.md): measure
 the reported NR slowdown, prove NR + DLSS Quality, then optimize measured costs
 before Reflex, frame generation and full path tracing. Baseline installer:
-`internal-d16dab5e`. Suggested implementation branch: `codex/neural-performance`
-from reviewed `main`; this planning update does not create or enable that work.
+`internal-d16dab5e`. Implementation branch: `codex/milestone-1`, created from
+reviewed `main` at `d21c4445`. Keep the milestone PR in draft until review-ready;
+only `ecarmen16` or `eraser851` may manually approve and merge the latest changes.
+No optimization implementation is merged into `main` by this branch setup.
 Use [PERFORMANCE_FEEDBACK.md](PERFORMANCE_FEEDBACK.md) for current-release feedback.
 
 | ID | Status | Task | Next evidence / dependency |

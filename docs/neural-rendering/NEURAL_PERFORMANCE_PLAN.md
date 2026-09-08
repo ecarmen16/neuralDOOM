@@ -1,8 +1,15 @@
 # Neural rendering performance plan
 
 Planning checkpoint: 2026-09-07. Tested release baseline: `internal-d16dab5e`.
-Suggested implementation branch: `codex/neural-performance`, from reviewed `main`.
+Implementation branch: **`codex/milestone-1`**, from reviewed `main` at `d21c4445`.
 This document schedules work; it does not enable new rendering combinations.
+
+All work in this roadmap stays on the milestone branch. Keep its PR in draft
+until review-ready; `ecarmen16` or `eraser851` must manually approve the latest
+changes and perform the merge. No agent merge, auto-merge or direct push to `main`.
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for the local push guard and current
+GitHub enforcement limitation. The planning documents already on `main` do not
+contain the optimization implementation.
 
 ## Priority and intended result
 
