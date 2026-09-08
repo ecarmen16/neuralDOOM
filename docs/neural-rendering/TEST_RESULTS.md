@@ -1215,3 +1215,25 @@ This does not expand binary redistribution approval.
 A bounded Native Release test deliberately made the logfile target a directory.
 The game still executed its config, wrote the completion config and exited 0.
 The optional-log failure no longer terminates startup.
+
+Final package validation used the committed b77ca4ce payload and identical
+engine hashes to the renderer smoke tests above. The single-file EXE verified
+its embedded payload. An actual fresh NR installation completed from an empty
+folder with a verified download cache and owned BFG data; all three installed
+launcher profiles passed ValidateOnly. Package verification rejected a changed
+shader and a path escape, restoring its fixture exactly afterward.
+
+An actual upgrade from the previous 2551d347 Native package also completed,
+preserving a saved-game fixture, saved reconstruction/lighting preferences and
+NR appearance settings. The new setup selection correctly took precedence over
+an older saved Native launch preference for the next launch. The UI worker
+success/failure paths passed against the packaged EXE. Only fixtures were changed;
+the tester's existing installation was not modified.
+
+A combined NR plus all four RTX effects run presented all 173 evaluated frames
+at native 1280x720 with zero rejections. The add-on separately reported successful
+feature-18 neural evaluations. The first harness assertion assumed an exact
+number of rendered frames from console wait ticks; recorded counters establish
+the pass, since rendering and console ticks differ. A subsequent startup check
+confirmed the separate F6/virtual-key-124 bindings. These final helper/documentation
+changes are repackaged from their clean commit; engine binaries are unchanged.

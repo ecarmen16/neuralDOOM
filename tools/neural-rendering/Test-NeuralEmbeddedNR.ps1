@@ -71,7 +71,7 @@ Expect-NRFailure '*Duplicate NR setting*'
 & $launcher -RepoRoot $fixture -Profile NR -PrepareOnly
 if ((Get-FileHash -LiteralPath (Join-Path $fixture 'neuralDoom.exe')).Hash -ne $manifest.sha256) { throw 'NR selected a stale engine.' }
 $prepared = [IO.File]::ReadAllText($ini)
-if ($prepared -ne $config.Replace('NeuralUplift=0', 'NeuralUplift=1').Replace('NREnableUpscaling=1', 'NREnableUpscaling=0').Replace('[OTHER]', "EnableHooks=1`r`nNRToggleKey=117`r`n[OTHER]")) {
+if ($prepared -ne $config.Replace('NeuralUplift=0', 'NeuralUplift=1').Replace('NREnableUpscaling=1', 'NREnableUpscaling=0').Replace('[OTHER]', "EnableHooks=1`r`nNRToggleKey=117`r`nNRScreenshotKey=124`r`n[OTHER]")) {
     throw 'NR configuration changed unrelated tuning or did not disable upscaling.'
 }
 $saved = Get-Content -LiteralPath (Join-Path $fixture 'captures/dogfood/base/neural_dogfood.cfg') -Raw

@@ -4,7 +4,7 @@
 
 1. Run **neuralDoom-Setup-<version>.exe**. Setup detects registered and older default/Desktop installations; Browse can find another. Choose **Upgrade / repair**, **Copy to a new folder**, **New installation**, or **Uninstall**.
 2. Select the destination and your owned **Doom 3 BFG Edition** installation. Upgrades replace program files in place with a rollback backup; a copy imports saves and settings into a separate folder. Your original BFG data remains unchanged.
-3. Choose **NR + DLAA**, **DLAA / DLSS**, or **Native RTX**. Leave DLL fields blank for automatic downloads, or select `nvngx_dlss.dll` / `nvngx_dlssnr.dll` locally. Local DLLs must be x64 with a valid NVIDIA signature. NR downloads the complete pinned compatibility stack, loads ReShade through the engine, and installs no `dxgi.dll` proxy.
+3. Choose **NR + DLAA**, **DLAA / DLSS**, or **Native RTX**. Leave DLL fields blank for automatic downloads, or select `nvngx_dlss.dll` / `nvngx_dlssnr.dll` locally. DLSS SR must have a valid NVIDIA x64 signature; NR must match the tested RHI 310.8.SF-v2 version. NR downloads the complete pinned compatibility stack, loads ReShade through the engine, and installs no `dxgi.dll` proxy.
 4. Review and install. Setup obtains Microsoft prerequisites, verified lighting data, and the chosen neural components. Up to 2.1 GB downloads and about 16 GB free space for a new install; allow 4 GB for an upgrade. No compiler, Git, Python or preinstalled archive tool is required. Windows may request permission for Microsoft prerequisites.
 5. Use the Start menu or desktop shortcut. Setup does not start the game. Its renderer selection applies on the first launch; afterward **Next Launch Profile** in System Options controls the same shortcut.
 
@@ -28,7 +28,7 @@ These defaults occupy keys unused by the normal game. Custom bindings are preser
 | F2 | Moving ray geometry on/off: visible opaque doors, props and characters. Does not toggle the four lighting effects. |
 | F3 | RTX material reflections only. Replaces the old F9 reflection binding. |
 | F4 | RTX diffuse material bounce only. |
-| F5 | Doom quicksave, unchanged. |
+| F5 | Doom quicksave, unchanged. The add-on's separate screenshot shortcut is moved to F13. |
 | F6 | NR on/off in the NR profile; off is full-resolution DLAA passthrough. It does not toggle the RTX lighting. The add-on owns this key and its current effect state. |
 | F7 | Ray-traced ambient occlusion only. |
 | F8 | Ray-traced contact shadows only. |
@@ -36,6 +36,7 @@ These defaults occupy keys unused by the normal game. Custom bindings are preser
 | F10 | Cycle: scene → AO visibility → contacts → bounce → albedo → reflections → reflection roughness → scene. Enable the corresponding effect to see its diagnostic. |
 | F11 | All four lighting effects: if any is on, turn all off; otherwise turn all on. Strengths, ray quality, reconstruction and geometry controls remain unchanged. |
 | F12 | Doom screenshot, unchanged. |
+| F13 | Optional NR comparison screenshot pair, if your keyboard/macro pad provides F13. No longer shares F5. |
 
 System Options also has all four individual lighting toggles, moving/animated geometry, independent reflection/bounce/emissive strengths, Ray Quality, All RTX Lighting, Diagnostic View and Install Free RTX Keys. The latter fills empty keys without replacing custom choices. HDR calibration, HUD/FOV and resolution are in the existing menus. **Doom Lighting Defaults** restores conservative contrast without resetting the rest of your preferences.
 

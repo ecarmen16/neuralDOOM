@@ -679,3 +679,13 @@ as a warning and guards the subsequent flush, avoiding a fatal startup error.
 
 Validation details and remaining manual acceptance are recorded in TEST_RESULTS.md.
 Next task: compare the new presets, resize and NR F6 behavior in a real play session.
+
+Installer verification follow-up: `EmbeddedNR.ps1::Get-NeuralNRFullResolutionConfig`
+sets `NRToggleKey=117` (F6) and `NRScreenshotKey=124` (F13), preserving Doom's
+F5 quicksave. These are decimal Windows virtual keys. The consumer labels F13
+as `0x124` in its banner; this is not a hexadecimal config value. ReShade's
+[typed config API](https://github.com/crosire/reshade/blob/v6.8.0/include/reshade.hpp)
+uses `std::from_chars` with the default decimal base. Setting zero restores the
+consumer's F5 default, so an explicit separate key is necessary. Installer and
+launcher fixtures now verify both keys. The internal guide also distinguishes
+signed DLSS SR selection from the exact tested community NR runtime pin.

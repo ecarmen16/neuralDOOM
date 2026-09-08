@@ -22,7 +22,7 @@ if ($script:downloads.Count -ne 5) { throw 'NR did not obtain all five required 
 if (Test-Path -LiteralPath (Join-Path $fixture 'dxgi.dll')) { throw 'Setup created a DXGI proxy.' }
 $ini = Join-Path $fixture 'reshade.ini'
 $text = [IO.File]::ReadAllText($ini)
-foreach ($key in @('NeuralUplift=1','NREnableUpscaling=0','EnableHooks=1','NRToggleKey=117')) { if (-not $text.Contains($key)) { throw "Missing NR contract: $key" } }
+foreach ($key in @('NeuralUplift=1','NREnableUpscaling=0','EnableHooks=1','NRToggleKey=117','NRScreenshotKey=124')) { if (-not $text.Contains($key)) { throw "Missing NR contract: $key" } }
 [IO.File]::WriteAllText($ini, $text + "NRIntensity=0.75`r`n")
 $script:downloads = @()
 Install-SetupNeuralComponents -RepoRoot $fixture -Profile NR -DlssDllPath (Join-Path $ArchiveCache 'nvngx_dlss.dll') -NRDllPath (Join-Path $fixture 'nvngx_dlssnr.dll')
