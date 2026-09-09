@@ -67,7 +67,8 @@ float3 ReconstructPositionCS( int2 hitPixel )
 	// Load returns 0 for any value accessed out of bounds
 	float depth = texelFetch( t_Depth, hitPixel, 0 ).r;
 
-	float2 uv = hitPixel * pc.rpWindowCoord.xy;
+	// Integer depth fetches represent pixel centers, including reduced inputs.
+	float2 uv = ( float2( hitPixel ) + 0.5f ) * pc.rpWindowCoord.xy;
 
 	// derive clip space from the depth buffer and screen position
 	float3 ndc = float3( uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, depth );

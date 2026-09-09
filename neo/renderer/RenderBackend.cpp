@@ -508,9 +508,10 @@ void idRenderBackend::PrepareStageTexturing( const shaderStage_t* pStage,  const
 			0.0f,  0.0f, 0.0f, 1.0f
 		);
 
-		// should this be the viewport width / height instead?
-		int w = renderSystem->GetWidth();
-		int h = renderSystem->GetHeight();
+		// The DDA walks depth texels in the raster viewport, including reduced
+		// DLSS inputs. Its projection must match rpWindowCoord and SV_Position.
+		int w = viewDef->viewport.GetWidth();
+		int h = viewDef->viewport.GetHeight();
 
 		ALIGNTYPE16 const idRenderMatrix screenScale(
 			w,  0.0f, 0.0f, 0.0f,

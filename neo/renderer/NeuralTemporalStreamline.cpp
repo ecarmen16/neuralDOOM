@@ -163,7 +163,9 @@ public:
 		CopyMatrix( inverseProjection, constants.clipToCameraView );
 		CopyMatrix( clipToPrevClip, constants.clipToPrevClip );
 		CopyMatrix( prevClipToClip, constants.prevClipToClip );
-		constants.jitterOffset = sl::float2( frame.currentJitterPixels.x, frame.currentJitterPixels.y );
+		// R_SetupProjectionMatrix shifts DX12 raster pixels by (+jitter.x, -jitter.y).
+		// Streamline expects that displacement in pixel coordinates, with +Y down.
+		constants.jitterOffset = sl::float2( frame.currentJitterPixels.x, -frame.currentJitterPixels.y );
 		constants.mvecScale = sl::float2( 1.0f / frame.renderWidth, 1.0f / frame.renderHeight );
 		constants.cameraPinholeOffset = sl::float2( 0.0f, 0.0f );
 		constants.cameraPos = ToFloat3( frame.cameraPosition );

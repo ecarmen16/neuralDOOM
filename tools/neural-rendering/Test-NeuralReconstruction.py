@@ -36,6 +36,12 @@ for name in ('ambient_lighting_IBL', 'ambient_lightgrid_IBL'):
     assert 't_Ssao.Sample( s_LinearClamp, screenTexCoord )' in shader, 'Retain filtered/clamped white AO fallback'
 ssr = pathlib.Path('neo/shaders/builtin/legacy/bumpyenvironment2.ps.hlsl').read_text(encoding='utf-8')
 ssr_pixel = re.search(r'texelFetch\( t_ScreenNormals, (.+?), 0 \)\.rgb', ssr).group(1)
+motion = pathlib.Path('neo/shaders/builtin/post/motionBlur.ps.hlsl').read_text(encoding='utf-8')
+motion_pixel = re.search(r'int2 rasterPixel = (.+?);', motion).group(1)
+motion_delta = re.search(r'float2 deltaPos = (.+?);', motion).group(1)
+original_motion_uv = re.search(r't_ViewDepth.Sample\( LinearSampler, (.+?) \)', motion).group(1)
+assert 'texelFetch( t_ViewColor, rasterPixel, 0 ).a' in motion
+assert 'texelFetch( t_ViewDepth, rasterPixel, 0 ).x' in motion
 adjust = menu[menu.index('void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustField'):]
 shim = r'''
 #include <map>
@@ -88,10 +94,13 @@ struct Image { Texture* GetTextureHandle(){return &hdrTexture;} } hdrImage;
 struct Images { Image* currentRenderHDRImage=&hdrImage; } images;
 Images* globalImages=&images;
 using uint=unsigned;
-struct float2 { float x,y; float2(float a,float b):x(a),y(b){} };
+struct float2 { float x,y; float2(float a=0,float b=0):x(a),y(b){} };
 float2 operator/(float2 a,float2 b){return {a.x/b.x,a.y/b.y};}
+float2 operator*(float2 a,float2 b){return {a.x*b.x,a.y*b.y};}
+float2 operator-(float2 a,float2 b){return {a.x-b.x,a.y-b.y};}
 struct int2 { int x,y; explicit int2(float2 p):x(int(p.x)),y(int(p.y)){} };
-struct Fragment { struct { float2 xy; } position; };
+struct Fragment { struct { float2 xy; } position; float2 texcoord0; };
+struct { struct { float2 zw; } rpWindowCoord; } pc;
 struct Gui { void EmitFullScreen(){} void Clear(){} } gui;
 class idRenderSystemLocal {
 public:
@@ -130,6 +139,10 @@ implementation = (
     + ''.join(f'float2 aoCoordinates{index}(Fragment fragment){{{block}return screenTexCoord;}}\n'
               for index, block in enumerate(ao_blocks))
     + 'int2 ssrNormalPixel(Fragment fragment){return ' + ssr_pixel + ';}\n'
+    + 'int2 motionRasterPixel(Fragment fragment){return ' + motion_pixel + ';}\n'
+    + 'float2 cameraMotion(float2 prevTexCoord,Fragment fragment){return ' + motion_delta + ';}\n'
+    + 'int2 originalMotionPixel(Fragment fragment){return int2((' + original_motion_uv
+    + ')*float2(hdrTexture.desc.width,hdrTexture.desc.height));}\n'
 )
 checks = r'''
 void require(bool ok){if(!ok)throw std::runtime_error("reconstruction regression");}
@@ -161,7 +174,7 @@ void checkViewport(){
     sdk=true;
     std::cout<<"PASS: DLSS tagged input coverage for all presets, resize and SDK fallback; legacy crop preserved\n";
 }
-void checkScreenCoordinates(bool originalFullscreen=false){
+void checkScreenCoordinates(bool originalFullscreen=false,bool originalMotion=false){
     // Exercise the actual extracted snapshot and shader expressions, then
     // identify the raster texel reached by arbitrary view-relative samples.
     // This catches stretching a reduced viewport over unrelated allocation pixels.
@@ -182,6 +195,7 @@ void checkScreenCoordinates(bool originalFullscreen=false){
             for(float u : {0.5f/width,0.37f,(width-0.5f)/width})
             for(float v : {0.5f/height,0.61f,(height-0.5f)/height}){
                 Fragment fragment={{{x+u*width,y+v*height}}};
+                fragment.texcoord0={u,v};
                 if(preset){
                     const float sourceX=(box.x+u*box.z)*tr.width;
                     const float sourceY=(box.y+v*box.w)*tr.height;
@@ -196,6 +210,14 @@ void checkScreenCoordinates(bool originalFullscreen=false){
                 }
                 const int2 normal=ssrNormalPixel(fragment);
                 require(normal.x==int(fragment.position.xy.x) && normal.y==int(fragment.position.xy.y));
+                const int2 camera=originalMotion?originalMotionPixel(fragment):motionRasterPixel(fragment);
+                if(camera.x!=normal.x || camera.y!=normal.y)
+                    throw std::runtime_error("camera motion source coordinate regression");
+                pc.rpWindowCoord.zw={float(width),float(height)};
+                const float2 still=cameraMotion(fragment.texcoord0,fragment);
+                require(still.x==0 && still.y==0);
+                const float2 moved=cameraMotion({u-0.031f,v+0.047f},fragment);
+                require(std::abs(moved.x+0.031f*width)<0.001f && std::abs(moved.y-0.047f*height)<0.001f);
             }
         }
         for(int backend : {0,1,2}){
@@ -204,11 +226,14 @@ void checkScreenCoordinates(bool originalFullscreen=false){
             require(box.x==0 && box.y==0 && box.z==1 && box.w==1);
         }
     }
-    std::cout<<"PASS: screen snapshot, AO and SSR raster coordinates for native, all DLSS presets, offsets and resize; other backends unchanged\n";
+    std::cout<<"PASS: screen snapshot, AO, SSR and camera-motion raster coordinates for native, all DLSS presets, offsets and resize; other backends unchanged\n";
 }
 int main(int argc,char** argv){try{
 if(argc>1 && std::string(argv[1])=="--original-fullscreen-source"){
     checkScreenCoordinates(true);return 0;
+}
+if(argc>1 && std::string(argv[1])=="--original-motion-source"){
+    checkScreenCoordinates(false,true);return 0;
 }
 require(R_NeuralReconstructionMode()==1);
 for(int nr=0;nr<=1;++nr){
@@ -253,3 +278,6 @@ with tempfile.TemporaryDirectory(prefix='neuraldoom-reconstruction-') as directo
     original = subprocess.run([str(exe), '--original-fullscreen-source'], capture_output=True, text=True)
     assert original.returncode != 0 and 'screen snapshot coordinate regression' in original.stderr, 'Original full-allocation snapshot must fail'
     print('PASS: negative control rejects the original fullscreen source region')
+    original_motion = subprocess.run([str(exe), '--original-motion-source'], capture_output=True, text=True)
+    assert original_motion.returncode != 0 and 'camera motion source coordinate regression' in original_motion.stderr, 'Original view-relative depth lookup must fail'
+    print('PASS: negative control rejects the original camera-motion depth lookup')

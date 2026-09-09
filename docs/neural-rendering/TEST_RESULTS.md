@@ -1478,3 +1478,76 @@ resolution before accepting this branch for a PR. The reproduced screen-coordina
 artifact is resolved; general visual acceptance remains pending.
 Reproduce the older intermittent F11 black-surface case separately; the composition
 correction may help it, but the saved-camera toggle check did not establish that.
+
+## 2026-09-08 - Reduced-input material pulsing and temporal-coordinate corrections
+
+The next playtest reported floor/material bulging and pulsing that increased from
+Quality toward Performance. Source inspection identified three concrete input
+errors; visual acceptance is separate from successful SDK evaluation.
+
+- `NeuralTemporalStreamline.cpp::idStreamlineNeuralTemporalBackend::Evaluate`
+  converts the engine jitter's Y sign when setting `sl::Constants::jitterOffset`.
+  The actual `GLMatrix.cpp::R_SetupProjectionMatrix` moves DX12 raster samples by
+  `(jitter.x, -jitter.y)`, while the adapter had reported `(jitter.x, jitter.y)`.
+  The adapter now reports the measured displacement in input pixels, +X right,
+  +Y down. Projection, jitter sequence, native TAA and shared frame metadata are
+  unchanged. NVIDIA's [sample projection](https://github.com/NVIDIA-RTX/Streamline_Sample/blob/main/donut/src/engine/View.cpp)
+  and [Streamline constants](https://github.com/NVIDIA-RTX/Streamline_Sample/blob/main/src/StreamlineSample.cpp)
+  confirm that its reported jitter agrees with raster displacement.
+- `builtin/post/motionBlur.ps.hlsl`, `VECTORS_ONLY` permutation, now fetches
+  camera-motion depth and alpha from the absolute raster pixel instead of
+  stretching input-view UVs over output-sized textures. Clip/reprojection UVs
+  remain input-relative; previous-minus-current motion is multiplied by input
+  dimensions so viewport origins cancel. Ordinary motion blur retains its
+  previous sampling. The wrong depth was especially harmful to camera-translation
+  parallax on nearby surfaces at reduced resolution.
+- `RenderBackend.cpp::PrepareStageTexturing`, `TG_REFLECT_CUBE`, builds the SSR
+  DDA projection from the raster viewport dimensions rather than display size.
+  `builtin/legacy/bumpyenvironment2.ps.hlsl::ReconstructPositionCS` reconstructs
+  integer depth fetches at pixel centers. At half input size, the previous
+  projection could start a ray twice as far across the depth texture; the
+  half-pixel reconstruction error was also amplified in output pixels.
+- Resource formats and sizes remain HDR/output RGBA16F, motion RG16F, masks R8,
+  and existing device-depth storage. No runtime, SDK, dependency, texture pack,
+  jitter pattern, sharpening or mip-bias changes.
+
+Validation:
+
+- `Test-NeuralJitter.py` executes the actual projection method, eight-point
+  jitter table and adapter statement: 192 raster/metadata checks pass across
+  native/all presets, resize and depth; the original Y sign fails.
+- `Test-NeuralReconstruction.py` additionally executes camera-motion fetch and
+  displacement expressions with nonzero viewport origins; the old normalized
+  depth lookup fails its negative control. `Test-SSRCoordinates.py` executes
+  the actual projection block and shader reconstruction: 240 pixel-center round
+  trips pass; old display-size projection and corner reconstruction each fail.
+- DX12 configured with RT ON using `Configure-RBDOOM-DX12.ps1`; SDK ON/OFF
+  RelWithDebInfo and Release builds passed with `Build-RBDOOM.ps1 -Configuration
+  <config> -Parallel 16`. SDK builds also passed after the final jitter change.
+- Independent focused review and `git diff --check` passed. SDK-on
+  RelWithDebInfo smoke passed the DLAA/Quality/Balanced/Performance matrix with
+  all four ray effects and rollback; SDK-off RelWithDebInfo native/effects-off
+  smoke passed. No performance claim is made from those runs.
+- Captured eight settled floor frames at five-frame intervals, 2560x720 output
+  and Performance 1280x360 input, before/after with NR off and on. The same copied
+  Mars City quicksave, camera position and 65-degree pitch were used. All four
+  valid sequences had zero reconstruction rejections; NR consumer evaluations
+  succeeded. An initial zero-evaluation/black capture was rejected, and initial
+  cinematic captures were excluded from floor comparisons.
+- In the central floor ROI, a local linear registration estimate (3x4 patches,
+  Gaussian radius 2, brightness-offset term) measured RMS inter-frame drift
+  falling from 2.17 to 0.067 output pixels with NR off, and 2.14 to 0.083 with NR
+  on. Estimated p95 drift fell from about 4.2 pixels to 0.12/0.15. These are
+  image-based estimates over eight frames, not geometric ground truth or a claim
+  about every material. The baseline showed coherent vertical oscillation;
+  corrected frame sequences retained stable floor structure. Filmic intensity
+  0.3 and stochastic ray lighting were retained, so residual pixel variation
+  is expected and zero-noise output is not claimed.
+- Evidence and the local capture/analysis scripts are isolated under ignored
+  `captures/neural/temporal-floor-*` and `pulse-fix-*`. Installed executable,
+  configuration, runtime and save-source hashes remained intact during testing.
+
+Next: verify the repaired build during camera movement at the player's display
+resolution, especially the originally reported materials. NR-specific material
+interpretation may still vary at lower input resolutions. The older F11
+black-surface report remains a separate open issue.
