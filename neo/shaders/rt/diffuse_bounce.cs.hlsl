@@ -59,7 +59,10 @@ void main(uint3 tid : SV_DispatchThreadID)
         float3 radiance = hitAlbedo * Incident(hit, hitNormal) + emission * Options.z;
         float3 cached;
         float cacheWeight = CachedRadiance(hit, cached);
-        radiance = lerp(radiance, cached + emission * max(Options.z - 1, 0), cacheWeight);
+        // Normal lighting samples before generic emissives; late diagnostics
+        // retain the completed-scene cache, which already includes one copy.
+        float cachedEmissionScale = AtlasOptions.y == 0 ? Options.z : max(Options.z - 1, 0);
+        radiance = lerp(radiance, cached + emission * cachedEmissionScale, cacheWeight);
         if (sampled && cacheWeight > 0) InterlockedAdd(Stats[6], 1);
         if (sampled && any(emission > 1e-4)) InterlockedAdd(Stats[7], 1);
         // Limit rare bright emissive fireflies while retaining HDR values above 1.

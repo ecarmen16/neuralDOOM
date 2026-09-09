@@ -94,9 +94,12 @@ void main(uint3 tid : SV_DispatchThreadID)
         float3 hit = ray.Origin + direction * reflected.CommittedRayT();
         float3 cached;
         float cacheWeight = CachedRadiance(hit, cached);
-        float3 radiance = cached;
-        // Skip the authored-light loop when the complete native shading is available.
-        if (cacheWeight < 0.999) radiance = lerp(hitAlbedo * Incident(hit, hitNormal) + emission, cached, cacheWeight);
+        // Normal lighting precedes generic emissives; late diagnostics already
+        // have their visible emission in the completed-scene cache.
+        float3 cachedEmission = AtlasOptions.y == 0 ? emission : 0;
+        float3 radiance = cached + cachedEmission;
+        // Skip the authored-light loop when native interaction shading is available.
+        if (cacheWeight < 0.999) radiance = lerp(hitAlbedo * Incident(hit, hitNormal) + emission, radiance, cacheWeight);
         if (any(!isfinite(radiance))) { InterlockedAdd(Stats[5], 1); continue; }
         radiance = max(radiance, 0);
         radiance *= min(1.0, 16.0 / max(1e-5, max(max(radiance.r, radiance.g), radiance.b)));

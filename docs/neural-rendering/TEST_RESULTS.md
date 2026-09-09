@@ -1401,3 +1401,80 @@ to a separate local folder. No proprietary assets/runtimes entered source contro
 Next: playtest the corrected branch build, especially live F1/F6 changes and
 moving scenes at the user's output resolution; then measure median/p95 frame
 times under OPT-001. No measured speedup or general visual acceptance is claimed.
+
+## 2026-09-08 - Glass composition and reduced-input screen-material regressions
+
+The first playtest reported newly unstable emissive/reflected lighting and
+opaque-looking glass/exhaust effects. The player clarified that intermittent
+black surfaces with F11 also occurred in the previous stable build: that older
+issue is tracked separately and is not claimed resolved here. Inspection found
+two independent defects; these were not attributed to the texture pack.
+
+- `RenderBackend.cpp::DrawViewInternal` previously replaced captured opaque probe
+  specular after generic transparency and fog had attenuated that probe in HDR.
+  Subtracting the original, unattenuated probe could clamp to black; adding bounce
+  at that point also bypassed foreground transmission. Normal
+  `R_RenderRayTracedGI` now executes immediately after `DrawInteractions`, before
+  SSR snapshots, generic materials, fog and refraction. Its `debugPass` argument
+  in `RenderCommon.h` and `RayTracingDiagnostic.cpp` preserves late F10 diagnostic
+  output while selecting exactly one lighting dispatch. Graphics state is
+  invalidated after lighting, including the copy-only failure fallback.
+- `rt/diffuse_bounce.cs.hlsl` and `rt/reflections.cs.hlsl` add supported material
+  emission to the earlier interaction-color cache exactly once. Late diagnostic
+  cache accounting remains unchanged; `rt/ray_materials.hlsli` documents the
+  cache boundary. `GatherStaticWorld` excludes subview/mirror materials, matching
+  existing dynamic-geometry coverage.
+- In backend 3, both `_currentRender` blits now crop their source to the actual
+  DLSS input viewport and expand it over the existing output-sized snapshot.
+  Legacy screen-color consumers therefore retain view-relative normalized UVs.
+  `builtin/legacy/bumpyenvironment2.ps.hlsl` instead fetches screen normals at
+  absolute raster pixels. Both `builtin/lighting/ambient*_IBL.ps.hlsl` shaders
+  normalize AO coordinates by the AO texture dimensions, preserving the clamped
+  white-texture fallback. The new SSAO and RT AO producers already wrote absolute
+  input-viewport pixels into the output-sized AO allocation.
+- No resource format, motion/jitter convention, SDK/runtime pin or dependency
+  changes. Main DLSS input remains zero-origin; full-size native/DLAA snapshot
+  selection is unchanged. Legacy SSAO (`r_useNewSsaoPass=0`) and its fullscreen
+  debug display are separate reduced-resolution follow-ups.
+
+Validation:
+
+- Configured DX12/RT ON with `Configure-RBDOOM-DX12.ps1`, then built SDK ON/OFF
+  RelWithDebInfo and Release using `Build-RBDOOM.ps1 -Configuration <config>
+  -Parallel 16`: all four passed.
+- `Test-RayLightingComposition.py` executes source-derived composition and
+  emission expressions: 18 glass/fog energy cases, single-dispatch debug routing
+  and cached/offscreen emission cases pass; deliberate broken ordering/emission
+  mutations fail. `Test-NeuralReconstruction.py` executes the actual snapshot
+  crop and AO/SSR coordinate snippets across presets, resize and viewport offsets;
+  the original fullscreen-snapshot negative control fails as expected.
+- Independent focused review and `git diff --check` passed.
+- At the same copied Mars City quicksave, a 2560x720 DLSS Quality baseline
+  (1707x480 input) showed a duplicated smaller scene rectangle even with RTX off.
+  The repaired Release build removes it with RTX both off and on. All six
+  DLAA/Quality off/on/off captures retain the same frozen view position; backend
+  and RT state checks pass with zero rejected DLSS frames and invalid ray outputs.
+  Animated shading still varies, so off-return captures are not claimed identical.
+- SDK-on RelWithDebInfo smoke passed all four effects, their history resets and
+  off/on recovery, plus the seven F10 modes. SDK-off RelWithDebInfo native smoke
+  passed with effects disabled. The first diagnostic run hit a stale test
+  expectation for the old raw F4 binding; `Test-NeuralDoom-Smoke.ps1` now expects
+  the shipped `rayTracingBounceToggle` command. All seven diagnostic captures
+  were present in that run, and the corrected full check passed on rerun.
+- Separate Release NR runs passed DLAA, Quality, Balanced and Performance at
+  1280x720 output, with respectively 466/477/477/477 presented engine frames and
+  zero rejections. Every process logged successful consumer evaluations at
+  counts 1 and 60. Inputs were 1280x720, 853x480, 742x418 and 640x360; NR retained
+  output-sized reconstructed color and input-sized guides. These are correctness
+  checks on RTX 5090 / driver 616.64, not performance measurements.
+- Evidence remains in ignored `captures/neural/material-*` folders. Player saves
+  and settings were copied for testing, and their source hashes remained intact.
+
+Known limit: additive translucent per-light interactions still enter the early
+radiance cache; generic alpha, fog and screen-warp stages now follow composition.
+This remains a hybrid one-bounce renderer with limited material coverage. Next:
+re-test the reported glass, mirrors and ship exhaust in live motion at the player's
+resolution before accepting this branch for a PR. The reproduced screen-coordinate
+artifact is resolved; general visual acceptance remains pending.
+Reproduce the older intermittent F11 black-surface case separately; the composition
+correction may help it, but the saved-camera toggle check did not establish that.

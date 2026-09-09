@@ -208,9 +208,10 @@ void main( PS_IN fragment, out PS_OUT result )
 	//diffuseColor = float3( 1.0, 1.0, 1.0 );
 	//diffuseColor = float3( 0.0, 0.0, 0.0 );
 
-	// calculate the screen texcoord in the 0.0 to 1.0 range
-	//float2 screenTexCoord = vposToScreenPosTexCoord( fragment.position.xy );
-	float2 screenTexCoord = fragment.position.xy * pc.rpWindowCoord.xy;
+	// AO uses absolute raster pixels in an output-sized texture, including DLSS input views.
+	uint aoWidth, aoHeight;
+	t_Ssao.GetDimensions( aoWidth, aoHeight );
+	float2 screenTexCoord = fragment.position.xy / float2( aoWidth, aoHeight );
 
 	ao = min( ao,  t_Ssao.Sample( s_LinearClamp, screenTexCoord ).r );
 

@@ -487,7 +487,7 @@ static bool GatherStaticWorld( const idRenderWorldLocal* world, std::vector<idVe
 			const srfTriangles_t* tri = surface ? surface->geometry : nullptr;
 			const idMaterial* material = surface ? surface->shader : nullptr;
 			if( !tri || !material || !material->IsDrawn() || material->Coverage() != MC_OPAQUE ||
-				material->Deform() != DFRM_NONE || material->IsPortalSky() ||
+				material->Deform() != DFRM_NONE || material->HasSubview() || material->IsPortalSky() ||
 				( shadowCastersOnly && ( !material->SurfaceCastsShadow() || material->TestMaterialFlag( MF_NOSELFSHADOW ) ) ) )
 			{
 				excluded++;
@@ -1201,8 +1201,10 @@ public:
 		cb.atlasOptions = idVec4( materials.size() * 2, r_rayTracingDebug.GetInteger(), 0, 0 );
 		list->writeBuffer( constants, &cb, sizeof( cb ) );
 		list->clearBufferUInt( stats, 0 );
-		// Reuse complete native material shading at visible ray hits, including
-		// probes and normal maps. Snapshot before adding GI prevents feedback.
+		// Normal lighting reuses native interactions, including probes and normal
+		// maps, before generic alpha, emissive, fog and screen-warp stages. The
+		// shaders add supported emissives explicitly. Diagnostics retain their
+		// late completed-scene snapshot. Snapshot before GI prevents feedback.
 		list->copyTexture( surfaceRadiance, nvrhi::TextureSlice(), color, nvrhi::TextureSlice() );
 		if( r_rayTracedGI.GetBool() )
 		{
@@ -1735,9 +1737,12 @@ bool R_BeginRayTracedReflections( nvrhi::ICommandList* list, const viewDef_t* vi
 #endif
 }
 
-bool R_RenderRayTracedGI( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color )
+bool R_RenderRayTracedGI( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color, bool debugPass )
 {
 #if defined( USE_RAYTRACING )
+	// Exactly one placement runs: normal lighting precedes alpha/fog; debug
+	// views replace the completed scene. Reject before any allocation or work.
+	if( debugPass != ( r_rayTracingDebug.GetInteger() != 0 ) ) { return false; }
 	if( !r_rayTracedGI.GetBool() && !r_rayTracedReflections.GetBool() ) { return false; }
 	RayTracedLighting* lighting = PrepareRayTracedLighting( list, view, color );
 	if( !lighting || ( !r_rayTracedGI.GetBool() && !lighting->HasReflectionCapture( view ) ) ) { return false; }

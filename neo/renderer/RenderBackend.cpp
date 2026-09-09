@@ -6321,8 +6321,28 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	DrawInteractions( _viewDef );
 
 	//-------------------------------------------------
+	// replace opaque probe lighting before glass, particles, fog and refraction
+	//-------------------------------------------------
+	if( R_RenderRayTracedGI( commandList, _viewDef, globalImages->currentDepthImage->GetTextureHandle(), globalImages->currentRenderHDRImage->GetTextureHandle() ) )
+	{
+		// Also restore graphics resource tracking if reflection setup failed
+		// after copying HDR but before recording a compute dispatch.
+		commandList->clearState();
+		currentVertexBuffer = nullptr;
+	}
+
+	//-------------------------------------------------
 	// resolve the screen for SSR
 	//-------------------------------------------------
+	idVec4 currentRenderSourceBox( 0.0f, 0.0f, 1.0f, 1.0f );
+	if( _viewDef->neuralBackendMode == 3 )
+	{
+		// Legacy screen materials address _currentRender in view-relative UVs.
+		// DLSS renders into a smaller rectangle of the output-sized HDR image.
+		const nvrhi::TextureDesc& sourceDesc = globalImages->currentRenderHDRImage->GetTextureHandle()->getDesc();
+		currentRenderSourceBox.Set( ( float )_viewDef->viewport.x1 / sourceDesc.width, ( float )_viewDef->viewport.y1 / sourceDesc.height,
+			( float )_viewDef->viewport.GetWidth() / sourceDesc.width, ( float )_viewDef->viewport.GetHeight() / sourceDesc.height );
+	}
 	if( is3D && r_useSSR.GetBool() && R_UseHiZ() )
 	{
 		OPTICK_GPU_EVENT( "Resolve_Screen4SSR" );
@@ -6340,6 +6360,7 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 			BlitParameters blitParms;
 			nvrhi::IFramebuffer* currentFB = ( nvrhi::IFramebuffer* )currentFrameBuffer->GetApiObject();
 			blitParms.sourceTexture = currentFB->getDesc().colorAttachments[0].texture;
+			blitParms.sourceBox = currentRenderSourceBox;
 			blitParms.targetFramebuffer = globalFramebuffers.postProcFBO->GetApiObject(); // _currentRender image
 			blitParms.targetViewport = nvrhi::Viewport( renderSystem->GetWidth(), renderSystem->GetHeight() );
 			commonPasses.BlitTexture( commandList, blitParms, &bindingCache );
@@ -6412,6 +6433,7 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 			BlitParameters blitParms;
 			nvrhi::IFramebuffer* currentFB = ( nvrhi::IFramebuffer* )currentFrameBuffer->GetApiObject();
 			blitParms.sourceTexture = currentFB->getDesc().colorAttachments[0].texture;
+			blitParms.sourceBox = currentRenderSourceBox;
 			blitParms.targetFramebuffer = globalFramebuffers.postProcFBO->GetApiObject(); // _currentRender image
 			blitParms.targetViewport = nvrhi::Viewport( renderSystem->GetWidth(), renderSystem->GetHeight() );
 			commonPasses.BlitTexture( commandList, blitParms, &bindingCache );
@@ -6460,8 +6482,11 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	//-------------------------------------------------
 	DrawMotionVectors();
 
-	if( R_RenderRayTracedGI( commandList, _viewDef, globalImages->currentDepthImage->GetTextureHandle(), globalImages->currentRenderHDRImage->GetTextureHandle() ) )
+	// Diagnostic lighting replaces the completed scene so later material stages
+	// do not obscure F10 views. Normal lighting ran before those stages above.
+	if( R_RenderRayTracedGI( commandList, _viewDef, globalImages->currentDepthImage->GetTextureHandle(), globalImages->currentRenderHDRImage->GetTextureHandle(), true ) )
 	{
+		commandList->clearState();
 		currentVertexBuffer = nullptr;
 	}
 	if( R_RenderRayTracingDebug( commandList, _viewDef, globalImages->ambientOcclusionImage[0]->GetTextureHandle(), globalImages->currentRenderHDRImage->GetTextureHandle() ) )

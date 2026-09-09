@@ -329,7 +329,8 @@ void main( PS_IN fragment, out PS_OUT result )
 	globalNormal.y = dot3( localNormal, fragment.texcoord3 );
 	globalNormal.z = dot3( localNormal, fragment.texcoord4 );
 
-	float3 screenNormalWS = ( ( 2.0 * t_ScreenNormals.Sample( s_LinearClamp, fragment.position.xy * pc.rpWindowCoord.xy ).rgb ) - 1.0 );
+	// Normals share raster pixel coordinates, even when the DLSS viewport is smaller than the texture.
+	float3 screenNormalWS = ( ( 2.0 * texelFetch( t_ScreenNormals, int2( fragment.position.xy ), 0 ).rgb ) - 1.0 );
 
 	// https://blog.selfshadow.com/publications/blending-in-detail/
 
