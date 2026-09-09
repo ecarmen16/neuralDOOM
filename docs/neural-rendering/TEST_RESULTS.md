@@ -1608,10 +1608,12 @@ choices. `Test-SystemOptionsSelection.py` passed 544 selections including the
 last row; `Test-SettingsRelaunch.py` passed path quoting and repeated restart
 cases. Their original arrow/replay behaviors fail the negative controls.
 
-DX12 configured with RT ON in SDK ON/OFF trees; RelWithDebInfo builds passed
-before the final small repeated-restart marker addition. Final build/package
-results are recorded below when complete. No shaders, resource formats,
-coordinate conventions, renderer passes or dependencies changed.
+DX12 configured with `Configure-RBDOOM-DX12.ps1 -RayTracing ON` in SDK ON/OFF
+trees. All four final builds passed with `Build-RBDOOM.ps1 -Configuration
+<RelWithDebInfo|Release> -Parallel 16`, including the repeated-restart marker.
+Release packaging uses the existing allowlisted `Build-InternalPackage.py`
+workflow and matching clean source/build manifests. No shaders, resource
+formats, coordinate conventions, renderer passes or dependencies changed.
 
 One isolated SDK runtime attempt exited before its completion marker; its log
 also reported missing game resources/fonts. This is not a passed reset test.
