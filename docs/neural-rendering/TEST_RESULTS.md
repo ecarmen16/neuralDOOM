@@ -1347,3 +1347,57 @@ Next checks (in a separate branch build/test installation):
    save/load and relaunch persistence. Obtain manual visual acceptance.
 4. Measure Release frame times against the DLAA baseline using the performance
    plan. Keep the branch unmerged and the published installer unchanged meanwhile.
+
+## 2026-09-08 - Milestone 1 local build and DLSS viewport correction
+
+Built branch `codex/milestone-1` from `4587dcfb` for a separate local playtest.
+Initial SDK counters accepted all presets, but visual inspection exposed a real
+viewport mismatch: the legacy crop anchored reduced input to the bottom of the
+texture while Streamline tagged input starting at `(0, 0)`. At 1280x720 output,
+Quality consumed 240 blank rows out of 480; Balanced consumed 302 out of 418.
+Successful SDK evaluation alone did not establish a correct image.
+
+- `neo/renderer/RenderWorld.cpp::idRenderWorldLocal::RenderScene` now selects the
+  existing explicit zero-origin crop overload for backend 3. Native TAA, DLAA,
+  irradiance captures and legacy resolution scaling retain their existing paths.
+  Formats, motion sign/units, jitter and output dimensions are unchanged; the
+  rendered color/depth/motion/mask region now agrees with the tagged input extent.
+- `tools/neural-rendering/Test-NeuralReconstruction.py` executes the actual crop
+  and viewport-routing bodies. All 24 DLSS input-coverage cases and 24 legacy
+  cases pass, including NR profiles, resize and unavailable SDK. Injecting the
+  original crop in memory makes the regression fail.
+- Configure: `Configure-RBDOOM-DX12.ps1 -BuildDirectory <sdk-or-native-tree>
+  -RayTracing ON`, retaining the existing pinned SDK ON/OFF cache settings.
+  Build: `Build-RBDOOM.ps1 -BuildDirectory <tree> -Configuration
+  <RelWithDebInfo-or-Release> -Parallel 16`. All four builds passed, including
+  rebuilds after the crop correction. No new dependency or runtime pin was added.
+- Focused review and launcher/preparation, reconstruction, safe-key, menu
+  selection and SWF lifetime regressions passed. Launch-picker tests used the
+  packaged Windows PowerShell 5.1 shell; PowerShell 7's WinForms compilation
+  environment lacks an assembly reference for that test.
+- GPU temporal transitions and synthetic static/dynamic ray checks passed.
+  After the correction, the Release SDK preset matrix with all four RTX effects
+  and the SDK-off RelWithDebInfo native smoke passed. One earlier native smoke
+  under compilation load missed its primary-view count threshold; deterministic
+  fixed-tic smoke reruns passed. These runs are correctness checks, not benchmarks.
+- Corrected Release NR runs on RTX 5090 / driver 616.64 completed at 1280x720
+  output: DLAA 341, Quality 477, Balanced 199 and Performance 476 presented engine
+  frames, each with zero rejections and exit 0. Input extents were respectively
+  1280x720, 853x480, 742x418 and 640x360. Each separate process logged successful
+  inline NR evaluations at counts 1 and 60. NR processed 1280x720 reconstructed
+  color with guides at the selected input extent; `NREnableUpscaling=0` remained
+  unchanged. NR processing itself did not become lower-resolution.
+- Inspected pre/post-fix scene captures: reduced-resolution SDK output now fills
+  the image. NR captures are retained for the local playtest. Full motion, F1/F6,
+  ultrawide, resize, save/load and artistic acceptance remain human checks.
+
+Evidence is local and ignored: `captures/neural/milestone1-*.log`, plus isolated
+`smoke-*` and `nr-milestone-*` folders in the playtest installation. The prerequisite
+script incorrectly included `.gitmodules` from ignored research archives; direct
+`git submodule status --recursive` verified all four actual engine submodules.
+The normal installed game was not modified; data, runtimes and saves were copied
+to a separate local folder. No proprietary assets/runtimes entered source control.
+
+Next: playtest the corrected branch build, especially live F1/F6 changes and
+moving scenes at the user's output resolution; then measure median/p95 frame
+times under OPT-001. No measured speedup or general visual acceptance is claimed.

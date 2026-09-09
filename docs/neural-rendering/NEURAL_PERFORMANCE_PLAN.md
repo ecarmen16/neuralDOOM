@@ -2,9 +2,11 @@
 
 Planning checkpoint: 2026-09-07. Tested release baseline: `internal-d16dab5e`.
 Implementation branch: **`codex/milestone-1`**, from reviewed `main` at `d21c4445`.
-Source checkpoint: NR + DLSS preset controls are implemented but unbuilt and
-untested. Builds, runtime validation and baseline measurements are deferred to
-the next testing session; the published release and player installation are unchanged.
+2026-09-08 checkpoint: SDK/native builds and bounded NR preset checks passed after
+correcting the DLSS input viewport origin. NR consumed full-output color with
+reduced-input guides in Quality, Balanced and Performance at 1280x720 output.
+Manual playtesting and baseline measurements remain pending. The branch build is
+staged separately; the published release and existing player installation are unchanged.
 
 All work in this roadmap stays on the milestone branch. Implement, review and
 playtest before opening a PR; `ecarmen16` or `eraser851` must manually approve the latest

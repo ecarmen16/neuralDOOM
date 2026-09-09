@@ -1,8 +1,9 @@
 # neuralDoom internal RTX test build
 
-Milestone 1 source adds experimental NR + DLSS controls. Builds and runtime tests
-are pending; the published `internal-d16dab5e` installer still has NR + DLAA only.
-Use a separate branch build/test installation when validation resumes.
+Milestone 1 adds experimental NR + DLSS controls. Branch builds, control tests and
+bounded NR preset runs passed on 2026-09-08 after correcting the input viewport.
+Use the separate branch playtest installation for visual/motion acceptance and
+performance feedback. The published `internal-d16dab5e` installer remains unchanged.
 
 ## Install or manage
 

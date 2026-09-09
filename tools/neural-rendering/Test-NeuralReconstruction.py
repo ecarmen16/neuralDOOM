@@ -1,4 +1,4 @@
-"""Exercise the shipped reconstruction controls without loading a renderer or SDK."""
+"""Exercise reconstruction controls and input viewport coverage without a GPU or SDK."""
 import pathlib
 import subprocess
 import tempfile
@@ -17,6 +17,8 @@ def body(source, signature):
 temporal = pathlib.Path('neo/renderer/NeuralTemporal.cpp').read_text(encoding='utf-8')
 controls = pathlib.Path('neo/renderer/RayTracingDiagnostic.cpp').read_text(encoding='utf-8')
 menu = pathlib.Path('neo/d3xp/menus/MenuScreen_Shell_SystemOptions.cpp').read_text(encoding='utf-8')
+world = pathlib.Path('neo/renderer/RenderWorld.cpp').read_text(encoding='utf-8')
+render_system = pathlib.Path('neo/renderer/RenderSystem.cpp').read_text(encoding='utf-8')
 adjust = menu[menu.index('void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustField'):]
 shim = r'''
 #include <map>
@@ -42,19 +44,78 @@ struct Commands {
     }
 } commands;
 Commands* cmdSystem=&commands;
-struct Common { void Printf(const char*, ...){} } commonInstance;
+struct Common {
+    void Printf(const char*, ...){}
+    void Error(const char*){throw std::runtime_error("invalid crop");}
+} commonInstance;
 Common* common=&commonInstance;
 bool sdk=true;
 bool R_StreamlineIsDLSSSupported(){return sdk;}
+struct idScreenRect { int x1=0, y1=0, x2=0, y2=0; };
+struct Gui { void EmitFullScreen(){} void Clear(){} } gui;
+class idRenderSystemLocal {
+public:
+    idScreenRect renderCrops[2];
+    int currentRenderCrop=0, width=1280, height=720;
+    Gui* guiModel=&gui;
+    bool IsInitialized(){return true;}
+    int GetWidth(){return width;}
+    int GetHeight(){return height;}
+    void PerformResolutionScaling(int&, int&){}
+    void GetCroppedViewport(idScreenRect* viewport){*viewport=renderCrops[currentRenderCrop];}
+    void CropRenderSize(int width, int height);
+    void CropRenderSize(int x, int y, int width, int height, bool topLeftAncor);
+} tr;
+CVar r_screenFraction;
+struct View { int neuralBackendMode, neuralDLSSQuality; idScreenRect viewport; };
+int requestedWidth=853, requestedHeight=480;
+bool R_StreamlineDLSSRenderSize(int, int, int& width, int& height, int){
+    if(!sdk)return false;
+    width=requestedWidth; height=requestedHeight; return true;
+}
 '''
 implementation = (
     'int R_NeuralReconstructionMode()' + body(temporal, 'int R_NeuralReconstructionMode()') + '\n'
     'bool R_SetNeuralReconstructionMode(int mode)' + body(temporal, 'bool R_SetNeuralReconstructionMode(') + '\n'
     'void toggle()' + body(controls, 'CONSOLE_COMMAND_SHIP( neuralReconstructionToggle,') + '\n'
     'void adjust(int adjustAmount)' + body(adjust, 'if( fieldIndex == SYSTEM_FIELD_RECONSTRUCTION )') + '\n'
+    'void idRenderSystemLocal::CropRenderSize(int width, int height)'
+    + body(render_system, 'void idRenderSystemLocal::CropRenderSize( int width, int height )') + '\n'
+    'void idRenderSystemLocal::CropRenderSize(int x, int y, int width, int height, bool topLeftAncor)'
+    + body(render_system, 'void idRenderSystemLocal::CropRenderSize( int x, int y, int width, int height, bool topLeftAncor )') + '\n'
+    'void cropView(View* parms){int windowWidth=tr.GetWidth(), windowHeight=tr.GetHeight();'
+    + body(world, 'else\n\t{\n\t\t// Explicit DLSS presets own the input extent') + '}\n'
 )
 checks = r'''
 void require(bool ok){if(!ok)throw std::runtime_error("reconstruction regression");}
+void checkViewport(){
+    // The SDK tags [0, renderWidth) x [0, renderHeight). Every tagged pixel
+    // must belong to the raster viewport, including reduced input and resize.
+    for(int scale : {1,2})for(int nr : {0,1})for(bool available : {false,true}){
+        tr.width=1280*scale;tr.height=720*scale;
+        vars.values["r_neuralCompatibilityEnable"]=nr;sdk=available;
+        const int widths[]={853,742,640}, heights[]={480,418,360};
+        for(int quality=0;quality<3;++quality){
+            requestedWidth=widths[quality]*scale;requestedHeight=heights[quality]*scale;
+            tr.currentRenderCrop=0;tr.renderCrops[0]={0,0,tr.width-1,tr.height-1};
+            r_screenFraction.value=50; // DLSS must own its input extent.
+            View view={3,quality,{}};cropView(&view);
+            const int width=available?requestedWidth:tr.width, height=available?requestedHeight:tr.height;
+            require(view.viewport.x1==0 && view.viewport.y1==0);
+            require(view.viewport.x2==width-1 && view.viewport.y2==height-1);
+        }
+        // Native/DLAA behavior must preserve the previous crop policy.
+        for(int backend : {0,1,2}){
+            tr.currentRenderCrop=0;tr.renderCrops[0]={0,0,tr.width-1,tr.height-1};
+            View view={backend,0,{}};cropView(&view);
+            const bool scaled=backend!=2 && !nr;
+            require(view.viewport.x1==0 && view.viewport.y1==(scaled?tr.height/2:0));
+            require(view.viewport.x2==(scaled?tr.width/2:tr.width)-1 && view.viewport.y2==tr.height-1);
+        }
+    }
+    sdk=true;
+    std::cout<<"PASS: DLSS tagged input coverage for all presets, resize and SDK fallback; legacy crop preserved\n";
+}
 int main(){try{
 require(R_NeuralReconstructionMode()==1);
 for(int nr=0;nr<=1;++nr){
@@ -85,6 +146,7 @@ for(int nr=0;nr<=1;++nr){
 }
 require(!R_SetNeuralReconstructionMode(0)); // NR must not silently bypass its evaluation trigger.
 std::cout<<"PASS: independent preferences, mode mapping, history reset, menu/key cycling and unavailable-SDK no-op\n";
+checkViewport();
 }catch(const std::exception&e){std::cerr<<e.what();return 1;}}
 '''
 with tempfile.TemporaryDirectory(prefix='neuraldoom-reconstruction-') as directory:

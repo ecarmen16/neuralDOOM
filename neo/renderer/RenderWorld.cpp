@@ -1077,7 +1077,15 @@ void idRenderWorldLocal::RenderScene( const renderView_t* renderView )
 				windowHeight = ( windowHeight * r_screenFraction.GetInteger() ) / 100;
 			}
 		}
-		tr.CropRenderSize( windowWidth, windowHeight );
+		if( parms->neuralBackendMode == 3 )
+		{
+			// Temporal inputs are tagged from (0, 0), unlike the legacy bottom-anchored crop.
+			tr.CropRenderSize( 0, 0, windowWidth, windowHeight, true );
+		}
+		else
+		{
+			tr.CropRenderSize( windowWidth, windowHeight );
+		}
 		tr.GetCroppedViewport( &parms->viewport );
 	}
 
