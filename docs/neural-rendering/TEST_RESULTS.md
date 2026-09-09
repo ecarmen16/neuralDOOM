@@ -1551,3 +1551,7 @@ Next: verify the repaired build during camera movement at the player's display
 resolution, especially the originally reported materials. NR-specific material
 interpretation may still vary at lower input resolutions. The older F11
 black-surface report remains a separate open issue.
+
+## 2026-09-08 accumulated-change review at b00e6922
+
+Read-only code audit of 65 downstream commits against `ea29c006`, with parallel temporal, ray-material and tooling reviews. [Detailed findings and evidence](REVIEW_2026-09-08.md) records seven confirmed downstream defects, three retained compatibility problems, their triggers, and narrow next corrections. No renderer changes, new build, game launch or GPU validation were performed during this review; the user's running playtest was left intact. Ten offline Python/source-derived checks and five isolated PowerShell tooling checks passed, while additional probes exposed gaps in their coverage. Initial source status and accumulated `git diff --check` were clean; only this documentation and the review report were added.
