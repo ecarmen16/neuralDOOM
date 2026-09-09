@@ -128,6 +128,12 @@ public:
 	}
 	void			SetConfig( int config, bool save );
 	void			RestoreDefault();
+	// Restore preferences and bindings without changing progress or achievements.
+	bool			RestoreSettingsDefaults();
+	static bool		IsResettablePreference( const idCVar* cvar );
+	static bool		HasPendingSettingsReset();
+	bool			ApplyPendingSettingsReset();
+	void			CompletePendingSettingsReset();
 
 	void			SetLeftyFlip( bool lf );
 	bool			GetLeftyFlip() const
@@ -160,6 +166,7 @@ protected:
 	state_t			state;
 	state_t			requestedState;
 	int				deviceNum;
+	bool			settingsResetAwaitingSave;
 
 	// Save:
 	uint64			achievementBits;

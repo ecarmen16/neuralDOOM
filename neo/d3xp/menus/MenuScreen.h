@@ -1397,6 +1397,7 @@ public:
 			SYSTEM_FIELD_RT_ALL,
 			SYSTEM_FIELD_RT_DEBUG,
 			SYSTEM_FIELD_SAFE_KEYS,
+			SYSTEM_FIELD_RESTORE_DEFAULTS,
 			MAX_SYSTEM_FIELDS
 		};
 
@@ -1418,8 +1419,10 @@ public:
 		virtual void				AdjustField( const int fieldIndex, const int adjustAmount );
 
 		bool						IsRestartRequired() const;
+		void						RestoreDefaults();
 
 	private:
+		bool defaultsRestored;
 		idStr originalRenderAPI;
 		int originalFramerate;
 		int originalAntialias;
@@ -1461,6 +1464,8 @@ public:
 	virtual void				ShowScreen( const mainMenuTransition_t transitionType );
 	virtual void				HideScreen( const mainMenuTransition_t transitionType );
 	virtual bool				HandleAction( idWidgetAction& action, const idWidgetEvent& event, idMenuWidget* widget, bool forceHandled = false );
+	void						ConfirmRestoreDefaults();
+	void						RestoreDefaults();
 
 private:
 	idMenuWidget_DynamicList* 	options;

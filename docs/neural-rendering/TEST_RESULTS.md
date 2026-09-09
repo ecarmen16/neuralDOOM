@@ -1555,3 +1555,70 @@ black-surface report remains a separate open issue.
 ## 2026-09-08 accumulated-change review at b00e6922
 
 Read-only code audit of 65 downstream commits against `ea29c006`, with parallel temporal, ray-material and tooling reviews. [Detailed findings and evidence](REVIEW_2026-09-08.md) records seven confirmed downstream defects, three retained compatibility problems, their triggers, and narrow next corrections. No renderer changes, new build, game launch or GPU validation were performed during this review; the user's running playtest was left intact. Ten offline Python/source-derived checks and five isolated PowerShell tooling checks passed, while additional probes exposed gaps in their coverage. Initial source status and accumulated `git diff --check` were clean; only this documentation and the review report were added.
+
+## 2026-09-08 - Launcher presentation and independent settings resets
+
+Follow-up requested after the accumulated-change review. The picker now uses
+keyboard-accessible profile and reconstruction cards, explains rendering cost,
+and restores its window once on showing. `LaunchPicker.cs::OnShown` addresses
+inherited minimized startup; the local trial shortcut also needs normal window
+style instead of its previous minimized style. Hidden constructor/event checks
+cover 130 combinations. A brief own-window probe from a minimized PowerShell
+host observed Visible=true, Normal, IsIconic=false; Windows did not grant it
+foreground focus in that automated probe. The rendered form was visually checked.
+
+- Launcher **Restore defaults** resets game/video/audio/controls and ReShade/NR.
+  `LaunchPicker.ps1` calls `Reset-NeuralSettings.ps1::Reset-NeuralGameSettings`
+  only after confirmation. Explicit settings files are backed up with checksums
+  under `.neuraldoom-cache/settings-reset/`; failed edits roll back. Saved games
+  and opaque profile files are preserved. Campaign unlocks from configuration
+  are retained. ReShade uses the installer's INPUT/NR defaults; custom external
+  presets are detached without modifying their files. A running-game mutex and
+  linked-path checks guard the transaction.
+- In-game **System Options > Restore Game / Video Defaults** independently resets
+  game/video/audio/controls. `MenuScreen_Shell_SystemOptions.cpp` adds the action,
+  confirmation and restart handling; `MenuScreen.h` declares its row/state.
+  ReShade files are untouched. The existing smaller **Doom Lighting Defaults**
+  action remains available. Current look tuning is not captured as new defaults.
+- `PlayerProfile.cpp/.h::RestoreSettingsDefaults` resets registered archived
+  preferences, excluding progress, installation paths and startup-only values;
+  it loads shipped bindings and `neural_rtx_contrast.cfg`, enables the four ray
+  effects when compiled, and selects DLAA when the active SDK supports it.
+  `Serialize` reads all achievements/statistics/DLC data while suppressing old
+  preferences/bindings when `neural_settings_reset.pending` contains `version1`.
+  `ApplyPendingSettingsReset` preserves the fresh launcher's display/profile/
+  reconstruction choice. `sys_profile.cpp::Pump` applies the pending reset after
+  loading; `OnSaveSettingsCompleted` consumes the marker only after a successful
+  save. Failed/corrupt profile loads cannot be overwritten by subsequent settings
+  autosaves while the reset remains pending.
+- `win_main.cpp::Sys_SettingsRelaunchCommandLine` removes generated launcher
+  preference seeds from **Restart Now**, preserving startup/runtime/filesystem
+  arguments and current reconstruction. Its private nonarchived INIT session
+  marker retains this behavior across subsequent restarts. Ordinary launches
+  keep their existing command line. This corrects downstream review finding 7.
+  The menu repeater now uses absolute selection indices and bounds checks,
+  correcting the retained scrolled-arrow defect reported in that review.
+
+Validation: independent focused reviews passed. Windows PowerShell 5.1 and
+PowerShell 7 reset fixtures passed backups, rollback/retry, mutex exclusion,
+linked-path rejection, unchanged save/profile bytes and unlock preservation.
+MSVC source-derived `Test-GameSettingsReset.py` passed with ray tracing compiled
+off/on, including real save scheduling after a corrupt load and explicit launch
+choices. `Test-SystemOptionsSelection.py` passed 544 selections including the
+last row; `Test-SettingsRelaunch.py` passed path quoting and repeated restart
+cases. Their original arrow/replay behaviors fail the negative controls.
+
+DX12 configured with RT ON in SDK ON/OFF trees; RelWithDebInfo builds passed
+before the final small repeated-restart marker addition. Final build/package
+results are recorded below when complete. No shaders, resource formats,
+coordinate conventions, renderer passes or dependencies changed.
+
+One isolated SDK runtime attempt exited before its completion marker; its log
+also reported missing game resources/fonts. This is not a passed reset test.
+The user was playing another game and requested packaging without further game
+launches. Runtime reset/restart and gameplay acceptance are therefore deferred
+to user testing. No live user settings were reset.
+
+Next: test both reset actions and Restart Now locally, then choose the preferred
+look before revising baseline values. The remaining six downstream review
+findings and two retained renderer problems remain separate work.

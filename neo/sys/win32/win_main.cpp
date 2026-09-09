@@ -49,8 +49,10 @@ If you have questions concerning this license or the applicable additional terms
 #include "../sys_local.h"
 #include "win_local.h"
 #include "../../renderer/RenderCommon.h"
+#include "../../framework/PlayerProfile.h"
 
 idCVar Win32Vars_t::sys_arch( "sys_arch", "", CVAR_SYSTEM | CVAR_INIT, "" );
+static idCVar sys_neuralLauncherSession( "sys_neuralLauncherSession", "0", CVAR_SYSTEM | CVAR_INIT | CVAR_BOOL, "internal launcher session marker for settings-preserving restarts" );
 idCVar Win32Vars_t::sys_cpustring( "sys_cpustring", "detect", CVAR_SYSTEM | CVAR_INIT, "" );
 idCVar Win32Vars_t::in_mouse( "in_mouse", "1", CVAR_SYSTEM | CVAR_BOOL, "enable mouse input" );
 idCVar Win32Vars_t::win_allowAltTab( "win_allowAltTab", "0", CVAR_SYSTEM | CVAR_BOOL, "allow Alt-Tab when fullscreen" );
@@ -348,6 +350,46 @@ const char* Sys_GetCmdLine()
 Sys_ReLaunch
 ========================
 */
+static idStr Sys_SettingsRelaunchCommandLine( const char* original )
+{
+	idCmdArgs args( original, true );
+	bool generatedSettings = false;
+	bool launcherSession = false;
+	for( int i = 0; i + 1 < args.Argc(); i++ )
+	{
+		if( idStr::Icmp( args.Argv( i ), "+exec" ) == 0 && idStr::Icmp( args.Argv( i + 1 ), "neural_dogfood.cfg" ) == 0 ) { generatedSettings = true; }
+		if( i + 2 < args.Argc() && idStr::Icmp( args.Argv( i ), "+set" ) == 0 && idStr::Icmp( args.Argv( i + 1 ), "sys_neuralLauncherSession" ) == 0 && idStr::Icmp( args.Argv( i + 2 ), "1" ) == 0 ) { launcherSession = true; }
+	}
+	if( !generatedSettings && !launcherSession ) { return original; }
+	// The launcher file and preference +sets are one-time seeds. Replaying them
+	// here would undo menu edits/restored defaults. Keep startup-only SDK/NR and
+	// filesystem arguments, along with unrelated explicit user commands.
+	idStr replay;
+	for( int i = 0; i < args.Argc(); i++ )
+	{
+		if( i + 1 < args.Argc() && idStr::Icmp( args.Argv( i ), "+exec" ) == 0 && idStr::Icmp( args.Argv( i + 1 ), "neural_dogfood.cfg" ) == 0 ) { i++; continue; }
+		if( i + 2 < args.Argc() && idStr::Icmp( args.Argv( i ), "+set" ) == 0 )
+		{
+			if( idPlayerProfile::IsResettablePreference( cvarSystem->Find( args.Argv( i + 1 ) ) ) ) { i += 2; continue; }
+			// Backend is a non-archived runtime selector; retain the current mode.
+			if( idStr::Icmp( args.Argv( i + 1 ), "r_neuralBackend" ) == 0 )
+			{
+				replay.Append( va( " +set r_neuralBackend %d", cvarSystem->GetCVarInteger( "r_neuralBackend" ) ) );
+				i += 2;
+				continue;
+			}
+		}
+		// Common::Init uses idCmdArgs with string escapes disabled. Quote each
+		// token, preserving literal backslashes and spaces in install/save paths.
+		replay.Append( " \"" );
+		replay.Append( args.Argv( i ) );
+		replay.Append( "\"" );
+	}
+	// Keep the scope after removing the generated exec, including later restarts.
+	if( !launcherSession ) { replay.Append( " +set sys_neuralLauncherSession 1" ); }
+	return replay;
+}
+
 void Sys_ReLaunch()
 {
 	TCHAR				szPathOrig[MAX_PRINT_MSG];
@@ -360,7 +402,7 @@ void Sys_ReLaunch()
 	// DG: we don't have function arguments in Sys_ReLaunch() anymore, everyone only passed
 	//     the command-line +" +set com_skipIntroVideos 1" anyway and it was painful on POSIX systems
 	//     so let's just add it here.
-	idStr cmdLine = Sys_GetCmdLine();
+	idStr cmdLine = Sys_SettingsRelaunchCommandLine( Sys_GetCmdLine() );
 	if( cmdLine.Find( "com_skipIntroVideos" ) < 0 )
 	{
 		cmdLine.Append( " +set com_skipIntroVideos 1" );

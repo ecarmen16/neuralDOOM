@@ -27,6 +27,8 @@ If you have questions concerning this license or the applicable additional terms
 */
 #include "precompiled.h"
 #pragma hdrstop
+#include "../renderer/NeuralTemporal.h"
+#include "../renderer/StreamlineIntegration.h"
 #include "PlayerProfile.h"
 
 // After releasing a version to the market, here are limitations for compatibility:
@@ -82,6 +84,21 @@ idPlayerProfile::idPlayerProfile()
 	requestedState		= IDLE;
 	deviceNum			= -1;
 	dirty				= false;
+	settingsResetAwaitingSave = false;
+}
+
+bool idPlayerProfile::IsResettablePreference( const idCVar* cvar )
+{
+	if( cvar == NULL || !( cvar->GetFlags() & CVAR_STATIC ) || !( cvar->GetFlags() & CVAR_ARCHIVE ) ||
+		( cvar->GetFlags() & ( CVAR_INIT | CVAR_ROM | CVAR_SERVERINFO | CVAR_NETWORKSYNC ) ) ) { return false; }
+	const char* name = cvar->GetName();
+	// These archived values describe progress or the installed game's location.
+	const char* preserved[] = { "g_nightmare", "g_roeNightmare", "g_leNightmare", "sys_useSteamPath", "sys_useGOGPath" };
+	for( int i = 0; i < ( int )ARRAY_COUNT( preserved ); i++ )
+	{
+		if( idStr::Icmp( name, preserved[i] ) == 0 ) { return false; }
+	}
+	return true;
 }
 
 /*
@@ -122,6 +139,7 @@ idPlayerProfile::Serialize
 */
 bool idPlayerProfile::Serialize( idSerializer& ser )
 {
+	const bool resetSettings = ser.IsReading() && HasPendingSettingsReset();
 	// NOTE:
 	// See comments at top of file on versioning rules
 
@@ -154,6 +172,22 @@ bool idPlayerProfile::Serialize( idSerializer& ser )
 	cvarDict.Serialize( ser );
 	if( ser.IsReading() )
 	{
+		if( resetSettings )
+		{
+			const char* unlocks[] = { "g_nightmare", "g_roeNightmare", "g_leNightmare" };
+			for( int i = 0; i < ( int )ARRAY_COUNT( unlocks ); i++ )
+			{
+				// Either the local configuration or the loaded profile may be newer.
+				if( cvarSystem->GetCVarBool( unlocks[i] ) ) { cvarDict.SetBool( unlocks[i], true ); }
+			}
+			// Read the complete profile, but do not reapply preferences queued for reset.
+			// Unlocks and other preserved values still take the normal import path.
+			for( int i = cvarDict.GetNumKeyVals() - 1; i >= 0; i-- )
+			{
+				const idKeyValue* entry = cvarDict.GetKeyVal( i );
+				if( IsResettablePreference( cvarSystem->Find( entry->GetKey() ) ) ) { cvarDict.Delete( entry->GetKey() ); }
+			}
+		}
 		// Never sync these cvars with Steam because they require an engine or video restart
 		cvarDict.Delete( "r_fullscreen" );
 		cvarDict.Delete( "r_vidMode" );
@@ -189,7 +223,7 @@ bool idPlayerProfile::Serialize( idSerializer& ser )
 		// Which binding is used on the console?
 		ser.Serialize( customConfig );
 
-		ExecConfig( false );
+		if( !resetSettings ) { ExecConfig( false ); }
 
 		if( customConfig )
 		{
@@ -197,7 +231,7 @@ bool idPlayerProfile::Serialize( idSerializer& ser )
 			{
 				idStr bind;
 				ser.SerializeString( bind );
-				idKeyInput::SetBinding( i, bind.c_str() );
+				if( !resetSettings ) { idKeyInput::SetBinding( i, bind.c_str() ); }
 			}
 		}
 	}
@@ -271,6 +305,9 @@ idPlayerProfile::SaveSettings
 */
 void idPlayerProfile::SaveSettings( bool forceDirty )
 {
+	// Keep an unreadable profile intact while a preferences-only reset is pending.
+	// Later volume/binding changes must not save a partially deserialized profile.
+	if( state == ERR && HasPendingSettingsReset() ) { return; }
 	if( state != SAVING )
 	{
 		if( forceDirty )
@@ -401,6 +438,78 @@ idPlayerProfile::SetConfig
 void idPlayerProfile::RestoreDefault()
 {
 	ExecConfig( true, true );
+}
+
+bool idPlayerProfile::RestoreSettingsDefaults()
+{
+	if( state != IDLE || requestedState != IDLE ) { return false; }
+	idDict preferences;
+	cvarSystem->MoveCVarsToDict( CVAR_ARCHIVE, preferences );
+	for( int i = 0; i < preferences.GetNumKeyVals(); i++ )
+	{
+		idCVar* cvar = cvarSystem->Find( preferences.GetKeyVal( i )->GetKey() );
+		if( IsResettablePreference( cvar ) ) { cvar->SetString( cvar->GetDefaultString() ); }
+	}
+	const char* transientSettings[] = { "r_lightScale", "r_useTemporalAA", "r_taaMotionVectors", "r_neuralDebug", "r_rayTracingDebug" };
+	for( int i = 0; i < ( int )ARRAY_COUNT( transientSettings ); i++ )
+	{
+		idCVar* cvar = cvarSystem->Find( transientSettings[i] );
+		if( cvar != NULL ) { cvar->SetString( cvar->GetDefaultString() ); }
+	}
+	// Keep the active SDK/NR startup boundary. Reconstruction can change in-session.
+	cvarSystem->SetCVarInteger( "r_antiAliasing", ANTI_ALIASING_TAA );
+	if( R_StreamlineIsDLSSSupported() ) { R_SetNeuralReconstructionMode( 1 ); }
+	else if( !cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) ) { cvarSystem->SetCVarInteger( "r_neuralBackend", 0 ); }
+#if defined( USE_RAYTRACING )
+	const char* rayFeatures[] = { "r_rayTracedAO", "r_rayTracedContactShadows", "r_rayTracedGI", "r_rayTracedReflections" };
+	for( int i = 0; i < ( int )ARRAY_COUNT( rayFeatures ); i++ ) { cvarSystem->SetCVarBool( rayFeatures[i], true ); }
+#endif
+	leftyFlip = false;
+	configSet = 0;
+	customConfig = false;
+	ExecConfig( true, true );
+	cmdSystem->BufferCommandText( CMD_EXEC_NOW, "exec neural_rtx_contrast.cfg\n" );
+	cvarSystem->SetModifiedFlags( CVAR_ARCHIVE );
+	SaveSettings( true );
+	return true;
+}
+
+bool idPlayerProfile::HasPendingSettingsReset()
+{
+	void* data = NULL;
+	const int length = fileSystem->ReadFile( "neural_settings_reset.pending", &data );
+	if( length < 0 ) { return false; }
+	idStr marker( ( const char* )data );
+	fileSystem->FreeFile( data );
+	marker.StripTrailingWhitespace();
+	return marker == "version1";
+}
+
+bool idPlayerProfile::ApplyPendingSettingsReset()
+{
+	if( !HasPendingSettingsReset() ) { return false; }
+	// The launcher has already opened this display and selected a runtime/profile.
+	// Retain its new choices; only the in-game action unconditionally selects DLAA.
+	const char* launchSettings[] = { "r_fullscreen", "r_vidMode", "r_windowWidth", "r_windowHeight", "r_hdrOutput", "r_neuralLaunchProfile", "r_neuralReconstructionMode", "r_neuralNRReconstructionMode" };
+	idDict launchPreferences;
+	for( int i = 0; i < ( int )ARRAY_COUNT( launchSettings ); i++ ) { launchPreferences.Set( launchSettings[i], cvarSystem->GetCVarString( launchSettings[i] ) ); }
+	const int reconstruction = R_NeuralReconstructionMode();
+	if( !RestoreSettingsDefaults() ) { return false; }
+	cvarSystem->SetCVarsFromDict( launchPreferences );
+	if( R_StreamlineIsDLSSSupported() ) { R_SetNeuralReconstructionMode( reconstruction ); }
+	settingsResetAwaitingSave = true;
+	common->Printf( "Pending game settings reset applied: launch profile %d, reconstruction %d.\n", cvarSystem->GetCVarInteger( "r_neuralLaunchProfile" ), R_NeuralReconstructionMode() );
+	return true;
+}
+
+void idPlayerProfile::CompletePendingSettingsReset()
+{
+	if( settingsResetAwaitingSave )
+	{
+		fileSystem->RemoveFile( "neural_settings_reset.pending" );
+		settingsResetAwaitingSave = false;
+		common->Printf( "Game settings reset saved; profile progress preserved.\n" );
+	}
 }
 
 /*

@@ -113,7 +113,8 @@ if (-not (Test-Path -LiteralPath (Join-Path $RepoRoot 'base/maps/mars_city2.reso
 }
 $saveRoot = Join-Path $RepoRoot 'captures/dogfood'
 $saveBase = Join-Path $saveRoot 'base'
-$firstRun = -not (Test-Path -LiteralPath (Join-Path $saveBase 'D3BFGConfig.cfg'))
+$firstRun = (Test-Path -LiteralPath (Join-Path $saveBase 'neural_settings_reset.pending')) -or
+    -not (Test-Path -LiteralPath (Join-Path $saveBase 'D3BFGConfig.cfg'))
 [string]$savedConfig = if ($firstRun) { '' } else { Get-Content -LiteralPath (Join-Path $saveBase 'D3BFGConfig.cfg') -Raw }
 $backend = if ($Profile -ne 'Native') { 2 } else { 0 }
 $quality = 0
