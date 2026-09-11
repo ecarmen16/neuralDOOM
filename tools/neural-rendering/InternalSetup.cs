@@ -57,7 +57,8 @@ class ChoiceButton : Button {
     internal readonly List<string> Items = new List<string>();
     readonly ContextMenuStrip menu = new ContextMenuStrip();
     int selected = -1;
-    internal int SelectedIndex { get { return selected; } set { selected = value; Text = value >= 0 && value < Items.Count ? Items[value] + "   v" : "Select an installation...   v"; } }
+    internal event EventHandler SelectedIndexChanged;
+    internal int SelectedIndex { get { return selected; } set { bool changed = selected != value; selected = value; Text = value >= 0 && value < Items.Count ? Items[value] + "   v" : "Select an installation...   v"; if (changed && SelectedIndexChanged != null) SelectedIndexChanged(this, EventArgs.Empty); } }
     internal object SelectedItem { get { return selected >= 0 && selected < Items.Count ? Items[selected] : null; } set { SelectedIndex = Items.IndexOf(value as string); } }
     protected override void OnClick(EventArgs e) {
         base.OnClick(e);
@@ -96,7 +97,7 @@ class SetupWindow : Form {
     Label status, transfer;
     ProgressBar progress;
     int page;
-    bool running, cancelRequested, showDetails, restartRequired;
+    bool running, cancelRequested, showDetails, restartRequired, textureFailed;
     string installPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "neuralDoom", "Game"), gamePath = "", logPath, cancelPath;
     bool desktopShortcut = true;
     bool neuralAvailable;
@@ -108,6 +109,10 @@ class SetupWindow : Form {
         Text = "neuralDoom Setup"; ClientSize = new Size(920, 630); MinimumSize = new Size(940, 670);
         StartPosition = FormStartPosition.CenterScreen; BackColor = background; ForeColor = ink;
         Font = new Font("Segoe UI", 10); AutoScaleMode = AutoScaleMode.Font; MaximizeBox = false;
+        FormBorderStyle = FormBorderStyle.FixedSingle;
+        using (Stream icon = Assembly.GetExecutingAssembly().GetManifestResourceStream("SetupIcon")) {
+            if (icon != null) using (Icon source = new Icon(icon)) Icon = (Icon)source.Clone();
+        }
         sidebar = new Panel { Dock = DockStyle.Left, Width = 226, BackColor = Color.FromArgb(13, 15, 19) };
         sidebar.Paint += DrawSidebar; Controls.Add(sidebar);
         Panel footer = new Panel { Dock = DockStyle.Bottom, Height = 76, BackColor = panelColor };
@@ -212,7 +217,7 @@ class SetupWindow : Form {
             TextAt("A darker world.\nA new light.", 38, 116, 32, ink);
             TextAt("Welcome to neuralDoom", 181, 38, 19, ink);
             TextAt("Doom 3 atmosphere, with ray-traced lighting, material reflections, HDR and ultrawide support.", 233, 64, 12, muted);
-            TextAt("Setup takes care of the downloads, supporting files and configuration. All you need is your installed copy of Doom 3 BFG Edition.", 320, 76, 11, muted);
+            TextAt("Setup takes care of the downloads, supporting files and configuration. BYOB(FG).", 320, 76, 11, muted);
             TextAt("Up to 4.3 GB to download  /  Allow 32 GB of free space", 431, 44, 10, ink);
         } else if (value == 8) {
             TextAt("More detail. Same darkness.", 34, 56, 24, ink);
@@ -236,7 +241,7 @@ class SetupWindow : Form {
             TextAt(installations.Count == 0 ? "Choose a new installation or browse for an existing copy." : "Existing neuralDoom installations were found.", 104, 50, 11, muted);
             TextAt("ACTION", 164, 26, 9, muted);
             operation = Choice(new [] { "Upgrade / repair an existing installation", "Copy to a new folder, including saves and settings", "New separate installation", "Uninstall (keep saves and settings)" }, Array.IndexOf(new [] { "Upgrade", "Copy", "New", "Uninstall" }, installMode), 197);
-            TextAt("EXISTING INSTALLATION", 258, 26, 9, muted);
+            Label existingLabel = TextAt("EXISTING INSTALLATION", 258, 26, 9, muted);
             existing = Choice(installations.ToArray(), installations.IndexOf(existingPath), 292);
             Button browse = MakeButton("Find another...", 32, 340, 160, false); content.Controls.Add(browse);
             browse.Click += delegate { using (FolderBrowserDialog picker = new FolderBrowserDialog()) {
@@ -247,6 +252,14 @@ class SetupWindow : Form {
                     existing.SelectedItem = picker.SelectedPath;
                 }
             } };
+            Label newHint = TextAt("Click Next to choose a folder for your new installation.", 292, 60, 11, muted);
+            EventHandler updateManagement = delegate {
+                bool isNew = operation.SelectedIndex == 2;
+                existingLabel.Visible = existing.Visible = browse.Visible = !isNew;
+                existing.Enabled = browse.Enabled = !isNew;
+                newHint.Visible = isNew;
+            };
+            operation.SelectedIndexChanged += updateManagement; updateManagement(null, EventArgs.Empty);
             TextAt("Upgrades back up replaced files and preserve saves and tuning.\nUninstall removes verified application files; personal files remain.", 416, 72, 11, muted);
         } else if (value == 6) {
             TextAt("Choose your rendering.", 34, 56, 25, ink);
@@ -285,6 +298,11 @@ class SetupWindow : Form {
             TextAt(success ? (installMode == "Uninstall" ? "Application removed." : "Welcome back to Mars.") : cancelRequested ? "Setup paused." : "Let's get this sorted.", 34, 72, 25, ink);
             TextAt(success ? (installMode == "Uninstall" ? "Saves, settings and modified files remain in the installation folder." : restartRequired ? "Installation is complete. Restart Windows before playing." : "Installation complete. Your game is ready.") : cancelRequested ? "Setup stopped safely. You can retry using the verified files already downloaded." : "Setup couldn't finish. Your log has the details; you can retry after resolving the issue.", 138, 92, 12, muted);
             TextAt(success && installMode != "Uninstall" ? "Use the Start menu or your desktop shortcut to start.\n" + (profile == "NR" ? "F6 NR on/off (keeps DLAA/DLSS choice)\n" : "") + "F3 reflections · F4 bounce · F7 AO · F8 contact shadows\nF11 compares all four lighting effects together." : "Your original BFG installation has not been changed.", 259, 122, 11, ink);
+            if (!success && textureFailed) {
+                TextAt("Texture download or verification failed. Setup stopped. Use the Texture pack page to download the BFG Lite ZIP in your browser and select it, or explicitly skip the pack.", 259, 122, 11, ink).BringToFront();
+                Button textures = MakeButton("Texture pack options", 32, 464, 240, true);
+                textures.Click += delegate { ShowPage(8); }; content.Controls.Add(textures);
+            }
             Button folder = MakeButton("Open install folder", 32, 402, 185, false); content.Controls.Add(folder);
             folder.Click += delegate { if (Directory.Exists(installPath)) Process.Start(new ProcessStartInfo(installPath) { UseShellExecute = true }); };
             Button logs = MakeButton("View setup log", 233, 402, 165, false); content.Controls.Add(logs);
@@ -357,7 +375,7 @@ class SetupWindow : Form {
     }
     internal static string Quote(string value) { return "\"" + value.Replace("\"", "") .TrimEnd('\\') + "\""; }
     async Task Install() {
-        running = true; cancelRequested = false; restartRequired = false; log.Clear();
+        running = true; cancelRequested = false; restartRequired = false; textureFailed = false; log.Clear();
         cancelPath = Path.Combine(InternalSetup.Scratch, "cancel");
         bool success = false;
         try {
@@ -389,7 +407,7 @@ class SetupWindow : Form {
     }
     void Receive(string line) {
         if (line == null) return;
-        lock (log) { log.AppendLine(line); }
+        lock (log) { log.AppendLine(line); if (line.StartsWith("@@TEXTURE_ERROR|", StringComparison.Ordinal)) textureFailed = true; }
         BeginInvoke((Action)delegate {
             if (line.IndexOf("Windows requests a restart", StringComparison.OrdinalIgnoreCase) >= 0) restartRequired = true;
             if (line.StartsWith("@@SETUP|", StringComparison.Ordinal) && !cancelRequested) { status.Text = line.Substring(8); transfer.Text = "This can take a few minutes. You can leave setup running."; }

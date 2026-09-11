@@ -7,6 +7,7 @@ $type = $types | Where-Object Name -EQ 'SetupWindow'
 $flags = [Reflection.BindingFlags]'Public,NonPublic,Instance'
 $window = [Activator]::CreateInstance($type)
 try {
+    if ($window.FormBorderStyle -ne 'FixedSingle' -or $window.MaximizeBox) { throw 'Installer is resizable.' }
     $null = $type.GetMethod('ShowPage',$flags).Invoke($window,@(8))
     $check = $type.GetField('texturePack',$flags).GetValue($window)
     $path = $type.GetField('textureFile',$flags).GetValue($window)
@@ -35,5 +36,19 @@ try {
     $skip = @($content.Controls | Where-Object Text -EQ 'Skip texture pack')[0]
     $null = [Windows.Forms.Button].GetMethod('OnClick',$flags).Invoke($skip,@([EventArgs]::Empty))
     if ($type.GetField('page',$flags).GetValue($window) -ne 2 -or $type.GetField('includeTexturePack',$flags).GetValue($window)) { throw 'Explicit skip did not proceed without textures.' }
+    $null = $type.GetMethod('ShowPage',$flags).Invoke($window,@(7))
+    $operation = $type.GetField('operation',$flags).GetValue($window)
+    $selection = $operation.GetType().GetProperty('SelectedIndex',$flags)
+    $selection.SetValue($operation,2,$null)
+    $existing = $type.GetField('existing',$flags).GetValue($window)
+    if ($existing.Visible -or $existing.Enabled) { throw 'New installation retained the existing-install selector.' }
+    $selection.SetValue($operation,0,$null)
+    if (-not $existing.Visible -or -not $existing.Enabled) { throw 'Upgrade did not restore the existing-install selector.' }
+    $type.GetField('textureFailed',$flags).SetValue($window,$true)
+    $null = $type.GetMethod('ShowPage',$flags).Invoke($window,@(5))
+    $options = @($content.Controls | Where-Object Text -EQ 'Texture pack options')
+    if ($options.Count -ne 1) { throw 'Texture failure has no direct recovery option.' }
+    $null = [Windows.Forms.Button].GetMethod('OnClick',$flags).Invoke($options[0],@([EventArgs]::Empty))
+    if ($type.GetField('page',$flags).GetValue($window) -ne 8) { throw 'Texture recovery did not return to pack selection.' }
 } finally { $window.Dispose() }
 Write-Host 'PASS: texture opt-in, disabled field, review Back navigation and choice persistence. Rendered hidden form; no installer or game launched.'

@@ -89,7 +89,8 @@ if ($neural) {
 & (Join-Path $PSScriptRoot 'Setup-NeuralDoom.ps1') -RepoRoot $RepoRoot -GamePath $GamePath -LightingPackPath $LightingPackPath -Profile Native -Configuration Release -SkipD3HDP -SkipNRRuntime -NonInteractive:$NonInteractive
 if ($IncludeD3HDP) {
     . (Join-Path $PSScriptRoot 'Setup-TexturePack.ps1')
-    Install-SetupTexturePack -RepoRoot $RepoRoot -ArchivePath $D3HDPArchivePath
+    try { Install-SetupTexturePack -RepoRoot $RepoRoot -ArchivePath $D3HDPArchivePath }
+    catch { Write-Host '@@TEXTURE_ERROR|Texture pack download or verification failed.'; throw }
 }
 . (Join-Path $PSScriptRoot 'Setup-NeuralComponents.ps1')
 Install-SetupNeuralComponents -RepoRoot $RepoRoot -Profile $Profile -DlssDllPath $DlssDllPath -NRDllPath $NRDllPath
