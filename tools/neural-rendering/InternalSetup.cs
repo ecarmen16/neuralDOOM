@@ -57,7 +57,8 @@ class ChoiceButton : Button {
     internal readonly List<string> Items = new List<string>();
     readonly ContextMenuStrip menu = new ContextMenuStrip();
     int selected = -1;
-    internal int SelectedIndex { get { return selected; } set { selected = value; Text = value >= 0 && value < Items.Count ? Items[value] + "   v" : "Select an installation...   v"; } }
+    internal event EventHandler SelectedIndexChanged;
+    internal int SelectedIndex { get { return selected; } set { bool changed = selected != value; selected = value; Text = value >= 0 && value < Items.Count ? Items[value] + "   v" : "Select an installation...   v"; if (changed && SelectedIndexChanged != null) SelectedIndexChanged(this, EventArgs.Empty); } }
     internal object SelectedItem { get { return selected >= 0 && selected < Items.Count ? Items[selected] : null; } set { SelectedIndex = Items.IndexOf(value as string); } }
     protected override void OnClick(EventArgs e) {
         base.OnClick(e);
@@ -87,13 +88,16 @@ class SetupWindow : Form {
     Panel content, sidebar;
     Button next, back, cancel;
     TextBox destination, game, details;
-    CheckBox shortcut;
+    CheckBox shortcut, texturePack;
+    TextBox textureFile;
+    bool includeTexturePack = true;
+    string texturePath = "";
     ChoiceButton renderer, operation, existing;
     TextBox dlssFile, nrFile;
     Label status, transfer;
     ProgressBar progress;
     int page;
-    bool running, cancelRequested, showDetails, restartRequired;
+    bool running, cancelRequested, showDetails, restartRequired, textureFailed;
     string installPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "neuralDoom", "Game"), gamePath = "", logPath, cancelPath;
     bool desktopShortcut = true;
     bool neuralAvailable;
@@ -105,6 +109,10 @@ class SetupWindow : Form {
         Text = "neuralDoom Setup"; ClientSize = new Size(920, 630); MinimumSize = new Size(940, 670);
         StartPosition = FormStartPosition.CenterScreen; BackColor = background; ForeColor = ink;
         Font = new Font("Segoe UI", 10); AutoScaleMode = AutoScaleMode.Font; MaximizeBox = false;
+        FormBorderStyle = FormBorderStyle.FixedSingle;
+        using (Stream icon = Assembly.GetExecutingAssembly().GetManifestResourceStream("SetupIcon")) {
+            if (icon != null) using (Icon source = new Icon(icon)) Icon = (Icon)source.Clone();
+        }
         sidebar = new Panel { Dock = DockStyle.Left, Width = 226, BackColor = Color.FromArgb(13, 15, 19) };
         sidebar.Paint += DrawSidebar; Controls.Add(sidebar);
         Panel footer = new Panel { Dock = DockStyle.Bottom, Height = 76, BackColor = panelColor };
@@ -122,13 +130,15 @@ class SetupWindow : Form {
             else if (page == 4) { Close(); }
             else if (page == 7) { if (ReadManagement()) ShowPage(installMode == "Uninstall" ? 2 : 1); }
             else if (page == 1) { if (ValidateChoices()) ShowPage(6); }
-            else if (page == 6) { if (ReadRenderer()) ShowPage(2); }
+            else if (page == 6) { if (ReadRenderer()) ShowPage(8); }
+            else if (page == 8) { if (ReadTextures()) ShowPage(2); }
             else ShowPage(7);
         };
         back.Click += delegate {
             if (page == 1) { installPath = destination.Text.Trim(); gamePath = game.Text.Trim(); desktopShortcut = shortcut.Checked; }
             if (page == 6) { profile = neuralAvailable ? new [] { "NR", "DLAA", "Native" }[renderer.SelectedIndex] : "Native"; dlssPath = dlssFile.Text.Trim(); nrPath = nrFile.Text.Trim(); }
-            ShowPage(page == 1 ? 7 : page == 6 ? 1 : page == 2 ? (installMode == "Uninstall" ? 7 : 6) : page == 5 ? 7 : 0);
+            if (page == 8) { includeTexturePack = texturePack.Checked; texturePath = textureFile.Text.Trim(); }
+            ShowPage(page == 8 ? 6 : page == 1 ? 7 : page == 6 ? 1 : page == 2 ? (installMode == "Uninstall" ? 7 : 8) : page == 5 ? 7 : 0);
         };
         cancel.Click += delegate { Close(); };
         FormClosing += delegate(object sender, FormClosingEventArgs e) {
@@ -190,8 +200,8 @@ class SetupWindow : Form {
         using (Pen line = new Pen(Color.FromArgb(46, 32, 34), 2)) { for (int i = 0; i < 8; i++) g.DrawLine(line, -50, 330 + i * 32, 260, 160 + i * 32); }
         using (Font title = new Font("Segoe UI", 24, FontStyle.Bold)) g.DrawString("neural\nDOOM", title, Brushes.White, 23, 34);
         using (Brush red = new SolidBrush(accent)) g.FillRectangle(red, 26, 146, 40, 4);
-        string[] steps = { "01   Welcome", "02   Install or manage", "03   Location", "04   Rendering", "05   Review", "06   Installation" };
-        int active = page == 7 ? 1 : page == 1 ? 2 : page == 6 ? 3 : page == 2 ? 4 : page >= 3 ? 5 : 0;
+        string[] steps = { "01   Welcome", "02   Install or manage", "03   Location", "04   Rendering", "05   Texture pack", "06   Review", "07   Installation" };
+        int active = page == 7 ? 1 : page == 1 ? 2 : page == 6 ? 3 : page == 8 ? 4 : page == 2 ? 5 : page >= 3 ? 6 : 0;
         for (int i = 0; i < steps.Length; i++) using (Brush brush = new SolidBrush(i == active ? ink : muted)) {
             using (Font font = new Font("Segoe UI", 10, i == active ? FontStyle.Bold : FontStyle.Regular)) g.DrawString(steps[i], font, brush, 26, 208 + 42 * i);
         }
@@ -200,21 +210,38 @@ class SetupWindow : Form {
     }
     void ShowPage(int value) {
         page = value; while (content.Controls.Count > 0) content.Controls[0].Dispose(); sidebar.Invalidate();
-        back.Visible = value == 1 || value == 2 || value == 5 || value == 6 || value == 7; back.Enabled = !running;
+        back.Visible = value == 1 || value == 2 || value == 5 || value == 6 || value == 7 || value == 8; back.Enabled = !running;
         next.Visible = value != 3; next.Text = value == 2 ? (installMode == "Uninstall" ? "Uninstall" : installMode == "Upgrade" ? "Upgrade" : "Install") : value == 4 ? "Finish" : value == 5 ? "Retry" : "Next";
         cancel.Visible = value != 4; cancel.Enabled = true; AcceptButton = next.Visible ? next : null;
         if (value == 0) {
             TextAt("A darker world.\nA new light.", 38, 116, 32, ink);
             TextAt("Welcome to neuralDoom", 181, 38, 19, ink);
             TextAt("Doom 3 atmosphere, with ray-traced lighting, material reflections, HDR and ultrawide support.", 233, 64, 12, muted);
-            TextAt("Setup takes care of the downloads, supporting files and configuration. All you need is your installed copy of Doom 3 BFG Edition.", 320, 76, 11, muted);
-            TextAt("Up to 2.1 GB to download  /  Allow 16 GB of free space", 431, 44, 10, ink);
+            TextAt("Setup takes care of the downloads, supporting files and configuration. BYOB(FG).", 320, 76, 11, muted);
+            TextAt("Up to 4.3 GB to download  /  Allow 32 GB of free space", 431, 44, 10, ink);
+        } else if (value == 8) {
+            TextAt("More detail. Same darkness.", 34, 56, 24, ink);
+            texturePack = new CheckBox { Text = "Install D3HDP BFG Lite textures and models", Checked = includeTexturePack, Location = new Point(32, 116), Size = new Size(594, 36), ForeColor = ink };
+            content.Controls.Add(texturePack);
+            TextAt("By H3llBaron, built on the DOOM 3 modding community's work. The original readme and a credits/source notice are preserved with the pack.", 169, 70, 11, muted);
+            TextAt("LOCAL BFG LITE ZIP (OPTIONAL)", 241, 22, 9, muted);
+            textureFile = DllField(texturePath, 268, "D3HDP_BFG_Lite.zip");
+            textureFile.Enabled = includeTexturePack;
+            texturePack.CheckedChanged += delegate { textureFile.Enabled = texturePack.Checked; };
+            TextAt("Leave blank for automatic download. If ModDB blocks setup, download the ZIP in your browser and select it here. Adds about 2.14 GB to downloads.", 337, 70, 11, muted);
+            Button source = MakeButton("Project / download page", 32, 425, 260, false);
+            source.Click += delegate { Process.Start(new ProcessStartInfo("https://www.moddb.com/mods/d3hdp-bfg-lite/downloads/d3hdp-bfg-lite") { UseShellExecute = true }); };
+            content.Controls.Add(source);
+            Button skipTextures = MakeButton("Skip texture pack", 316, 425, 230, false);
+            skipTextures.Click += delegate { includeTexturePack = false; texturePath = textureFile.Text.Trim(); ShowPage(2); };
+            content.Controls.Add(skipTextures);
+            TextAt("Full original credits are installed under notices/D3HDP-BFG-Lite.", 478, 48, 10, ink);
         } else if (value == 7) {
             TextAt("Install. Upgrade. Make room.", 34, 56, 24, ink);
             TextAt(installations.Count == 0 ? "Choose a new installation or browse for an existing copy." : "Existing neuralDoom installations were found.", 104, 50, 11, muted);
             TextAt("ACTION", 164, 26, 9, muted);
             operation = Choice(new [] { "Upgrade / repair an existing installation", "Copy to a new folder, including saves and settings", "New separate installation", "Uninstall (keep saves and settings)" }, Array.IndexOf(new [] { "Upgrade", "Copy", "New", "Uninstall" }, installMode), 197);
-            TextAt("EXISTING INSTALLATION", 258, 26, 9, muted);
+            Label existingLabel = TextAt("EXISTING INSTALLATION", 258, 26, 9, muted);
             existing = Choice(installations.ToArray(), installations.IndexOf(existingPath), 292);
             Button browse = MakeButton("Find another...", 32, 340, 160, false); content.Controls.Add(browse);
             browse.Click += delegate { using (FolderBrowserDialog picker = new FolderBrowserDialog()) {
@@ -225,6 +252,14 @@ class SetupWindow : Form {
                     existing.SelectedItem = picker.SelectedPath;
                 }
             } };
+            Label newHint = TextAt("Click Next to choose a folder for your new installation.", 292, 60, 11, muted);
+            EventHandler updateManagement = delegate {
+                bool isNew = operation.SelectedIndex == 2;
+                existingLabel.Visible = existing.Visible = browse.Visible = !isNew;
+                existing.Enabled = browse.Enabled = !isNew;
+                newHint.Visible = isNew;
+            };
+            operation.SelectedIndexChanged += updateManagement; updateManagement(null, EventArgs.Empty);
             TextAt("Upgrades back up replaced files and preserve saves and tuning.\nUninstall removes verified application files; personal files remain.", 416, 72, 11, muted);
         } else if (value == 6) {
             TextAt("Choose your rendering.", 34, 56, 25, ink);
@@ -247,7 +282,7 @@ class SetupWindow : Form {
             TextAt("Ready when you are.", 34, 54, 25, ink);
             TextAt("INSTALL LOCATION", 120, 28, 9, muted); TextAt(installPath, 150, 68, 11, ink);
             TextAt("GAME DATA SOURCE", 232, 28, 9, muted); TextAt(gamePath, 262, 68, 11, ink);
-            TextAt(installMode == "Uninstall" ? "UNINSTALL - verified program files will be removed. Saves, settings, modified files and downloads will remain in this folder." : installMode.ToUpperInvariant() + " / " + profile + "\nSetup verifies downloads and prepares your chosen renderer. Existing saves and tuning are preserved.", 351, 80, 11, muted);
+            TextAt(installMode == "Uninstall" ? "UNINSTALL - verified program files will be removed. Saves, settings, modified files and downloads will remain in this folder." : installMode.ToUpperInvariant() + " / " + profile + (includeTexturePack ? " / D3HDP textures" : "") + "\nSetup verifies downloads and prepares your chosen renderer. Existing saves and tuning are preserved.", 351, 80, 11, muted);
             TextAt("Windows may request permission for Microsoft prerequisites.\nThe game will not launch automatically.", 443, 52, 10, ink);
         } else if (value == 3) {
             TextAt("Building your experience.", 34, 56, 24, ink);
@@ -263,6 +298,11 @@ class SetupWindow : Form {
             TextAt(success ? (installMode == "Uninstall" ? "Application removed." : "Welcome back to Mars.") : cancelRequested ? "Setup paused." : "Let's get this sorted.", 34, 72, 25, ink);
             TextAt(success ? (installMode == "Uninstall" ? "Saves, settings and modified files remain in the installation folder." : restartRequired ? "Installation is complete. Restart Windows before playing." : "Installation complete. Your game is ready.") : cancelRequested ? "Setup stopped safely. You can retry using the verified files already downloaded." : "Setup couldn't finish. Your log has the details; you can retry after resolving the issue.", 138, 92, 12, muted);
             TextAt(success && installMode != "Uninstall" ? "Use the Start menu or your desktop shortcut to start.\n" + (profile == "NR" ? "F6 NR on/off (keeps DLAA/DLSS choice)\n" : "") + "F3 reflections · F4 bounce · F7 AO · F8 contact shadows\nF11 compares all four lighting effects together." : "Your original BFG installation has not been changed.", 259, 122, 11, ink);
+            if (!success && textureFailed) {
+                TextAt("Texture download or verification failed. Setup stopped. Use the Texture pack page to download the BFG Lite ZIP in your browser and select it, or explicitly skip the pack.", 259, 122, 11, ink).BringToFront();
+                Button textures = MakeButton("Texture pack options", 32, 464, 240, true);
+                textures.Click += delegate { ShowPage(8); }; content.Controls.Add(textures);
+            }
             Button folder = MakeButton("Open install folder", 32, 402, 185, false); content.Controls.Add(folder);
             folder.Click += delegate { if (Directory.Exists(installPath)) Process.Start(new ProcessStartInfo(installPath) { UseShellExecute = true }); };
             Button logs = MakeButton("View setup log", 233, 402, 165, false); content.Controls.Add(logs);
@@ -280,7 +320,7 @@ class SetupWindow : Form {
             if (installMode == "Upgrade" && !String.Equals(installPath, existingPath, StringComparison.OrdinalIgnoreCase)) throw new Exception("Select a different existing installation on the previous page.");
             if (HasInstallContent(installPath) && (installMode != "Upgrade" || !File.Exists(Path.Combine(installPath, "internal-package.json")))) throw new Exception("Choose an empty folder for a new copy, or select Upgrade on the previous page.");
             string root = Path.GetPathRoot(installPath);
-            if (new DriveInfo(root).AvailableFreeSpace < (installMode == "Upgrade" ? 4L : 16L) * 1024 * 1024 * 1024) throw new Exception("Allow 16 GB for a new installation or 4 GB for an upgrade and its backup.");
+            if (new DriveInfo(root).AvailableFreeSpace < (installMode == "Upgrade" ? 20L : 32L) * 1024 * 1024 * 1024) throw new Exception("Allow 32 GB for a new installation or 20 GB for an upgrade, downloads and texture staging.");
             return true;
         } catch (Exception error) { MessageBox.Show(this, error.Message, "Check your folders", MessageBoxButtons.OK, MessageBoxIcon.Information); return false; }
     }
@@ -302,6 +342,11 @@ class SetupWindow : Form {
         if (installMode == "Upgrade" || installMode == "Uninstall") installPath = existingPath;
         else if (installMode == "Copy") { installPath = existingPath.TrimEnd('\\') + "-copy"; gamePath = existingPath; }
         else installPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "neuralDoom", "Game");
+        return true;
+    }
+    bool ReadTextures() {
+        includeTexturePack = texturePack.Checked; texturePath = textureFile.Text.Trim();
+        if (includeTexturePack && texturePath.Length > 0 && !File.Exists(texturePath)) { MessageBox.Show(this, "Select an existing D3HDP ZIP, or clear the field for automatic download."); return false; }
         return true;
     }
     bool ReadRenderer() {
@@ -330,7 +375,7 @@ class SetupWindow : Form {
     }
     internal static string Quote(string value) { return "\"" + value.Replace("\"", "") .TrimEnd('\\') + "\""; }
     async Task Install() {
-        running = true; cancelRequested = false; restartRequired = false; log.Clear();
+        running = true; cancelRequested = false; restartRequired = false; textureFailed = false; log.Clear();
         cancelPath = Path.Combine(InternalSetup.Scratch, "cancel");
         bool success = false;
         try {
@@ -343,6 +388,8 @@ class SetupWindow : Form {
                 ProcessStartInfo start = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe"));
                 start.UseShellExecute = false; start.CreateNoWindow = true; start.RedirectStandardOutput = true; start.RedirectStandardError = true;
                 start.Arguments = "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File " + Quote(InternalSetup.Bootstrap) + " -PackagePath " + Quote(InternalSetup.Payload) + " -Sha256 " + InternalSetup.Hash + " -Destination " + Quote(installPath) + " -Mode " + installMode + " -Profile " + profile + " -NonInteractive" + (desktopShortcut ? "" : " -SkipShortcut");
+                if (includeTexturePack) start.Arguments += " -IncludeD3HDP";
+                if (includeTexturePack && texturePath.Length > 0) start.Arguments += " -D3HDPArchivePath " + Quote(texturePath);
                 if (gamePath.Length > 0) start.Arguments += " -GamePath " + Quote(gamePath);
                 if (existingPath.Length > 0) start.Arguments += " -ExistingPath " + Quote(existingPath);
                 if (profile != "Native" && dlssPath.Length > 0) start.Arguments += " -DlssDllPath " + Quote(dlssPath);
@@ -360,7 +407,7 @@ class SetupWindow : Form {
     }
     void Receive(string line) {
         if (line == null) return;
-        lock (log) { log.AppendLine(line); }
+        lock (log) { log.AppendLine(line); if (line.StartsWith("@@TEXTURE_ERROR|", StringComparison.Ordinal)) textureFailed = true; }
         BeginInvoke((Action)delegate {
             if (line.IndexOf("Windows requests a restart", StringComparison.OrdinalIgnoreCase) >= 0) restartRequired = true;
             if (line.StartsWith("@@SETUP|", StringComparison.Ordinal) && !cancelRequested) { status.Text = line.Substring(8); transfer.Text = "This can take a few minutes. You can leave setup running."; }
@@ -388,7 +435,7 @@ class SetupWindow : Form {
     static bool ValidGame(string path) { return !String.IsNullOrEmpty(path) && File.Exists(Path.Combine(path, "base", "maps", "mars_city2.resources")); }
     internal void Preview(string directory) {
         Directory.CreateDirectory(directory); Show();
-        for (int i = 0; i <= 7; i++) {
+        for (int i = 0; i <= 8; i++) {
             ShowPage(i); Application.DoEvents();
             if (next.Visible && next.Left <= cancel.Right) throw new Exception("Wizard navigation overlaps.");
             using (Bitmap bitmap = new Bitmap(Width, Height)) { DrawToBitmap(bitmap, new Rectangle(Point.Empty, Size)); bitmap.Save(Path.Combine(directory, "setup-" + i + ".png")); }

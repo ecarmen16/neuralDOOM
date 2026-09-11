@@ -127,6 +127,7 @@ function Remove-SetupInstallation {
 function Invoke-SetupDeployment {
     param([string]$Stage, [string]$Destination, [ValidateSet('New','Upgrade','Copy')][string]$Mode,
         [string]$ExistingPath, [string]$GamePath, [string]$Profile, [string]$DlssDllPath, [string]$NRDllPath,
+        [switch]$IncludeD3HDP, [string]$D3HDPArchivePath,
         [switch]$SkipShortcut, [switch]$SkipStartMenu, [switch]$SkipRegistration)
     Assert-SetupInstallRoot $Destination -Existing:($Mode -eq 'Upgrade')
     if ($Mode -ne 'Upgrade' -and (Test-Path -LiteralPath $Destination) -and @(Get-SetupFiles $Destination).Count) { throw 'A separate installation needs an empty folder. Choose Upgrade to replace a recognized installation.' }
@@ -184,7 +185,7 @@ function Invoke-SetupDeployment {
             $sourceIni = Get-SetupSafePath $ExistingPath 'reshade.ini'
             if (Test-Path -LiteralPath $sourceIni) { Copy-Item -LiteralPath $sourceIni -Destination (Join-Path $Destination 'reshade.ini') }
         }
-        & (Join-Path $Destination 'tools/neural-rendering/Install-InternalTest.ps1') -RepoRoot $Destination -GamePath $GamePath -Profile $Profile -DlssDllPath $DlssDllPath -NRDllPath $NRDllPath -SkipShortcut:$SkipShortcut -SkipStartMenu:$SkipStartMenu -NonInteractive -ManagedDeployment
+        & (Join-Path $Destination 'tools/neural-rendering/Install-InternalTest.ps1') -RepoRoot $Destination -GamePath $GamePath -Profile $Profile -DlssDllPath $DlssDllPath -NRDllPath $NRDllPath -IncludeD3HDP:$IncludeD3HDP -D3HDPArchivePath $D3HDPArchivePath -SkipShortcut:$SkipShortcut -SkipStartMenu:$SkipStartMenu -NonInteractive -ManagedDeployment
         # Remove obsolete package files only when unchanged; modified files remain.
         if ($Mode -eq 'Upgrade') {
             $oldPackage = Get-Content -LiteralPath (Join-Path $backup 'internal-package.json') -Raw | ConvertFrom-Json

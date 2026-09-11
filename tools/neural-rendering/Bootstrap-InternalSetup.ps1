@@ -9,6 +9,8 @@ param(
     [string]$ExistingPath,
     [string]$DlssDllPath,
     [string]$NRDllPath,
+    [switch]$IncludeD3HDP,
+    [string]$D3HDPArchivePath,
     [switch]$SkipRegistration,
     [switch]$SkipShortcut,
     [switch]$SkipStartMenu,
@@ -62,7 +64,7 @@ try {
     & (Join-Path $stage 'tools/neural-rendering/Install-InternalTest.ps1') -RepoRoot $stage -VerifyOnly -Profile $Profile
     . (Join-Path $stage 'tools/neural-rendering/Install-Lifecycle.ps1')
     if ($Mode -eq 'Uninstall') { Remove-SetupInstallation -Root $Destination -SkipRegistration:$SkipRegistration; return }
-    Invoke-SetupDeployment -Stage $stage -Destination $Destination -Mode $Mode -ExistingPath $ExistingPath -GamePath $GamePath -Profile $Profile -DlssDllPath $DlssDllPath -NRDllPath $NRDllPath -SkipShortcut:$SkipShortcut -SkipStartMenu:$SkipStartMenu -SkipRegistration:$SkipRegistration
+    Invoke-SetupDeployment -Stage $stage -Destination $Destination -Mode $Mode -ExistingPath $ExistingPath -GamePath $GamePath -Profile $Profile -DlssDllPath $DlssDllPath -NRDllPath $NRDllPath -IncludeD3HDP:$IncludeD3HDP -D3HDPArchivePath $D3HDPArchivePath -SkipShortcut:$SkipShortcut -SkipStartMenu:$SkipStartMenu -SkipRegistration:$SkipRegistration
 } finally {
     $tempPrefix = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
     $resolvedStage = [IO.Path]::GetFullPath($stage)

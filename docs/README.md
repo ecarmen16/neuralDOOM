@@ -14,6 +14,7 @@ Milestone 1 is released. Start with the guide that matches what you want to do.
 - [Windows build guide](neural-rendering/WINDOWS_SETUP.md)
 - [Contribution workflow](../CONTRIBUTING.md)
 - [Maintainer packaging](../INTERNAL_TESTING.md#maintainer-packaging)
+- [GitHub release automation](neural-rendering/CLOUD_RELEASES.md)
 - [Build and validation workflow](neural-rendering/UNATTENDED_WORKFLOW.md)
 - [Renderer test plan](neural-rendering/TEST_PLAN.md)
 - [Workspace layout](neural-rendering/WORKSPACE_LAYOUT.md)

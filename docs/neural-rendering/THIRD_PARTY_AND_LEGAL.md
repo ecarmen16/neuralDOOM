@@ -54,6 +54,8 @@ The experimental `renodx-dlss5.addon64` and `nvngx_dlssnr.dll` remain unapproved
 
 ### D3HDP BFG Lite
 
+Local texture-installer branch (2026-09-11): the optional setup page credits **H3llBaron and the Doom 3 modding community** and links the original project. It downloads or imports a pinned BFG Lite archive on the user's machine and preserves the original readme and credit documents under `notices/D3HDP-BFG-Lite`. This local acquisition does not grant permission to redistribute the pack; no assets are included in our installer payload or source. The local overlay experiment and validation limits are documented in [TEXTURE_INSTALLER_TEST.md](TEXTURE_INSTALLER_TEST.md).
+
 | Field | Answer |
 |---|---|
 | Project/version | `D3HDP_BFG_Lite.zip`; previously inspected local release plus current July 2026 ModDB release |
@@ -120,6 +122,10 @@ Local acquisition record:
 
 ## Local diagnostic-tool record
 
+### GitHub-hosted release tooling
+
+The release workflow reuses the documented ISPC and official Streamline SDK pins for compilation only. It does not redistribute their binaries. GitHub's `actions/checkout` (MIT), `actions/setup-python` (MIT), `actions/upload-artifact` (MIT) and `actions/download-artifact` (MIT) execute on the hosted runner, pinned to exact commits in `.github/workflows/release-installer.yml`; their implementations are not copied into our source or installer. See [cloud release documentation](CLOUD_RELEASES.md) for artifact scope and permissions.
+
 ### RenderDoc 1.46
 
 - Installed system-wide through Winget package `BaldurKarlsson.RenderDoc` from the official RenderDoc MSI.
@@ -179,3 +185,6 @@ No retail resources, lighting/mod packs, NVIDIA DLLs, ReShade/RenoDX add-ons or 
 New setup-only helper: official 7-Zip standalone `7zr.exe` release 26.03 from `https://github.com/ip7z/7zip/releases/download/26.03/7zr.exe`, 602624 bytes, SHA-256 `AD4C82FADCBDF93C03B4FC440F300509C7D60C5C2F4D183E35D9D70D6957037D`. The [publisher license](https://www.7-zip.org/license.txt) describes LGPL-2.1-or-later for the standalone files. This executable is downloaded directly into the installation cache, never linked into the engine or bundled in our artifacts. Updates require an explicit version/hash review; removal is deleting the setup cache. No runtime dependency is added to the game.
 
 The Microsoft VC++ prerequisite is downloaded from its official HTTPS endpoint when missing and must pass valid Microsoft-publisher Authenticode verification before execution. It is not bundled. Setup accepts success/already-installed/restart-required codes and never restarts Windows itself. The Windows .NET Framework supplies the setup bootstrap compiler/runtime; its binary is not redistributed. The bootstrap's GPL source accompanies the embedded package. DLAA/NR runtime restrictions remain unchanged.
+# Installer icon authoring
+
+The setup icon is an original project asset, licensed GPL-3.0-or-later with its generator. Regenerating it uses [Pillow](https://github.com/python-pillow/Pillow/blob/main/LICENSE), under its HPND license. Pillow is an optional asset-authoring tool; neither release builds nor installed applications require or bundle it.
