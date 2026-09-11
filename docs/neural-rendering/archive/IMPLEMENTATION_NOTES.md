@@ -993,3 +993,27 @@ then request human review of the final commit before a maintainer merges.
   dynamic-aware reflection history/reprojection before lifting this default.
 - SDK-off RelWithDebInfo build also PASS using `Build-RBDOOM.ps1 -BuildDirectory
   build-rt -Configuration RelWithDebInfo`.
+
+### 2026-09-11 - Keep body shadows independent of Moving Ray Geometry
+
+`R_WantDynamicRayGeometry`, `R_SnapshotDynamicRaySurface`, and
+`RayQueryDiagnostic::UpdateDynamic` now admit hidden shadow-only player surfaces
+through `r_rayTracingPlayerShadows` independently of ordinary moving geometry.
+Ordinary surfaces still require `r_rayTracingDynamicGeometry`. The native player
+shadow switch, animated-geometry switch, per-view/light exclusions and AO/camera
+exclusions remain in effect. Game Options now explains this independence.
+
+CPU tests exercise both frontend and backend with MRG off: hidden body surfaces
+remain in contact/material scenes, ordinary geometry is absent, AO excludes the
+body, and the separate player-shadow toggle removes it. Tests PASS, as do the
+existing ordered NVRHI/DXIL contracts. SDK-on RelWithDebInfo build PASS using
+`Build-RBDOOM.ps1 -BuildDirectory build-private-neural -Configuration RelWithDebInfo`.
+No resource formats or coordinates changed. Focused diff review and whitespace
+check PASS. This supersedes the earlier note that the DLSS MRG default removes
+body shadows. Reflection filtering changes are a separate local experiment and
+must not be included in this PR commit.
+
+Runtime PASS: isolated SDK map run completed and shut down normally. With MRG off,
+4 hidden skinned body/head surfaces (3608 triangles) remained; Player Shadows off
+removed all 4; re-enabling restored all 4. Reflections remained active with zero
+sampled invalid values. Evidence: ignored profile-fixes-runtime/base/body-independence.log.

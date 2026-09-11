@@ -47,7 +47,7 @@ void RB_BakeTextureMatrixIntoTexgen( idPlane lightProject[3], const float* textu
 bool R_WantDynamicRayGeometry()
 {
 #if defined( USE_RAYTRACING )
-	return r_rayTracingDynamicGeometry.GetBool() && ( r_rayTracedAO.GetBool() || r_rayTracedGI.GetBool() || r_rayTracedReflections.GetBool() || r_rayTracedContactShadows.GetBool() );
+	return ( r_rayTracingDynamicGeometry.GetBool() || r_rayTracingPlayerShadows.GetBool() ) && ( r_rayTracedAO.GetBool() || r_rayTracedGI.GetBool() || r_rayTracedReflections.GetBool() || r_rayTracedContactShadows.GetBool() );
 #else
 	return false;
 #endif
@@ -274,12 +274,13 @@ public:
 		std::vector<rtShadowPolicy_t> policies;
 		if( uv ) { uv->clear(); }
 		if( accepted ) { accepted->clear(); }
-		if( r_rayTracingDynamicGeometry.GetBool() )
+		if( r_rayTracingDynamicGeometry.GetBool() || r_rayTracingPlayerShadows.GetBool() )
 		{
 			for( const viewEntity_t* entity = view->viewEntitys; entity; entity = entity->next )
 			{
 				for( const rayDynamicSurface_t* surface = entity->raySurfaces; surface; surface = surface->next )
 				{
+					if( !surface->shadowOnly && !r_rayTracingDynamicGeometry.GetBool() ) { continue; }
 					if( ( surface->shadowOnly && ( !r_rayTracingPlayerShadows.GetBool() || ( !shadowsOnly && !uv ) ) ) || ( shadowsOnly && !surface->castsShadow ) || ( surface->skinned && !r_rayTracingSkinnedGeometry.GetBool() ) ) { continue; }
 					if( count >= RT_DYNAMIC_SURFACES || points.size() + surface->numVerts > RT_DYNAMIC_VERTICES || elements.size() + surface->numIndexes > RT_DYNAMIC_INDICES ) { skipped++; continue; }
 					bool valid = true;

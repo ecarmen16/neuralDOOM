@@ -279,6 +279,7 @@ R_SnapshotDynamicRaySurface
 */
 static void R_SnapshotDynamicRaySurface( viewEntity_t* entity, const srfTriangles_t* tri, const idMaterial* material, const float* registers, bool noShadow, bool skinnedModel, bool shadowOnly = false, int suppressLight = 0 )
 {
+	if( !( shadowOnly ? r_rayTracingPlayerShadows.GetBool() : r_rayTracingDynamicGeometry.GetBool() ) ) { return; }
 	if( !R_WantDynamicRayGeometry() || entity->weaponDepthHack || entity->modelDepthHack != 0 || entity->isGuiSurface ||
 		!tri || !tri->verts || !tri->indexes || !material->ReceivesLighting() || material->Coverage() != MC_OPAQUE ||
 		material->Deform() != DFRM_NONE || material->HasSubview() || material->IsPortalSky() || tri->numVerts <= 0 || tri->numIndexes <= 0 ||

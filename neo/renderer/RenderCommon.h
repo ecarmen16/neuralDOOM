@@ -417,6 +417,7 @@ struct rayDynamicSurface_t
 };
 bool R_WantDynamicRayGeometry();
 extern idCVar r_rayTracingSkinnedGeometry;
+extern idCVar r_rayTracingDynamicGeometry;
 extern idCVar r_rayTracingPlayerShadows;
 
 struct viewEntity_t
