@@ -9,7 +9,7 @@ function Test-D3HDPArchive {
     $file = Get-Item -LiteralPath $Path
     if (($file.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Texture archive must be a regular local file.' }
     if ($file.Length -eq 2143217579 -and (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash -eq 'E72ABB1C6C8C69FB28913D33709B298AC9553D4F52B10B0D02776BF00589BC4F') { return }
-    if ($file.Length -eq 2143408902 -and (Get-FileHash -LiteralPath $Path -Algorithm MD5).Hash -eq '1288283E5B0116EEA38BE993DA423725') { return }
+    if ($file.Length -eq 2143408902 -and (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash -eq '513539D158C29B3A5C48E14C73FB8968427AD2644FD75F3E2C39991A589E813C') { return }
     throw 'D3HDP ZIP does not match either inspected publisher release. Select the original D3HDP_BFG_Lite.zip; do not repackage it.'
 }
 
@@ -64,9 +64,9 @@ function Install-SetupTexturePack {
             $expanded += $entry.Length
             if ($expanded -gt 12GB) { throw 'Texture archive exceeds the supported expanded size.' }
             if ($name.EndsWith('/')) { continue }
-            if ($name -ne 'Readme.txt' -and -not $name.StartsWith('mod_D3HDP_Lite/', [StringComparison]::OrdinalIgnoreCase)) { throw 'Unexpected texture archive member.' }
-            if ($name -eq 'Readme.txt') {
-                $target = 'notices/D3HDP-BFG-Lite/Readme.txt'; $readme = $true
+            if ($name -notin @('Readme.txt', 'Readme.pdf') -and -not $name.StartsWith('mod_D3HDP_Lite/', [StringComparison]::OrdinalIgnoreCase)) { throw 'Unexpected texture archive member.' }
+            if ($name -in @('Readme.txt', 'Readme.pdf')) {
+                $target = 'notices/D3HDP-BFG-Lite/' + $name; $readme = $true
             } else {
                 $relative = $name.Substring('mod_D3HDP_Lite/'.Length)
                 if ($relative -match '^[^/]+\.pk4$') {
@@ -74,7 +74,7 @@ function Install-SetupTexturePack {
                     $assetCount++
                 } elseif ($relative -match '(?i)(readme|credits|license|copying)' -and $relative -match '\.(txt|md|html|pdf)$') {
                     $target = 'notices/D3HDP-BFG-Lite/mod/' + $relative
-                } elseif ($relative -match '^(textures|models|materials|skins|def|sound|particles|guis|fonts|env|lights|script|generated)/' -and $relative -notmatch '\.(exe|dll|bat|cmd|ps1|cfg)$') {
+                } elseif ($relative -match '^(textures|models|materials|skins|def|sound|particles|guis|fonts|env|lights|script|generated|maps|ui)/' -and $relative -notmatch '\.(exe|dll|bat|cmd|ps1|cfg)$') {
                     $out = $loose.CreateEntry($relative, [IO.Compression.CompressionLevel]::Optimal)
                     $out.LastWriteTime = [DateTimeOffset]::new(2000, 1, 1, 0, 0, 0, [TimeSpan]::Zero)
                     $src = $entry.Open(); $dst = $out.Open()
@@ -93,6 +93,7 @@ function Install-SetupTexturePack {
         if (-not $readme -or $assetCount -eq 0) { throw 'Texture archive lacks the original readme or usable content.' }
         $check = [IO.Compression.ZipFile]::OpenRead($loosePath)
         try { if ($check.Entries.Count) { $outputs += @{ path = 'base/zzz_neural_d3hdp_loose.pk4'; source = $loosePath } } } finally { $check.Dispose() }
+        $outputs += @{ path = 'notices/D3HDP-BFG-Lite/Credits.md'; source = (Join-Path $PSScriptRoot '../../docs/neural-rendering/D3HDP_CREDITS.md') }
         foreach ($item in $outputs) {
             $item.sha256 = (Get-FileHash -LiteralPath $item.source).Hash
             $target = Get-SetupSafePath $RepoRoot $item.path
@@ -103,9 +104,9 @@ function Install-SetupTexturePack {
             New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
             if (-not (Test-Path -LiteralPath $target)) { Copy-Item -LiteralPath $item.source -Destination $target }
         }
-        $manifest = @{ project = 'D3HDP BFG Lite'; author = 'H3llBaron and credited contributors'; source = 'https://www.moddb.com/mods/d3hdp-bfg-lite/downloads/d3hdp-bfg-lite'; archiveSha256 = (Get-FileHash -LiteralPath $archive).Hash; files = @($outputs | ForEach-Object { @{ path = $_.path; sha256 = $_.sha256 } }) }
+        $manifest = @{ project = 'D3HDP BFG Lite'; author = 'H3llBaron and the Doom 3 modding community'; source = 'https://www.moddb.com/mods/d3hdp-bfg-lite/downloads/d3hdp-bfg-lite'; archiveSha256 = (Get-FileHash -LiteralPath $archive).Hash; files = @($outputs | ForEach-Object { @{ path = $_.path; sha256 = $_.sha256 } }) }
         $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $RepoRoot 'notices/D3HDP-BFG-Lite/installed.json') -Encoding UTF8
-        Write-SetupStatus 'D3HDP installed. Original credits: notices/D3HDP-BFG-Lite/Readme.txt'
+        Write-SetupStatus 'D3HDP installed. Original readme and credits: notices/D3HDP-BFG-Lite'
     } finally {
         if ($loose) { $loose.Dispose() }; $zip.Dispose()
         $prefix = [IO.Path]::GetFullPath((Join-Path $RepoRoot '.neuraldoom-cache')).TrimEnd('\') + '\'

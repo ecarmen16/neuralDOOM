@@ -218,7 +218,8 @@ class SetupWindow : Form {
             TextAt("More detail. Same darkness.", 34, 56, 24, ink);
             texturePack = new CheckBox { Text = "Install D3HDP BFG Lite textures and models", Checked = includeTexturePack, Location = new Point(32, 116), Size = new Size(594, 36), ForeColor = ink };
             content.Controls.Add(texturePack);
-            TextAt("By H3llBaron and the contributors credited in the original readme. This optional community pack is downloaded separately from ModDB.", 169, 70, 11, muted);
+            TextAt("By H3llBaron, built on the DOOM 3 modding community's work. The original readme and a credits/source notice are preserved with the pack.", 169, 70, 11, muted);
+            TextAt("LOCAL BFG LITE ZIP (OPTIONAL)", 241, 22, 9, muted);
             textureFile = DllField(texturePath, 268, "D3HDP_BFG_Lite.zip");
             textureFile.Enabled = includeTexturePack;
             texturePack.CheckedChanged += delegate { textureFile.Enabled = texturePack.Checked; };
@@ -226,6 +227,9 @@ class SetupWindow : Form {
             Button source = MakeButton("Project / download page", 32, 425, 260, false);
             source.Click += delegate { Process.Start(new ProcessStartInfo("https://www.moddb.com/mods/d3hdp-bfg-lite/downloads/d3hdp-bfg-lite") { UseShellExecute = true }); };
             content.Controls.Add(source);
+            Button skipTextures = MakeButton("Skip texture pack", 316, 425, 230, false);
+            skipTextures.Click += delegate { includeTexturePack = false; texturePath = textureFile.Text.Trim(); ShowPage(2); };
+            content.Controls.Add(skipTextures);
             TextAt("Full original credits are installed under notices/D3HDP-BFG-Lite.", 478, 48, 10, ink);
         } else if (value == 7) {
             TextAt("Install. Upgrade. Make room.", 34, 56, 24, ink);

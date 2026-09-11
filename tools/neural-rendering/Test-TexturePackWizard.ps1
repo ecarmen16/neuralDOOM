@@ -27,9 +27,13 @@ try {
     [Windows.Forms.Application]::DoEvents()
     $bitmap = New-Object Drawing.Bitmap $window.Width,$window.Height
     try {
-        $window.DrawToBitmap($bitmap, $window.ClientRectangle)
+        $window.DrawToBitmap($bitmap, (New-Object Drawing.Rectangle 0,0,$window.Width,$window.Height))
         $image = Join-Path $PSScriptRoot '../../captures/neural/texture-wizard.png'
         $bitmap.Save($image)
     } finally { $bitmap.Dispose() }
+    $content = $type.GetField('content',$flags).GetValue($window)
+    $skip = @($content.Controls | Where-Object Text -EQ 'Skip texture pack')[0]
+    $null = [Windows.Forms.Button].GetMethod('OnClick',$flags).Invoke($skip,@([EventArgs]::Empty))
+    if ($type.GetField('page',$flags).GetValue($window) -ne 2 -or $type.GetField('includeTexturePack',$flags).GetValue($window)) { throw 'Explicit skip did not proceed without textures.' }
 } finally { $window.Dispose() }
 Write-Host 'PASS: texture opt-in, disabled field, review Back navigation and choice persistence. Rendered hidden form; no installer or game launched.'
