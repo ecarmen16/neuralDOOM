@@ -46,7 +46,9 @@ bool Surface(uint primitive, float2 bary, float3 direction, out float3 normal, o
     emission = max(0, Atlas.SampleLevel(LinearWrap, float3(dot(st, m.emissiveS), dot(st, m.emissiveT), m.emissive.w), 0).rgb * m.emissive.rgb);
     return all(isfinite(albedo)) && all(isfinite(emission));
 }
-// Native raster shading is a radiance cache for visible hits. Geometric depth
+// Native interaction shading is a radiance cache for visible hits, captured
+// before generic alpha/emissive stages and fog (late diagnostics retain the
+// completed-scene cache). Geometric depth
 // agreement rejects occluded hits; offscreen hits retain explicit material/light
 // evaluation. This is a hybrid one-bounce estimate, not a full path tracer.
 float CachedRadiance(float3 hit, out float3 radiance)

@@ -5,6 +5,7 @@
 
 #include "RenderCommon.h"
 #include "StreamlineIntegration.h"
+#include "NeuralTemporal.h"
 #include "../framework/KeyInput.h"
 #include "../framework/Common_local.h"
 #include "../sys/DeviceManager.h"
@@ -486,7 +487,7 @@ static bool GatherStaticWorld( const idRenderWorldLocal* world, std::vector<idVe
 			const srfTriangles_t* tri = surface ? surface->geometry : nullptr;
 			const idMaterial* material = surface ? surface->shader : nullptr;
 			if( !tri || !material || !material->IsDrawn() || material->Coverage() != MC_OPAQUE ||
-				material->Deform() != DFRM_NONE || material->IsPortalSky() ||
+				material->Deform() != DFRM_NONE || material->HasSubview() || material->IsPortalSky() ||
 				( shadowCastersOnly && ( !material->SurfaceCastsShadow() || material->TestMaterialFlag( MF_NOSELFSHADOW ) ) ) )
 			{
 				excluded++;
@@ -1200,8 +1201,10 @@ public:
 		cb.atlasOptions = idVec4( materials.size() * 2, r_rayTracingDebug.GetInteger(), 0, 0 );
 		list->writeBuffer( constants, &cb, sizeof( cb ) );
 		list->clearBufferUInt( stats, 0 );
-		// Reuse complete native material shading at visible ray hits, including
-		// probes and normal maps. Snapshot before adding GI prevents feedback.
+		// Normal lighting reuses native interactions, including probes and normal
+		// maps, before generic alpha, emissive, fog and screen-warp stages. The
+		// shaders add supported emissives explicitly. Diagnostics retain their
+		// late completed-scene snapshot. Snapshot before GI prevents feedback.
 		list->copyTexture( surfaceRadiance, nvrhi::TextureSlice(), color, nvrhi::TextureSlice() );
 		if( r_rayTracedGI.GetBool() )
 		{
@@ -1734,9 +1737,12 @@ bool R_BeginRayTracedReflections( nvrhi::ICommandList* list, const viewDef_t* vi
 #endif
 }
 
-bool R_RenderRayTracedGI( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color )
+bool R_RenderRayTracedGI( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color, bool debugPass )
 {
 #if defined( USE_RAYTRACING )
+	// Exactly one placement runs: normal lighting precedes alpha/fog; debug
+	// views replace the completed scene. Reject before any allocation or work.
+	if( debugPass != ( r_rayTracingDebug.GetInteger() != 0 ) ) { return false; }
 	if( !r_rayTracedGI.GetBool() && !r_rayTracedReflections.GetBool() ) { return false; }
 	RayTracedLighting* lighting = PrepareRayTracedLighting( list, view, color );
 	if( !lighting || ( !r_rayTracedGI.GetBool() && !lighting->HasReflectionCapture( view ) ) ) { return false; }
@@ -1872,20 +1878,17 @@ CONSOLE_COMMAND_SHIP( rayTracingAOToggle, "Toggle only ray-traced ambient occlus
 CONSOLE_COMMAND_SHIP( rayTracingContactToggle, "Toggle only ray-traced contact shadows", NULL ) { R_ToggleLightingControl( r_rayTracedContactShadows, "RTX contacts" ); }
 CONSOLE_COMMAND_SHIP( rayTracingDynamicToggle, "Toggle moving ray geometry; preserve lighting choices", NULL ) { R_ToggleLightingControl( r_rayTracingDynamicGeometry, "Moving ray geometry" ); }
 CONSOLE_COMMAND_SHIP( rayTracingSkinnedToggle, "Toggle animated ray geometry; requires moving ray geometry", NULL ) { R_ToggleLightingControl( r_rayTracingSkinnedGeometry, "Animated ray geometry" ); }
-CONSOLE_COMMAND_SHIP( neuralReconstructionToggle, "Switch native-resolution TAA/DLAA when available; preserve NR input", NULL )
+CONSOLE_COMMAND_SHIP( neuralReconstructionToggle, "Cycle NR DLAA/DLSS presets, or toggle SDK-only TAA/DLAA", NULL )
 {
-	if( cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) || !R_StreamlineIsDLSSSupported() )
+	const bool nr = cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" );
+	const int mode = nr ? 1 + R_NeuralReconstructionMode() % 4 : ( cvarSystem->GetCVarInteger( "r_neuralBackend" ) != 2 ? 1 : 0 );
+	if( !R_SetNeuralReconstructionMode( mode ) )
 	{
-		common->Printf( "Reconstruction unchanged: NR uses DLAA input; otherwise select a DLAA-capable launch.\n" );
+		common->Printf( "Reconstruction unchanged: DLAA/DLSS is unavailable in this launch.\n" );
 		return;
 	}
-	const bool enable = cvarSystem->GetCVarInteger( "r_neuralBackend" ) != 2;
-	cvarSystem->SetCVarBool( "r_useTemporalAA", true );
-	cvarSystem->SetCVarInteger( "r_antiAliasing", ANTI_ALIASING_TAA );
-	cvarSystem->SetCVarInteger( "r_neuralBackend", enable ? 2 : 0 );
-	cvarSystem->SetCVarInteger( "r_neuralReconstructionMode", enable ? 1 : 0 );
-	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "neuralHistoryReset\n" );
-	common->Printf( "Reconstruction: %s (full resolution)\n", enable ? "DLAA" : "TAA" );
+	const char* names[] = { "TAA (100%)", "DLAA (100%)", "DLSS Quality", "DLSS Balanced", "DLSS Performance" };
+	common->Printf( "Reconstruction: %s%s\n", names[mode], nr && mode >= 2 ? " (experimental NR combination)" : "" );
 }
 
 static idCVar r_neuralKeysVersion( "r_neuralKeysVersion", "0", CVAR_ARCHIVE | CVAR_INTEGER, "safe RTX key migration version", 0, 1 );
@@ -1909,5 +1912,5 @@ CONSOLE_COMMAND_SHIP( neuralInstallKeys, "Install unused RTX F keys; preserve cu
 		if( !binding[0] || ( key.oldCommand[0] && idStr::Icmp( binding, key.oldCommand ) == 0 ) ) { idKeyInput::SetBinding( key.key, key.command ); }
 	}
 	r_neuralKeysVersion.SetInteger( 1 );
-	common->Printf( "RTX keys installed in free slots. F1 TAA/DLAA, F2 moving geometry, F3 reflections, F4 bounce, F7 AO, F8 contacts, F10 views, F11 all lighting. F6 reserved for external NR. Custom keys preserved.\n" );
+	common->Printf( "RTX keys installed in free slots. F1 reconstruction, F2 moving geometry, F3 reflections, F4 bounce, F7 AO, F8 contacts, F10 views, F11 all lighting. F6 reserved for external NR. Custom keys preserved.\n" );
 }

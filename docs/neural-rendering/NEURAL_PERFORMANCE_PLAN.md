@@ -1,8 +1,19 @@
 # Neural rendering performance plan
 
 Planning checkpoint: 2026-09-07. Tested release baseline: `internal-d16dab5e`.
-Suggested implementation branch: `codex/neural-performance`, from reviewed `main`.
-This document schedules work; it does not enable new rendering combinations.
+Implementation branch: **`codex/milestone-1`**, from reviewed `main` at `d21c4445`.
+2026-09-08 checkpoint: SDK/native builds and bounded NR preset checks passed after
+correcting the DLSS input viewport origin. NR consumed full-output color with
+reduced-input guides in Quality, Balanced and Performance at 1280x720 output.
+Manual playtesting and baseline measurements remain pending. The branch build is
+staged separately; the published release and existing player installation are unchanged.
+
+All work in this roadmap stays on the milestone branch. Implement, review and
+playtest before opening a PR; `ecarmen16` or `eraser851` must manually approve the latest
+changes and perform the merge. No agent merge, auto-merge or direct push to `main`.
+See [CONTRIBUTING.md](../../CONTRIBUTING.md) for the local push guard and current
+GitHub enforcement limitation. The planning documents already on `main` do not
+contain the optimization implementation.
 
 ## Priority and intended result
 
@@ -83,13 +94,15 @@ on a single FPS reading. Visual acceptance also determines whether a preset is u
 
 ## OPT-010/020: remove the profile restriction carefully
 
-Current source explicitly locks NR to DLAA in the launcher, menu and viewport
-selection. This is the validated integration policy, not an established universal
-NR requirement. `NREnableUpscaling=0` controls the external add-on; changing it is
+The published baseline locks NR to DLAA in the launcher, menu and viewport
+selection. The milestone source removes those locks for explicit DLSS selections,
+with a separate archived NR choice defaulting to DLAA. This is an experiment,
+not validated NR compatibility. `NREnableUpscaling=0` controls the external add-on; changing it is
 not equivalent to selecting engine DLSS Quality.
 
 1. Keep current runtime pins and the installed player folder unchanged. Use an
-   isolated fixture and a development-only experiment switch, disabled by default.
+   isolated fixture. Lower-resolution NR input requires an explicit experimental
+   reconstruction choice; the default remains native DLAA.
 2. Trace what the consumer observes around the existing DLSS evaluation: input
    versus reconstructed color, depth/motion extents, motion scale, jitter, exposure,
    reset state and NR dispatch dimensions. Confirm actual NR evaluation, not just
@@ -100,7 +113,9 @@ not equivalent to selecting engine DLSS Quality.
 4. Test static/moving scenes, doors/characters, weapon effects, glass, HUD/PDA,
    resize, FOV change, map/save load, F6 and reconstruction transitions. Check SDK
    rejections and fallbacks; no stale-history or partial-viewport presentation.
-5. Only then expose proven choices through the existing picker and System Options.
+5. The branch picker and System Options are implemented ahead of runtime testing
+   for source review. Keep the combinations labeled experimental and withhold a
+   release/PR until testing determines which choices can be supported.
    Save reconstruction independently of NR appearance enablement. F6 toggles only
    NR; it must not switch Quality back to DLAA. Test upgrades and relaunch without
    asking testers to apply configs. Add Balanced/Performance one at a time.
@@ -165,6 +180,7 @@ dependency/license records before introducing SDK plugins or changing pins. Keep
 third-party runtimes, retail data, captures and personal feedback out of Git.
 
 Publish one reviewed installer checkpoint per useful milestone, with matching
-committed source and verified hashes. The next implementation task is OPT-001,
-followed immediately by the isolated Quality experiment; no path-tracing or
-frame-generation code is included in this planning change.
+committed source and verified hashes. Next: build the branch separately, run the
+prepared control regressions, capture OPT-001 and prove the Quality combination
+before accepting Balanced/Performance. No path-tracing or frame-generation code
+is included in this source checkpoint.

@@ -45,3 +45,46 @@ with tempfile.TemporaryDirectory(prefix='neuraldoom-privacy-') as temporary:
     stage('%USERPROFILE%/Saved Games')
     check(0, True)
 print('PASS: staged index remains checked after working-copy cleanup; privacy findings report location only.')
+
+with tempfile.TemporaryDirectory(prefix='neuraldoom-settings-privacy-') as temporary:
+    for index, name in enumerate(('settings-snapshots/personal.zip', 'base/D3BFGConfig.cfg',
+                                  'reshade.ini', 'ReShadePreset.ini', 'profile.bin',
+                                  '.neuraldoom-snapshot-interrupted.tmp')):
+        fixture = Path(temporary) / str(index)
+        subprocess.run(['git', 'init', '-q', str(fixture)], check=True)
+        target = fixture / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text('private settings fixture')
+        subprocess.run(['git', '-C', str(fixture), 'add', '-f', name], check=True)
+        result = subprocess.run([str(powershell), '-NoProfile', '-ExecutionPolicy', 'Bypass',
+                                 '-File', str(audit), '-RepoRoot', str(fixture), '-AllowDirty', '-Staged'],
+                                capture_output=True, text=True)
+        assert result.returncode == 1, name
+print('PASS: forced additions of personal settings, snapshots and interrupted ZIPs are rejected.')
+
+history_spec = importlib.util.spec_from_file_location('history_audit', root / 'tools/neural-rendering/Test-PublicHistory.py')
+history_audit = importlib.util.module_from_spec(history_spec)
+history_spec.loader.exec_module(history_audit)
+with tempfile.TemporaryDirectory(prefix='neuraldoom-history-privacy-') as temporary:
+    fixture = Path(temporary)
+    subprocess.run(['git', 'init', '-q', str(fixture)], check=True)
+    def commit_fixture():
+        subprocess.run(['git', '-C', str(fixture), 'add', '-A'], check=True)
+        subprocess.run(['git', '-C', str(fixture), '-c', 'user.name=Privacy Fixture',
+                        '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'Fixture'], check=True)
+    document = fixture / 'example.md'
+    document.write_text('Clean baseline')
+    commit_fixture()
+    baseline = history_audit.git(fixture, 'rev-parse', 'HEAD').decode().strip()
+    document.write_text(profile)
+    artifact = fixture / 'private.resources'
+    artifact.write_bytes(b'fixture')
+    commit_fixture()
+    document.write_text('Clean current tree')
+    artifact.unlink()
+    commit_fixture()
+    report = history_audit.audit(fixture, ['--all'], baseline)
+    assert {row['category'] for row in report['findings']} == {'personal-windows-path', 'local-artifact-path'}
+    assert all(not row['inherited'] for row in report['findings'])
+    assert 'privacy-fixture' not in str(report)
+print('PASS: history audit finds removed private paths/artifacts without exposing matching content.')

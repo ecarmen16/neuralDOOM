@@ -148,7 +148,7 @@ class SetupWindow : Form {
         }
         profile = neuralAvailable ? "NR" : "Native";
         gamePath = FindBFG(); FindInstallations();
-        if (installations.Count > 0) { existingPath = installations[0]; installMode = "Upgrade"; }
+        if (installations.Count > 0) { existingPath = installations[0]; installPath = existingPath; installMode = "Upgrade"; }
         ShowPage(0);
     }
     Button MakeButton(string text, int x, int y, int width, bool primary) {
@@ -228,8 +228,8 @@ class SetupWindow : Form {
             TextAt("Upgrades back up replaced files and preserve saves and tuning.\nUninstall removes verified application files; personal files remain.", 416, 72, 11, muted);
         } else if (value == 6) {
             TextAt("Choose your rendering.", 34, 56, 25, ink);
-            renderer = Choice(neuralAvailable ? new [] { "NR + DLAA - F6 comparison (experimental)", "DLAA / DLSS - native NVIDIA reconstruction", "Native RTX - no neural downloads" } : new [] { "Native RTX - this package has no neural engine" }, neuralAvailable ? Array.IndexOf(new [] { "NR", "DLAA", "Native" }, profile) : 0, 110);
-            TextAt("DLAA renders at 100%. DLSS Quality, Balanced and Performance are optional in-game choices. NR keeps full-resolution DLAA input; F6 switches NR on/off. NR uses SDR output.", 162, 91, 11, muted);
+            renderer = Choice(neuralAvailable ? new [] { "NR + DLAA / DLSS - experimental", "DLAA / DLSS - NVIDIA reconstruction", "Native RTX - no neural downloads" } : new [] { "Native RTX - this package has no neural engine" }, neuralAvailable ? Array.IndexOf(new [] { "NR", "DLAA", "Native" }, profile) : 0, 110);
+            TextAt("NR defaults to DLAA at 100%. DLSS Quality, Balanced and Performance are explicit launcher/menu choices; NR + DLSS needs branch testing. F6 toggles NR while keeping reconstruction. NR uses SDR output.", 162, 91, 11, muted);
             TextAt("Optional DLSS DLL  /  Leave blank for automatic download", 275, 28, 10, ink);
             dlssFile = DllField(dlssPath, 310, "nvngx_dlss.dll");
             TextAt("Optional NR DLL  /  Leave blank for automatic download", 354, 28, 10, ink);
@@ -262,7 +262,7 @@ class SetupWindow : Form {
             bool success = value == 4;
             TextAt(success ? (installMode == "Uninstall" ? "Application removed." : "Welcome back to Mars.") : cancelRequested ? "Setup paused." : "Let's get this sorted.", 34, 72, 25, ink);
             TextAt(success ? (installMode == "Uninstall" ? "Saves, settings and modified files remain in the installation folder." : restartRequired ? "Installation is complete. Restart Windows before playing." : "Installation complete. Your game is ready.") : cancelRequested ? "Setup stopped safely. You can retry using the verified files already downloaded." : "Setup couldn't finish. Your log has the details; you can retry after resolving the issue.", 138, 92, 12, muted);
-            TextAt(success && installMode != "Uninstall" ? "Use the Start menu or your desktop shortcut to start.\n" + (profile == "NR" ? "F6 NR on/off (DLAA passthrough)\n" : "") + "F3 reflections · F4 bounce · F7 AO · F8 contact shadows\nF11 compares all four lighting effects together." : "Your original BFG installation has not been changed.", 259, 122, 11, ink);
+            TextAt(success && installMode != "Uninstall" ? "Use the Start menu or your desktop shortcut to start.\n" + (profile == "NR" ? "F6 NR on/off (keeps DLAA/DLSS choice)\n" : "") + "F3 reflections · F4 bounce · F7 AO · F8 contact shadows\nF11 compares all four lighting effects together." : "Your original BFG installation has not been changed.", 259, 122, 11, ink);
             Button folder = MakeButton("Open install folder", 32, 402, 185, false); content.Controls.Add(folder);
             folder.Click += delegate { if (Directory.Exists(installPath)) Process.Start(new ProcessStartInfo(installPath) { UseShellExecute = true }); };
             Button logs = MakeButton("View setup log", 233, 402, 165, false); content.Controls.Add(logs);

@@ -1883,7 +1883,7 @@ void R_BeginRayTracedContacts( nvrhi::ICommandList* list, const viewDef_t* view,
 bool R_BeginRayTracedContactLight( nvrhi::ICommandList* list, const viewDef_t* view, const viewLight_t* light );
 void R_EndRayTracedContactLight( nvrhi::ICommandList* list );
 bool R_RenderRayTracingDebug( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* ao, nvrhi::ITexture* color );
-bool R_RenderRayTracedGI( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color );
+bool R_RenderRayTracedGI( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color, bool debugPass = false );
 bool R_BeginRayTracedReflections( nvrhi::ICommandList* list, const viewDef_t* view, nvrhi::ITexture* depth, nvrhi::ITexture* color );
 void RB_SetVertexColorParms( stageVertexColor_t svc );
 

@@ -36,7 +36,6 @@ If you have questions concerning this license or the applicable additional terms
 const static int NUM_SYSTEM_OPTIONS_OPTIONS = 8;
 
 static idCVar r_neuralLaunchProfile( "r_neuralLaunchProfile", "-1", CVAR_ARCHIVE | CVAR_INTEGER, "launcher preference: -1 ask, 0 Native, 1 DLAA, 2 local NR; next launch", -1, 2 );
-static idCVar r_neuralReconstructionMode( "r_neuralReconstructionMode", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "saved reconstruction: 0 TAA, 1 DLAA, 2 DLSS Quality, 3 Balanced, 4 Performance", 0, 4 );
 struct neuralMenuSetting_t { const char* label; const char* name; float step, maximum; };
 static const neuralMenuSetting_t neuralMenuSettings[] = {
 	{ "RTX Reflections", "r_rayTracedReflections", 1, 1 },
@@ -284,7 +283,7 @@ void idMenuScreen_Shell_SystemOptions::Initialize( idMenuHandler* data )
 		control->SetOptionType( OPTION_SLIDER_TEXT );
 		const int rayIndex = field - idMenuDataSource_SystemSettings::SYSTEM_FIELD_RT_FIRST;
 		if( rayIndex >= 0 && rayIndex < 9 ) { control->SetLabel( neuralMenuSettings[rayIndex].label ); }
-		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RECONSTRUCTION ) { control->SetLabel( "DLAA / DLSS Quality" ); control->SetDescription( "DLAA at 100%, or DLSS Quality (~67%), Balanced (~58%), Performance (50%) per dimension. Select DLAA / DLSS in Next Launch Profile for these choices. NR keeps native DLAA input." ); }
+		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RECONSTRUCTION ) { control->SetLabel( "DLAA / DLSS Quality" ); control->SetDescription( "DLAA at 100%, or DLSS Quality (~67%), Balanced (~58%), Performance (50%) per dimension. NR + DLSS is experimental. F6 keeps the selected reconstruction. Each neural profile remembers its own choice." ); }
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RENDER_STATUS ) { control->SetLabel( "Rendering Status" ); }
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_FPS_COUNTER ) { control->SetLabel( "FPS Counter" ); control->SetDescription( "Compact frames-per-second display in the top-right corner. Follows window resizing and ultrawide resolutions." ); }
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RT_QUALITY ) { control->SetLabel( "Ray Quality" ); control->SetDescription( "Changes ray samples, not rendering resolution or lighting strength." ); }
@@ -293,6 +292,12 @@ void idMenuScreen_Shell_SystemOptions::Initialize( idMenuHandler* data )
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_NR_STATUS ) { control->SetLabel( "NR Compatibility" ); control->SetDescription( "F6 belongs to the external NR add-on. Its on/off state is not reported to the engine. Native HDR is bypassed in the NR profile." ); }
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RT_ALL ) { control->SetLabel( "All RTX Lighting" ); control->SetDescription( "Toggle AO, contacts, bounce and reflections together; preserves their strengths and ray quality." ); }
 		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RT_DEBUG ) { control->SetLabel( "RTX Diagnostic View" ); }
+		else if( field == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RESTORE_DEFAULTS )
+		{
+			control->SetOptionType( OPTION_BUTTON_TEXT );
+			control->SetLabel( "Restore Game / Video Defaults" );
+			control->SetDescription( "Restore shipped game, video, audio and control settings. Keeps saves, achievements, unlocks and ReShade settings. Confirmation required." );
+		}
 		else { control->SetLabel( "Install Free RTX Keys" ); control->SetDescription( "Fill unused F keys only. Preserves custom binds, F5 quicksave, F9 quickload and F12 screenshot. Remap actions in Keyboard Bindings." ); }
 		control->SetDataSource( &systemData, field );
 		control->SetupEvents( DEFAULT_REPEAT_TIME, options->GetChildren().Num() );
@@ -426,6 +431,40 @@ void idMenuScreen_Shell_SystemOptions::HideScreen( const mainMenuTransition_t tr
 	idMenuScreen::HideScreen( transitionType );
 }
 
+void idMenuScreen_Shell_SystemOptions::ConfirmRestoreDefaults()
+{
+	class idSWFScriptFunction_RestoreSettings : public idSWFScriptFunction_RefCounted
+	{
+	public:
+		idSWFScriptFunction_RestoreSettings( idMenuScreen_Shell_SystemOptions* screen, bool accept ) : screen( screen ), accept( accept ) {}
+		idSWFScriptVar Call( idSWFScriptObject* thisObject, const idSWFParmList& parms )
+		{
+			common->Dialog().ClearDialog( GDM_BINDINGS_RESTORE );
+			if( accept ) { screen->RestoreDefaults(); }
+			return idSWFScriptVar();
+		}
+	private:
+		idMenuScreen_Shell_SystemOptions* screen;
+		bool accept;
+	};
+	menuData->ClearWidgetActionRepeater();
+	idStaticList<idSWFScriptFunction*, 4> callbacks;
+	idStaticList<idStrId, 4> optionText;
+	callbacks.Append( new idSWFScriptFunction_RestoreSettings( this, true ) );
+	callbacks.Append( new idSWFScriptFunction_RestoreSettings( this, false ) );
+	optionText.Append( idStrId( "#str_swf_restore_defaults" ) );
+	optionText.Append( idStrId( "#STR_SWF_CANCEL" ) );
+	common->Dialog().AddDynamicDialog( GDM_BINDINGS_RESTORE, callbacks, optionText, true,
+		"Restore game, video, audio and controls to shipped defaults? Custom bindings will be replaced. Saves, achievements, unlocks and ReShade are kept. Video changes may require a restart." );
+}
+
+void idMenuScreen_Shell_SystemOptions::RestoreDefaults()
+{
+	systemData.RestoreDefaults();
+	options->Update();
+	Update();
+}
+
 /*
 ========================
 idMenuScreen_Shell_SystemOptions::HandleAction h
@@ -458,6 +497,7 @@ bool idMenuScreen_Shell_SystemOptions::HandleAction( idWidgetAction& action, con
 			return true;
 		}
 		case WIDGET_ACTION_ADJUST_FIELD:
+			if( widget->GetDataSourceFieldIndex() == idMenuDataSource_SystemSettings::SYSTEM_FIELD_RESTORE_DEFAULTS ) { return true; }
 			if( widget->GetDataSourceFieldIndex() == idMenuDataSource_SystemSettings::SYSTEM_FIELD_FULLSCREEN )
 			{
 				menuData->SetNextScreen( SHELL_AREA_RESOLUTION, MENU_TRANSITION_SIMPLE );
@@ -488,6 +528,9 @@ bool idMenuScreen_Shell_SystemOptions::HandleAction( idWidgetAction& action, con
 
 			switch( parms[0].ToInteger() )
 			{
+				case idMenuDataSource_SystemSettings::SYSTEM_FIELD_RESTORE_DEFAULTS:
+					ConfirmRestoreDefaults();
+					return true;
 				case idMenuDataSource_SystemSettings::SYSTEM_FIELD_FULLSCREEN:
 				{
 					menuData->SetNextScreen( SHELL_AREA_RESOLUTION, MENU_TRANSITION_SIMPLE );
@@ -513,9 +556,11 @@ bool idMenuScreen_Shell_SystemOptions::HandleAction( idWidgetAction& action, con
 			if( parms.Num() == 4 )
 			{
 				int selectionIndex = parms[3].ToInteger();
+				if( selectionIndex < 0 || selectionIndex >= options->GetTotalNumberOfOptions() ) { return true; }
 				if( selectionIndex != options->GetFocusIndex() )
 				{
-					options->SetViewIndex( options->GetViewOffset() + selectionIndex );
+					// SetupEvents stores the absolute child index, including on scrolled rows.
+					options->SetViewIndex( selectionIndex );
 					options->SetFocusIndex( selectionIndex );
 				}
 			}
@@ -546,9 +591,10 @@ idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::LoadData
 */
 void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::LoadData()
 {
+	defaultsRestored = false;
 	for( int i = 0; i < 9; i++ ) { originalRaySettings[i] = cvarSystem->GetCVarFloat( neuralMenuSettings[i].name ); }
 	for( int i = 0; i < 3; i++ ) { originalRaySamples[i] = cvarSystem->GetCVarInteger( neuralSampleSettings[i] ); }
-	originalReconstruction = r_neuralReconstructionMode.GetInteger();
+	originalReconstruction = R_NeuralReconstructionMode();
 	originalLaunchProfile = r_neuralLaunchProfile.GetInteger();
 	originalFPSCounter = com_showFPS.GetInteger();
 	originalRenderAPI = r_graphicsAPI.GetString();
@@ -591,6 +637,7 @@ idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsRestartRequ
 */
 bool idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsRestartRequired() const
 {
+	if( defaultsRestored ) { return true; }
 	if( originalHDROutput != r_hdrOutput.GetInteger() ) { return true; }
 	/*
 	if( originalAntialias != r_antiAliasing.GetInteger() )
@@ -620,6 +667,21 @@ idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::CommitData
 void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::CommitData()
 {
 	cvarSystem->SetModifiedFlags( CVAR_ARCHIVE );
+}
+
+void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::RestoreDefaults()
+{
+	idLocalUser* user = session->GetSignInManager().GetMasterLocalUser();
+	idPlayerProfile* profile = user != NULL ? user->GetProfile() : NULL;
+	if( profile != NULL && profile->RestoreSettingsDefaults() )
+	{
+		// Resolution and other startup video defaults take effect on the next launch.
+		defaultsRestored = true;
+	}
+	else
+	{
+		common->Dialog().AddDialog( GDM_LOADING_PROFILE, DIALOG_CONTINUE, NULL, NULL, false );
+	}
 }
 
 /*
@@ -666,6 +728,7 @@ idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustField
 */
 void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustField( const int fieldIndex, const int adjustAmount )
 {
+	if( fieldIndex == SYSTEM_FIELD_RESTORE_DEFAULTS ) { return; }
 	if( fieldIndex == SYSTEM_FIELD_FPS_COUNTER ) { com_showFPS.SetInteger( com_showFPS.GetInteger() == 0 ? 1 : 0 ); return; }
 	if( fieldIndex == SYSTEM_FIELD_LAUNCH_PROFILE )
 	{
@@ -692,16 +755,10 @@ void idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::AdjustFi
 	}
 	if( fieldIndex == SYSTEM_FIELD_RECONSTRUCTION )
 	{
-		if( !cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) && R_StreamlineIsDLSSSupported() )
-		{
-			const int mode = ( r_neuralReconstructionMode.GetInteger() + ( adjustAmount > 0 ? 1 : 4 ) ) % 5;
-			r_neuralReconstructionMode.SetInteger( mode );
-			cvarSystem->SetCVarBool( "r_useTemporalAA", true );
-			r_antiAliasing.SetInteger( ANTI_ALIASING_TAA );
-			cvarSystem->SetCVarInteger( "r_neuralBackend", mode == 0 ? 0 : mode == 1 ? 2 : 3 );
-			if( mode >= 2 ) { cvarSystem->SetCVarInteger( "r_neuralDLSSQuality", mode - 2 ); }
-			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "neuralHistoryReset\n" );
-		}
+		const int first = cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) ? 1 : 0;
+		const int count = 5 - first;
+		const int mode = first + ( R_NeuralReconstructionMode() - first + ( adjustAmount > 0 ? 1 : count - 1 ) ) % count;
+		R_SetNeuralReconstructionMode( mode );
 		return;
 	}
 	if( fieldIndex == SYSTEM_FIELD_RT_QUALITY )
@@ -913,7 +970,7 @@ idSWFScriptVar idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings
 	if( fieldIndex == SYSTEM_FIELD_FPS_COUNTER ) { return com_showFPS.GetInteger() == 0 ? "Off" : com_showFPS.GetInteger() == 1 ? "Top right" : "Detailed (console)"; }
 	if( fieldIndex == SYSTEM_FIELD_LAUNCH_PROFILE )
 	{
-		const char* names[] = { "Ask on launch", "Native RTX", "DLAA / DLSS", "NR + DLAA" };
+		const char* names[] = { "Ask on launch", "Native RTX", "DLAA / DLSS", "NR + DLAA / DLSS" };
 		return names[r_neuralLaunchProfile.GetInteger() + 1];
 	}
 	if( fieldIndex == SYSTEM_FIELD_NR_STATUS ) { return cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) ? "NR profile; add-on F6" : "Not loaded"; }
@@ -928,6 +985,7 @@ idSWFScriptVar idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings
 		return views[idMath::ClampInt( 0, 6, cvarSystem->GetCVarInteger( "r_rayTracingDebug" ) )];
 	}
 	if( fieldIndex == SYSTEM_FIELD_SAFE_KEYS ) { return "Apply (preserve custom)"; }
+	if( fieldIndex == SYSTEM_FIELD_RESTORE_DEFAULTS ) { return "Confirm..."; }
 	const int rayIndex = fieldIndex - SYSTEM_FIELD_RT_FIRST;
 	if( rayIndex >= 0 && rayIndex < 9 )
 	{
@@ -942,7 +1000,6 @@ idSWFScriptVar idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings
 	if( fieldIndex == SYSTEM_FIELD_RECONSTRUCTION )
 	{
 		if( !R_UseTemporalAA() ) { return "Temporal AA inactive"; }
-		if( cvarSystem->GetCVarBool( "r_neuralCompatibilityEnable" ) ) { return "NR uses DLAA (100%)"; }
 		if( !R_StreamlineIsDLSSSupported() ) { return "TAA (DLAA unavailable)"; }
 		if( cvarSystem->GetCVarInteger( "r_neuralBackend" ) == 3 ) { return va( "DLSS %s", R_StreamlineDLSSQualityName() ); }
 		return cvarSystem->GetCVarInteger( "r_neuralBackend" ) == 2 ? "DLAA (100%)" : "Native TAA (100%)";
@@ -1172,11 +1229,12 @@ idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsDataChanged
 */
 bool idMenuScreen_Shell_SystemOptions::idMenuDataSource_SystemSettings::IsDataChanged() const
 {
+	if( defaultsRestored ) { return true; }
 	if( originalFPSCounter != com_showFPS.GetInteger() ) { return true; }
 	for( int i = 0; i < 9; i++ ) { if( originalRaySettings[i] != cvarSystem->GetCVarFloat( neuralMenuSettings[i].name ) ) { return true; } }
 	for( int i = 0; i < 3; i++ ) { if( originalRaySamples[i] != cvarSystem->GetCVarInteger( neuralSampleSettings[i] ) ) { return true; } }
 	if( originalLaunchProfile != r_neuralLaunchProfile.GetInteger() ) { return true; }
-	if( originalReconstruction != r_neuralReconstructionMode.GetInteger() ) { return true; }
+	if( originalReconstruction != R_NeuralReconstructionMode() ) { return true; }
 
 	if( idStr::Icmp( r_graphicsAPI.GetString(), originalRenderAPI ) != 0 )
 	{

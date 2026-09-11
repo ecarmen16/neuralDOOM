@@ -1321,3 +1321,330 @@ No installed player folder was modified. Visual acceptance remains manual,
 especially the reported F8 door angle, moving reflections, NR appearance and HDR.
 Next task: the five-minute check in `INTERNAL_TESTING.md`, using the rebuilt
 installer and its matching source revision.
+
+## 2026-09-07 - Milestone 1 source review; execution deferred
+
+NR-specific reconstruction choices and viewport routing are implemented for branch
+testing. Reviewed the changed source, preference isolation, menu/key control flow,
+input/output dimensions, existing temporal resets and fallback paths. Corrected
+the regression harness's fully qualified menu symbol during review.
+
+No configure/build command, test executable, game, runtime fixture, installer or
+benchmark was run for this checkpoint. RelWithDebInfo/Release compilation,
+control regressions and GPU validation are **PENDING**, as requested. Earlier
+release results above do not validate this feature. No performance gain or working
+NR + DLSS combination is claimed; reduced-input handling with the existing
+`NREnableUpscaling=0` consumer configuration is an unresolved runtime gate.
+
+Next checks (in a separate branch build/test installation):
+
+1. Build SDK-off/on RelWithDebInfo and SDK-on Release. Run
+   `Test-NeuralReconstruction.py`, `Test-LaunchPicker.ps1`,
+   `Test-NeuralEmbeddedNR.ps1`, and existing safe-key/menu regressions.
+2. Confirm unchanged NR + DLAA and SDK-only/native fallbacks, then test Quality
+   with actual input/output extents and successful consumer NR evaluations.
+3. Test Balanced/Performance individually, F1/F6, resize/FOV, moving scenes,
+   save/load and relaunch persistence. Obtain manual visual acceptance.
+4. Measure Release frame times against the DLAA baseline using the performance
+   plan. Keep the branch unmerged and the published installer unchanged meanwhile.
+
+## 2026-09-08 - Milestone 1 local build and DLSS viewport correction
+
+Built branch `codex/milestone-1` from `4587dcfb` for a separate local playtest.
+Initial SDK counters accepted all presets, but visual inspection exposed a real
+viewport mismatch: the legacy crop anchored reduced input to the bottom of the
+texture while Streamline tagged input starting at `(0, 0)`. At 1280x720 output,
+Quality consumed 240 blank rows out of 480; Balanced consumed 302 out of 418.
+Successful SDK evaluation alone did not establish a correct image.
+
+- `neo/renderer/RenderWorld.cpp::idRenderWorldLocal::RenderScene` now selects the
+  existing explicit zero-origin crop overload for backend 3. Native TAA, DLAA,
+  irradiance captures and legacy resolution scaling retain their existing paths.
+  Formats, motion sign/units, jitter and output dimensions are unchanged; the
+  rendered color/depth/motion/mask region now agrees with the tagged input extent.
+- `tools/neural-rendering/Test-NeuralReconstruction.py` executes the actual crop
+  and viewport-routing bodies. All 24 DLSS input-coverage cases and 24 legacy
+  cases pass, including NR profiles, resize and unavailable SDK. Injecting the
+  original crop in memory makes the regression fail.
+- Configure: `Configure-RBDOOM-DX12.ps1 -BuildDirectory <sdk-or-native-tree>
+  -RayTracing ON`, retaining the existing pinned SDK ON/OFF cache settings.
+  Build: `Build-RBDOOM.ps1 -BuildDirectory <tree> -Configuration
+  <RelWithDebInfo-or-Release> -Parallel 16`. All four builds passed, including
+  rebuilds after the crop correction. No new dependency or runtime pin was added.
+- Focused review and launcher/preparation, reconstruction, safe-key, menu
+  selection and SWF lifetime regressions passed. Launch-picker tests used the
+  packaged Windows PowerShell 5.1 shell; PowerShell 7's WinForms compilation
+  environment lacks an assembly reference for that test.
+- GPU temporal transitions and synthetic static/dynamic ray checks passed.
+  After the correction, the Release SDK preset matrix with all four RTX effects
+  and the SDK-off RelWithDebInfo native smoke passed. One earlier native smoke
+  under compilation load missed its primary-view count threshold; deterministic
+  fixed-tic smoke reruns passed. These runs are correctness checks, not benchmarks.
+- Corrected Release NR runs on RTX 5090 / driver 616.64 completed at 1280x720
+  output: DLAA 341, Quality 477, Balanced 199 and Performance 476 presented engine
+  frames, each with zero rejections and exit 0. Input extents were respectively
+  1280x720, 853x480, 742x418 and 640x360. Each separate process logged successful
+  inline NR evaluations at counts 1 and 60. NR processed 1280x720 reconstructed
+  color with guides at the selected input extent; `NREnableUpscaling=0` remained
+  unchanged. NR processing itself did not become lower-resolution.
+- Inspected pre/post-fix scene captures: reduced-resolution SDK output now fills
+  the image. NR captures are retained for the local playtest. Full motion, F1/F6,
+  ultrawide, resize, save/load and artistic acceptance remain human checks.
+
+Evidence is local and ignored: `captures/neural/milestone1-*.log`, plus isolated
+`smoke-*` and `nr-milestone-*` folders in the playtest installation. The prerequisite
+script incorrectly included `.gitmodules` from ignored research archives; direct
+`git submodule status --recursive` verified all four actual engine submodules.
+The normal installed game was not modified; data, runtimes and saves were copied
+to a separate local folder. No proprietary assets/runtimes entered source control.
+
+Next: playtest the corrected branch build, especially live F1/F6 changes and
+moving scenes at the user's output resolution; then measure median/p95 frame
+times under OPT-001. No measured speedup or general visual acceptance is claimed.
+
+## 2026-09-08 - Glass composition and reduced-input screen-material regressions
+
+The first playtest reported newly unstable emissive/reflected lighting and
+opaque-looking glass/exhaust effects. The player clarified that intermittent
+black surfaces with F11 also occurred in the previous stable build: that older
+issue is tracked separately and is not claimed resolved here. Inspection found
+two independent defects; these were not attributed to the texture pack.
+
+- `RenderBackend.cpp::DrawViewInternal` previously replaced captured opaque probe
+  specular after generic transparency and fog had attenuated that probe in HDR.
+  Subtracting the original, unattenuated probe could clamp to black; adding bounce
+  at that point also bypassed foreground transmission. Normal
+  `R_RenderRayTracedGI` now executes immediately after `DrawInteractions`, before
+  SSR snapshots, generic materials, fog and refraction. Its `debugPass` argument
+  in `RenderCommon.h` and `RayTracingDiagnostic.cpp` preserves late F10 diagnostic
+  output while selecting exactly one lighting dispatch. Graphics state is
+  invalidated after lighting, including the copy-only failure fallback.
+- `rt/diffuse_bounce.cs.hlsl` and `rt/reflections.cs.hlsl` add supported material
+  emission to the earlier interaction-color cache exactly once. Late diagnostic
+  cache accounting remains unchanged; `rt/ray_materials.hlsli` documents the
+  cache boundary. `GatherStaticWorld` excludes subview/mirror materials, matching
+  existing dynamic-geometry coverage.
+- In backend 3, both `_currentRender` blits now crop their source to the actual
+  DLSS input viewport and expand it over the existing output-sized snapshot.
+  Legacy screen-color consumers therefore retain view-relative normalized UVs.
+  `builtin/legacy/bumpyenvironment2.ps.hlsl` instead fetches screen normals at
+  absolute raster pixels. Both `builtin/lighting/ambient*_IBL.ps.hlsl` shaders
+  normalize AO coordinates by the AO texture dimensions, preserving the clamped
+  white-texture fallback. The new SSAO and RT AO producers already wrote absolute
+  input-viewport pixels into the output-sized AO allocation.
+- No resource format, motion/jitter convention, SDK/runtime pin or dependency
+  changes. Main DLSS input remains zero-origin; full-size native/DLAA snapshot
+  selection is unchanged. Legacy SSAO (`r_useNewSsaoPass=0`) and its fullscreen
+  debug display are separate reduced-resolution follow-ups.
+
+Validation:
+
+- Configured DX12/RT ON with `Configure-RBDOOM-DX12.ps1`, then built SDK ON/OFF
+  RelWithDebInfo and Release using `Build-RBDOOM.ps1 -Configuration <config>
+  -Parallel 16`: all four passed.
+- `Test-RayLightingComposition.py` executes source-derived composition and
+  emission expressions: 18 glass/fog energy cases, single-dispatch debug routing
+  and cached/offscreen emission cases pass; deliberate broken ordering/emission
+  mutations fail. `Test-NeuralReconstruction.py` executes the actual snapshot
+  crop and AO/SSR coordinate snippets across presets, resize and viewport offsets;
+  the original fullscreen-snapshot negative control fails as expected.
+- Independent focused review and `git diff --check` passed.
+- At the same copied Mars City quicksave, a 2560x720 DLSS Quality baseline
+  (1707x480 input) showed a duplicated smaller scene rectangle even with RTX off.
+  The repaired Release build removes it with RTX both off and on. All six
+  DLAA/Quality off/on/off captures retain the same frozen view position; backend
+  and RT state checks pass with zero rejected DLSS frames and invalid ray outputs.
+  Animated shading still varies, so off-return captures are not claimed identical.
+- SDK-on RelWithDebInfo smoke passed all four effects, their history resets and
+  off/on recovery, plus the seven F10 modes. SDK-off RelWithDebInfo native smoke
+  passed with effects disabled. The first diagnostic run hit a stale test
+  expectation for the old raw F4 binding; `Test-NeuralDoom-Smoke.ps1` now expects
+  the shipped `rayTracingBounceToggle` command. All seven diagnostic captures
+  were present in that run, and the corrected full check passed on rerun.
+- Separate Release NR runs passed DLAA, Quality, Balanced and Performance at
+  1280x720 output, with respectively 466/477/477/477 presented engine frames and
+  zero rejections. Every process logged successful consumer evaluations at
+  counts 1 and 60. Inputs were 1280x720, 853x480, 742x418 and 640x360; NR retained
+  output-sized reconstructed color and input-sized guides. These are correctness
+  checks on RTX 5090 / driver 616.64, not performance measurements.
+- Evidence remains in ignored `captures/neural/material-*` folders. Player saves
+  and settings were copied for testing, and their source hashes remained intact.
+
+Known limit: additive translucent per-light interactions still enter the early
+radiance cache; generic alpha, fog and screen-warp stages now follow composition.
+This remains a hybrid one-bounce renderer with limited material coverage. Next:
+re-test the reported glass, mirrors and ship exhaust in live motion at the player's
+resolution before accepting this branch for a PR. The reproduced screen-coordinate
+artifact is resolved; general visual acceptance remains pending.
+Reproduce the older intermittent F11 black-surface case separately; the composition
+correction may help it, but the saved-camera toggle check did not establish that.
+
+## 2026-09-08 - Reduced-input material pulsing and temporal-coordinate corrections
+
+The next playtest reported floor/material bulging and pulsing that increased from
+Quality toward Performance. Source inspection identified three concrete input
+errors; visual acceptance is separate from successful SDK evaluation.
+
+- `NeuralTemporalStreamline.cpp::idStreamlineNeuralTemporalBackend::Evaluate`
+  converts the engine jitter's Y sign when setting `sl::Constants::jitterOffset`.
+  The actual `GLMatrix.cpp::R_SetupProjectionMatrix` moves DX12 raster samples by
+  `(jitter.x, -jitter.y)`, while the adapter had reported `(jitter.x, jitter.y)`.
+  The adapter now reports the measured displacement in input pixels, +X right,
+  +Y down. Projection, jitter sequence, native TAA and shared frame metadata are
+  unchanged. NVIDIA's [sample projection](https://github.com/NVIDIA-RTX/Streamline_Sample/blob/main/donut/src/engine/View.cpp)
+  and [Streamline constants](https://github.com/NVIDIA-RTX/Streamline_Sample/blob/main/src/StreamlineSample.cpp)
+  confirm that its reported jitter agrees with raster displacement.
+- `builtin/post/motionBlur.ps.hlsl`, `VECTORS_ONLY` permutation, now fetches
+  camera-motion depth and alpha from the absolute raster pixel instead of
+  stretching input-view UVs over output-sized textures. Clip/reprojection UVs
+  remain input-relative; previous-minus-current motion is multiplied by input
+  dimensions so viewport origins cancel. Ordinary motion blur retains its
+  previous sampling. The wrong depth was especially harmful to camera-translation
+  parallax on nearby surfaces at reduced resolution.
+- `RenderBackend.cpp::PrepareStageTexturing`, `TG_REFLECT_CUBE`, builds the SSR
+  DDA projection from the raster viewport dimensions rather than display size.
+  `builtin/legacy/bumpyenvironment2.ps.hlsl::ReconstructPositionCS` reconstructs
+  integer depth fetches at pixel centers. At half input size, the previous
+  projection could start a ray twice as far across the depth texture; the
+  half-pixel reconstruction error was also amplified in output pixels.
+- Resource formats and sizes remain HDR/output RGBA16F, motion RG16F, masks R8,
+  and existing device-depth storage. No runtime, SDK, dependency, texture pack,
+  jitter pattern, sharpening or mip-bias changes.
+
+Validation:
+
+- `Test-NeuralJitter.py` executes the actual projection method, eight-point
+  jitter table and adapter statement: 192 raster/metadata checks pass across
+  native/all presets, resize and depth; the original Y sign fails.
+- `Test-NeuralReconstruction.py` additionally executes camera-motion fetch and
+  displacement expressions with nonzero viewport origins; the old normalized
+  depth lookup fails its negative control. `Test-SSRCoordinates.py` executes
+  the actual projection block and shader reconstruction: 240 pixel-center round
+  trips pass; old display-size projection and corner reconstruction each fail.
+- DX12 configured with RT ON using `Configure-RBDOOM-DX12.ps1`; SDK ON/OFF
+  RelWithDebInfo and Release builds passed with `Build-RBDOOM.ps1 -Configuration
+  <config> -Parallel 16`. SDK builds also passed after the final jitter change.
+- Independent focused review and `git diff --check` passed. SDK-on
+  RelWithDebInfo smoke passed the DLAA/Quality/Balanced/Performance matrix with
+  all four ray effects and rollback; SDK-off RelWithDebInfo native/effects-off
+  smoke passed. No performance claim is made from those runs.
+- Captured eight settled floor frames at five-frame intervals, 2560x720 output
+  and Performance 1280x360 input, before/after with NR off and on. The same copied
+  Mars City quicksave, camera position and 65-degree pitch were used. All four
+  valid sequences had zero reconstruction rejections; NR consumer evaluations
+  succeeded. An initial zero-evaluation/black capture was rejected, and initial
+  cinematic captures were excluded from floor comparisons.
+- In the central floor ROI, a local linear registration estimate (3x4 patches,
+  Gaussian radius 2, brightness-offset term) measured RMS inter-frame drift
+  falling from 2.17 to 0.067 output pixels with NR off, and 2.14 to 0.083 with NR
+  on. Estimated p95 drift fell from about 4.2 pixels to 0.12/0.15. These are
+  image-based estimates over eight frames, not geometric ground truth or a claim
+  about every material. The baseline showed coherent vertical oscillation;
+  corrected frame sequences retained stable floor structure. Filmic intensity
+  0.3 and stochastic ray lighting were retained, so residual pixel variation
+  is expected and zero-noise output is not claimed.
+- Evidence and the local capture/analysis scripts are isolated under ignored
+  `captures/neural/temporal-floor-*` and `pulse-fix-*`. Installed executable,
+  configuration, runtime and save-source hashes remained intact during testing.
+
+Next: verify the repaired build during camera movement at the player's display
+resolution, especially the originally reported materials. NR-specific material
+interpretation may still vary at lower input resolutions. The older F11
+black-surface report remains a separate open issue.
+
+## 2026-09-08 accumulated-change review at b00e6922
+
+Read-only code audit of 65 downstream commits against `ea29c006`, with parallel temporal, ray-material and tooling reviews. [Detailed findings and evidence](REVIEW_2026-09-08.md) records seven confirmed downstream defects, three retained compatibility problems, their triggers, and narrow next corrections. No renderer changes, new build, game launch or GPU validation were performed during this review; the user's running playtest was left intact. Ten offline Python/source-derived checks and five isolated PowerShell tooling checks passed, while additional probes exposed gaps in their coverage. Initial source status and accumulated `git diff --check` were clean; only this documentation and the review report were added.
+
+## 2026-09-08 - Launcher presentation and independent settings resets
+
+Follow-up requested after the accumulated-change review. The picker now uses
+keyboard-accessible profile and reconstruction cards, explains rendering cost,
+and restores its window once on showing. `LaunchPicker.cs::OnShown` addresses
+inherited minimized startup; the local trial shortcut also needs normal window
+style instead of its previous minimized style. Hidden constructor/event checks
+cover 130 combinations. A brief own-window probe from a minimized PowerShell
+host observed Visible=true, Normal, IsIconic=false; Windows did not grant it
+foreground focus in that automated probe. The rendered form was visually checked.
+
+- Launcher **Restore defaults** resets game/video/audio/controls and ReShade/NR.
+  `LaunchPicker.ps1` calls `Reset-NeuralSettings.ps1::Reset-NeuralGameSettings`
+  only after confirmation. Explicit settings files are backed up with checksums
+  under `.neuraldoom-cache/settings-reset/`; failed edits roll back. Saved games
+  and opaque profile files are preserved. Campaign unlocks from configuration
+  are retained. ReShade uses the installer's INPUT/NR defaults; custom external
+  presets are detached without modifying their files. A running-game mutex and
+  linked-path checks guard the transaction.
+- In-game **System Options > Restore Game / Video Defaults** independently resets
+  game/video/audio/controls. `MenuScreen_Shell_SystemOptions.cpp` adds the action,
+  confirmation and restart handling; `MenuScreen.h` declares its row/state.
+  ReShade files are untouched. The existing smaller **Doom Lighting Defaults**
+  action remains available. Current look tuning is not captured as new defaults.
+- `PlayerProfile.cpp/.h::RestoreSettingsDefaults` resets registered archived
+  preferences, excluding progress, installation paths and startup-only values;
+  it loads shipped bindings and `neural_rtx_contrast.cfg`, enables the four ray
+  effects when compiled, and selects DLAA when the active SDK supports it.
+  `Serialize` reads all achievements/statistics/DLC data while suppressing old
+  preferences/bindings when `neural_settings_reset.pending` contains `version1`.
+  `ApplyPendingSettingsReset` preserves the fresh launcher's display/profile/
+  reconstruction choice. `sys_profile.cpp::Pump` applies the pending reset after
+  loading; `OnSaveSettingsCompleted` consumes the marker only after a successful
+  save. Failed/corrupt profile loads cannot be overwritten by subsequent settings
+  autosaves while the reset remains pending.
+- `win_main.cpp::Sys_SettingsRelaunchCommandLine` removes generated launcher
+  preference seeds from **Restart Now**, preserving startup/runtime/filesystem
+  arguments and current reconstruction. Its private nonarchived INIT session
+  marker retains this behavior across subsequent restarts. Ordinary launches
+  keep their existing command line. This corrects downstream review finding 7.
+  The menu repeater now uses absolute selection indices and bounds checks,
+  correcting the retained scrolled-arrow defect reported in that review.
+
+Validation: independent focused reviews passed. Windows PowerShell 5.1 and
+PowerShell 7 reset fixtures passed backups, rollback/retry, mutex exclusion,
+linked-path rejection, unchanged save/profile bytes and unlock preservation.
+MSVC source-derived `Test-GameSettingsReset.py` passed with ray tracing compiled
+off/on, including real save scheduling after a corrupt load and explicit launch
+choices. `Test-SystemOptionsSelection.py` passed 544 selections including the
+last row; `Test-SettingsRelaunch.py` passed path quoting and repeated restart
+cases. Their original arrow/replay behaviors fail the negative controls.
+
+DX12 configured with `Configure-RBDOOM-DX12.ps1 -RayTracing ON` in SDK ON/OFF
+trees. All four final builds passed with `Build-RBDOOM.ps1 -Configuration
+<RelWithDebInfo|Release> -Parallel 16`, including the repeated-restart marker.
+Release packaging uses the existing allowlisted `Build-InternalPackage.py`
+workflow and matching clean source/build manifests. No shaders, resource
+formats, coordinate conventions, renderer passes or dependencies changed.
+
+One isolated SDK runtime attempt exited before its completion marker; its log
+also reported missing game resources/fonts. This is not a passed reset test.
+The user was playing another game and requested packaging without further game
+launches. Runtime reset/restart and gameplay acceptance are therefore deferred
+to user testing. No live user settings were reset.
+
+Next: test both reset actions and Restart Now locally, then choose the preferred
+look before revising baseline values. The remaining six downstream review
+findings and two retained renderer problems remain separate work.
+
+## 2026-09-11 - Personal settings snapshots and public preview preparation
+
+`Save-NeuralSettingsSnapshot.ps1::Save-NeuralSettingsSnapshot` exports allowlisted
+saved game/binding and ReShade/NR settings into a new ZIP with SHA-256 manifest.
+It excludes profile progress, saves, runtimes and generated launch commands;
+blocks active Doom, pending resets, linked paths and overwriting an existing ZIP;
+and reports an absent optional effects preset. `LaunchPicker.cs/.ps1` expose a
+save-only event/dialog without closing or changing the chosen rendering modes.
+`Reset-NeuralSettings.ps1` shares its existing mutex guard with action-specific
+wording. Current settings and shipped baseline values are unchanged.
+
+The Git ignore/source gate now rejects personal settings and snapshot artifacts.
+`Test-PublicHistory.py` adds read-only all-ref object inventory/privacy reporting,
+complementing redacted Gitleaks. See PUBLIC_READINESS.md for audit scope and limits.
+`InternalSetup.cs::SetupWindow` initializes an automatically selected upgrade's
+destination correctly, fixing review finding 6 before publishing the preview.
+
+PowerShell 5.1/7 snapshot fixtures, 131 hidden picker states, hidden default-upgrade
+navigation, source/privacy tests and focused diff review passed. The picker was
+rendered to a bitmap without launching a game. No renderer/shader/resource-format
+or dependency change occurred. Release builds/package verification are required
+at the final clean source commit. Runtime reset/restart acceptance and selecting
+a sanitized, maintainer-approved baseline remain the next player-validation task.

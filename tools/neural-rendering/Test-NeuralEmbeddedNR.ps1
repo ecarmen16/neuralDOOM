@@ -101,7 +101,7 @@ if ($next -match 'set r_forceAmbient|set r_hdrAutoExposure|set r_rayTracedReflec
 if ([IO.File]::ReadAllText($playerConfig) -ne $playerText) { throw 'Preparation edited the saved config.' }
 Write-Host 'PASS: automatic contrast migration, preparation retry, exact config backup, and preservation of later tuning.'
 
-# The SDK profile honors saved reconstruction; NR keeps native DLAA input.
+# Existing SDK settings do not change the initial NR native-DLAA default.
 [IO.File]::WriteAllText($playerConfig, 'set r_neuralReconstructionMode "0"' + "`r`n")
 $preparedTAA = (& $launcher -RepoRoot $fixture -Profile DLAA -PrepareOnly 6>&1 | Out-String)
 if ($preparedTAA -notmatch 'Reconstruction: Native TAA') { throw 'DLAA profile ignored saved TAA preference.' }
@@ -127,6 +127,37 @@ foreach ($mode in 0..4) {
     if ($generated -notmatch "(?m)^set r_neuralReconstructionMode $mode\r?$") { throw 'Launch quality was not persisted for the menu.' }
 }
 Write-Host 'PASS: explicit launch quality selections are written to the game session config.'
+
+foreach ($mode in 1..4) {
+    $name = @('TAA','DLAA','Quality','Balanced','Performance')[$mode]
+    $expectedQuality = [Math]::Max(0, $mode - 2)
+    $expectedBackend = if ($mode -eq 1) { 2 } else { 3 }
+    $iniBefore = [IO.File]::ReadAllText($ini)
+    foreach ($explicit in @($false, $true)) {
+        $savedMode = if ($explicit) { 1 + $mode % 4 } else { $mode }
+        [IO.File]::WriteAllText($playerConfig, "set r_neuralReconstructionMode 0`r`nset r_neuralNRReconstructionMode $savedMode`r`n")
+        $savedBefore = [IO.File]::ReadAllText($playerConfig)
+        $selectionArgs = @{}
+        if ($explicit) { $selectionArgs.Reconstruction = $name }
+        $argv = & {
+            . $launcher -RepoRoot $fixture -Profile NR @selectionArgs -PrepareOnly 6>$null
+            $launchArgs -join ' '
+        }
+        $generated = Get-Content -LiteralPath (Join-Path $fixture 'captures/dogfood/base/neural_dogfood.cfg') -Raw
+        if ($argv -notmatch "\+set r_neuralBackend $expectedBackend(?: |$)" -or
+            $generated -notmatch "(?m)^set r_neuralDLSSQuality $expectedQuality\r?$" -or
+            $generated -notmatch "(?m)^set r_neuralNRReconstructionMode $mode\r?$") { throw 'NR reconstruction does not match the engine arguments and saved menu choice.' }
+        if ($generated -match '(?m)^set r_neuralReconstructionMode ' -or $generated -match '(?m)^(?:un)?bind F6') { throw 'NR selection changed SDK preferences or F6.' }
+        if ([IO.File]::ReadAllText($playerConfig) -ne $savedBefore -or [IO.File]::ReadAllText($ini) -ne $iniBefore) { throw 'NR preset preparation changed saved settings or add-on configuration.' }
+    }
+    $preparedTAA = (& $launcher -RepoRoot $fixture -Profile DLAA -PrepareOnly 6>&1 | Out-String)
+    if ($preparedTAA -notmatch 'Reconstruction: Native TAA') { throw 'NR preset leaked into the SDK profile.' }
+}
+$caught = $false
+try { & $launcher -RepoRoot $fixture -Profile NR -Reconstruction TAA -ValidateOnly }
+catch { if ($_.Exception.Message -notlike 'NR requires a DLAA or DLSS evaluation*') { throw }; $caught = $true }
+if (-not $caught) { throw 'NR accepted TAA without a reconstruction evaluation.' }
+Write-Host 'PASS: NR presets map to engine arguments, preserve F6/add-on settings, remain independent of SDK presets, and reject TAA.'
 
 # Inspect the actual prepared argv without starting a process.
 $disabledRays = "set r_rayTracedAO 0`nset r_rayTracedContactShadows 0`nset r_rayTracedGI 0`nset r_rayTracedReflections 0`n"

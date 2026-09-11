@@ -63,15 +63,23 @@ void main( PS_IN fragment, out PS_OUT result )
 #endif
 
 	// don't motion blur the hands, which were drawn with alpha = 0
-	if( t_ViewColor.Sample( LinearSampler, fragment.texcoord0 ).a == 0.0 )
+#if VECTORS_ONLY
+	// Temporal inputs occupy the active viewport inside output-sized textures.
+	// Raster pixels address those resources; texcoord0 remains view-relative.
+	int2 rasterPixel = int2( fragment.position.xy );
+	float viewAlpha = texelFetch( t_ViewColor, rasterPixel, 0 ).a;
+	float windowZ = texelFetch( t_ViewDepth, rasterPixel, 0 ).x;
+#else
+	float viewAlpha = t_ViewColor.Sample( LinearSampler, fragment.texcoord0 ).a;
+	float windowZ = t_ViewDepth.Sample( LinearSampler, fragment.texcoord0 ).x;
+#endif
+	if( viewAlpha == 0.0 )
 	{
 		discard;
 		return;
 	}
 
 	// derive clip space from the depth buffer and screen position
-	float windowZ = t_ViewDepth.Sample( LinearSampler, fragment.texcoord0 ).x;
-
 	//float3 ndc = float3( fragment.texcoord0 * 2.0 - 1.0, windowZ * 2.0 - 1.0 );
 	//float clipW = -rpProjectionMatrixZ.w / ( -rpProjectionMatrixZ.z - ndc.z );
 
@@ -102,10 +110,8 @@ void main( PS_IN fragment, out PS_OUT result )
 	float2 delta = ( fragment.texcoord0 - prevTexCoord );
 
 #if VECTORS_ONLY
-	float2 prevWindowPos = prevTexCoord * pc.rpWindowCoord.zw;
-
-	float2 deltaPos = prevWindowPos - fragment.position.xy;
-	float2 deltaUV = prevTexCoord - fragment.texcoord0;
+	// Subtract in view-relative space so a nonzero viewport origin cancels.
+	float2 deltaPos = ( prevTexCoord - fragment.texcoord0 ) * pc.rpWindowCoord.zw;
 
 	result.color = float4( deltaPos, 0.0, 1.0 );
 #else

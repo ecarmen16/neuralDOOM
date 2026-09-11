@@ -9,15 +9,23 @@ Statuses: `BLOCKED`, `READY`, `IN PROGRESS`, `VERIFY`, `DONE`, `DEFERRED`.
 The next work is [NEURAL_PERFORMANCE_PLAN.md](NEURAL_PERFORMANCE_PLAN.md): measure
 the reported NR slowdown, prove NR + DLSS Quality, then optimize measured costs
 before Reflex, frame generation and full path tracing. Baseline installer:
-`internal-d16dab5e`. Suggested implementation branch: `codex/neural-performance`
-from reviewed `main`; this planning update does not create or enable that work.
+`internal-d16dab5e`. Implementation branch: `codex/milestone-1`, created from
+reviewed `main` at `d21c4445`. Review and playtest branch builds before opening a PR;
+only `ecarmen16` or `eraser851` may manually approve and merge the latest changes.
+No optimization implementation is merged into `main` by this branch setup.
 Use [PERFORMANCE_FEEDBACK.md](PERFORMANCE_FEEDBACK.md) for current-release feedback.
+
+2026-09-08: branch SDK/native builds and bounded GPU checks passed after fixing
+the DLSS input viewport origin. NR evaluated with all three reduced-input presets
+at 1280x720 output. A separate local playtest preserves the existing installation.
+Manual visual/motion acceptance and performance measurements remain pending; see
+the latest entry in `TEST_RESULTS.md`.
 
 | ID | Status | Task | Next evidence / dependency |
 |---|---|---|---|
 | OPT-001 | READY | Isolate NR, reconstruction and RTX cost | Repeated Release frame-time measurements, pass/dispatch dimensions and timer coverage |
-| OPT-010 | DEFERRED | Guarded NR + DLSS Quality experiment | OPT-001; prove actual NR evaluations and correct mixed input/output dimensions |
-| OPT-020 | DEFERRED | Persist validated NR reconstruction choices in launcher/menu | OPT-010; Quality first, then Balanced/Performance; F6 retains reconstruction |
+| OPT-010 | VERIFY | NR + DLSS Quality evaluated with corrected zero-origin inputs | 853x480 guides / 1280x720 NR output passed; motion/ultrawide visual checks and OPT-001 remain |
+| OPT-020 | VERIFY | Independent NR presets in launcher/menu/F1, native DLAA default | Control tests and separate DLAA/Quality/Balanced/Performance NR runs pass; live F1/F6 and wider playtest remain |
 | OPT-030 | DEFERRED | Optimize measured rendering hot spots | OPT-001 identifies work worth changing; no hidden quality reduction |
 | OPT-040 | DEFERRED | Shared frame identity and Reflex | Initial NR/DLSS result; independent fallback work if its compatibility is blocked |
 | OPT-050 | DEFERRED | Frame Generation and supported MFG modes | OPT-040 and valid frame/UI/presentation lifetime |

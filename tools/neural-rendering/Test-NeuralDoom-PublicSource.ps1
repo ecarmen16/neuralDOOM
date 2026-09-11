@@ -42,11 +42,14 @@ try {
         if ($forbiddenLeafNames -contains $leaf.ToLowerInvariant()) {
             $failures += "Tracked local runtime: $trackedFile"
         }
-        if ($normalized -match '(^|/)(captures|releases|neural-local|local-proprietary|local-research|\.neuraldoom-cache|mod_D3HDP_Lite)(/|$)') {
+        if ($normalized -match '(?i)(^|/)(captures|releases|neural-local|local-proprietary|local-research|\.neuraldoom-cache|settings-snapshots|mod_D3HDP_Lite)(/|$)') {
             $failures += "Tracked local-only path: $trackedFile"
         }
         if ($normalized -match '(?i)\.(resources?|pk4|rdc)$') {
             $failures += "Tracked game data or capture: $trackedFile"
+        }
+        if ($leaf -match '(?i)^(D3BFGConfig\.cfg|ReShadePreset\.ini|reshade\.ini|imgui\.ini|profile\.bin|\.neuraldoom-snapshot-.*\.tmp)$') {
+            $failures += "Tracked personal settings: $trackedFile"
         }
     }
 

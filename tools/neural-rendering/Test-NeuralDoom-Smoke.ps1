@@ -369,7 +369,7 @@ try {
     }
     if ($RayTracingDebugViews) {
         $savedConfig = Get-Content -LiteralPath (Join-Path $saveBase.FullName 'D3BFGConfig.cfg') -Raw
-        if ($savedConfig -notmatch 'bind\s+"?F4"?\s+"toggle r_rayTracedGI; neuralHistoryReset"' -or
+        if ($savedConfig -notmatch 'bind\s+"?F4"?\s+"rayTracingBounceToggle"' -or
             $savedConfig -notmatch 'bind\s+"?F11"?\s+"rayTracingToggle"' -or [regex]::Matches($log, 'Ray-tracing view [0-6]:').Count -ne 7) { throw 'RTX example bindings or debug-view cycle failed.' }
     }
     $probes = [regex]::Matches($log, 'PROBE_LIGHTING world=1 map=(\S+) probes=(\d+) irradianceReady=(\d+) radianceReady=(\d+) complete=(\d+) defaulted=(\d+) unloaded=(\d+)')

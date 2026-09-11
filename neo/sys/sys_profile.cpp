@@ -102,10 +102,17 @@ void idProfileMgr::Pump()
 			const idSaveLoadParms& parms = profileLoadProcessor->GetParms();
 			if( parms.GetError() == SAVEGAME_E_FOLDER_NOT_FOUND || parms.GetError() == SAVEGAME_E_FILE_NOT_FOUND )
 			{
-				profile->SaveSettings( true );
+				if( !profile->ApplyPendingSettingsReset() ) { profile->SaveSettings( true ); }
 			}
 			else if( parms.GetError() == SAVEGAME_E_CORRUPTED )
 			{
+				// A settings reset must not replace a profile whose progress could not be read.
+				if( idPlayerProfile::HasPendingSettingsReset() )
+				{
+					profile->SetState( idPlayerProfile::ERR );
+					common->Dialog().AddDialog( GDM_CORRUPT_PROFILE, DIALOG_CONTINUE, NULL, NULL, false );
+					return;
+				}
 				idLib::Warning( "Profile corrupt, creating a new one..." );
 				common->Dialog().AddDialog( GDM_CORRUPT_PROFILE, DIALOG_CONTINUE, NULL, NULL, false );
 				profile->SetDefaults();
@@ -114,6 +121,10 @@ void idProfileMgr::Pump()
 			else if( parms.GetError() != SAVEGAME_E_NONE )
 			{
 				profile->SetState( idPlayerProfile::ERR );
+			}
+			else
+			{
+				profile->ApplyPendingSettingsReset();
 			}
 
 			session->OnLocalUserProfileLoaded( user );
@@ -307,6 +318,10 @@ void idProfileMgr::OnSaveSettingsCompleted( idSaveLoadParms* parms )
 	if( parms->GetError() != SAVEGAME_E_NONE )
 	{
 		common->Dialog().AddDialog( GDM_PROFILE_SAVE_ERROR, DIALOG_CONTINUE, NULL, NULL, false );
+	}
+	else
+	{
+		profile->CompletePendingSettingsReset();
 	}
 	if( game )
 	{

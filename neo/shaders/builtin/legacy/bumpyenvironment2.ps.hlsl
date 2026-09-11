@@ -67,7 +67,8 @@ float3 ReconstructPositionCS( int2 hitPixel )
 	// Load returns 0 for any value accessed out of bounds
 	float depth = texelFetch( t_Depth, hitPixel, 0 ).r;
 
-	float2 uv = hitPixel * pc.rpWindowCoord.xy;
+	// Integer depth fetches represent pixel centers, including reduced inputs.
+	float2 uv = ( float2( hitPixel ) + 0.5f ) * pc.rpWindowCoord.xy;
 
 	// derive clip space from the depth buffer and screen position
 	float3 ndc = float3( uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0, depth );
@@ -329,7 +330,8 @@ void main( PS_IN fragment, out PS_OUT result )
 	globalNormal.y = dot3( localNormal, fragment.texcoord3 );
 	globalNormal.z = dot3( localNormal, fragment.texcoord4 );
 
-	float3 screenNormalWS = ( ( 2.0 * t_ScreenNormals.Sample( s_LinearClamp, fragment.position.xy * pc.rpWindowCoord.xy ).rgb ) - 1.0 );
+	// Normals share raster pixel coordinates, even when the DLSS viewport is smaller than the texture.
+	float3 screenNormalWS = ( ( 2.0 * texelFetch( t_ScreenNormals, int2( fragment.position.xy ), 0 ).rgb ) - 1.0 );
 
 	// https://blog.selfshadow.com/publications/blending-in-detail/
 

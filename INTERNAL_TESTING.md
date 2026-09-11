@@ -1,10 +1,16 @@
 # neuralDoom internal RTX test build
 
+Milestone 1 adds experimental NR + DLSS controls. Branch builds, control tests and
+bounded NR preset runs passed on 2026-09-08 after correcting the input viewport.
+Use the separate branch playtest installation for visual/motion acceptance and
+performance feedback. Each release tag identifies its exact preview source;
+older installers remain available separately.
+
 ## Install or manage
 
 1. Run **neuralDoom-Setup-<version>.exe**. Setup detects registered and older default/Desktop installations; Browse can find another. Choose **Upgrade / repair**, **Copy to a new folder**, **New installation**, or **Uninstall**.
 2. Select the destination and your owned **Doom 3 BFG Edition** installation. Upgrades replace program files in place with a rollback backup; a copy imports saves and settings into a separate folder. Your original BFG data remains unchanged.
-3. Choose **NR + DLAA**, **DLAA / DLSS**, or **Native RTX**. Leave DLL fields blank for automatic downloads, or select `nvngx_dlss.dll` / `nvngx_dlssnr.dll` locally. DLSS SR must have a valid NVIDIA x64 signature; NR must match the tested RHI 310.8.SF-v2 version. NR downloads the complete pinned compatibility stack, loads ReShade through the engine, and installs no `dxgi.dll` proxy.
+3. Choose **NR + DLAA / DLSS**, **DLAA / DLSS**, or **Native RTX**. Leave DLL fields blank for automatic downloads, or select `nvngx_dlss.dll` / `nvngx_dlssnr.dll` locally. DLSS SR must have a valid NVIDIA x64 signature; NR must match the tested RHI 310.8.SF-v2 version. NR downloads the complete pinned compatibility stack, loads ReShade through the engine, and installs no `dxgi.dll` proxy.
 4. Review and install. Setup obtains Microsoft prerequisites, verified lighting data, and the chosen neural components. Up to 2.1 GB downloads and about 16 GB free space for a new install; allow 4 GB for an upgrade. No compiler, Git, Python or preinstalled archive tool is required. Windows may request permission for Microsoft prerequisites.
 5. Use the Start menu or desktop shortcut. The launcher shows the available rendering profiles and explains their tradeoffs. NR is the fresh-install default; setup and saved **Next Launch Profile** choices select the initial option. Choose a profile and click **Play Doom 3** to enter the Doom 3 menu directly. Setup does not start the game.
 
@@ -12,7 +18,8 @@
 
 | Mode | Rendering input | Main tradeoff |
 |---|---|---|
-| NR + DLAA (default) | Native resolution | Experimental neural appearance processing adds cost and can change brightness/detail. F6 compares NR with direct DLAA passthrough. Native HDR and reduced-resolution DLSS are unavailable. |
+| NR + DLAA (default) | Native resolution | Experimental neural appearance processing adds cost and can change brightness/detail. F6 compares NR with direct DLAA passthrough. Native HDR is unavailable. |
+| NR + DLSS (branch experiment) | Quality ~67%, Balanced ~58%, Performance ~50% per axis | Explicit choices to reduce engine rendering cost. NR may retain substantial processing cost; compatibility and performance have not yet been measured. F6 preserves the chosen reconstruction. |
 | DLAA | Native resolution | NVIDIA anti-aliasing prioritizes edge stability and detail without reducing rendering resolution. Native HDR is available; NR is not loaded. |
 | DLSS Quality | About 67% per axis, 44% of native pixels | Upscaling favors detail; may improve FPS when GPU limited. |
 | DLSS Balanced | About 58% per axis, 34% of native pixels | Lower rendering cost with more loss of fine detail and stability in motion. |
@@ -31,16 +38,35 @@ The package contains our native and SDK-enabled engines, compiled shaders and co
 
 ## Exact comparison controls
 
+### Personal settings snapshots and resets
+
+After exiting Doom 3 normally, use **Save snapshot...** in the launcher to save
+a ZIP under `settings-snapshots` or another local folder. It captures saved game
+configuration/bindings, ReShade/NR configuration and the referenced effects
+preset when present, with a checksum manifest. Unsaved launcher selections are
+not applied. Savegames, profile progress, runtime DLLs, shaders and screenshots
+are excluded. Snapshot files may contain local paths: keep them personal, out
+of Git and release packages. This is a save-only export, not an automatic restore
+or public baseline-preset feature.
+
+Launcher **Restore defaults...** includes ReShade/NR. The independent in-game
+**System Options > Restore Game / Video Defaults** resets game/video/audio/controls
+while retaining external ReShade settings. Both preserve saves and progress.
+Finish a pending reset by launching and exiting before taking a new snapshot.
+Shipped defaults remain unchanged until the maintainer confirms the preferred
+settings after a full reset; a later sanitized baseline should omit personal
+paths, bindings and progress flags as appropriate.
+
 These defaults occupy keys unused by the normal game. Custom bindings are preserved. All engine actions below can be remapped in **Settings > Controls > Keyboard Bindings**, under **Renderer Comparisons**. Animated geometry has a bindable action but no extra default key.
 
 | Key | Exactly what it changes |
 |---|---|
-| F1 | Native-resolution TAA / DLAA in the DLAA/DLSS profile. Using F1 leaves a DLSS upscale preset. No change in Native or NR. |
+| F1 | In NR: cycle DLAA → Quality → Balanced → Performance → DLAA. In the SDK-only profile: native-resolution TAA / DLAA; this leaves an upscale preset. No change in Native. |
 | F2 | Moving ray geometry on/off: visible opaque doors, props and characters. Does not toggle the four lighting effects. |
 | F3 | RTX material reflections only. Replaces the old F9 reflection binding. |
 | F4 | RTX diffuse material bounce only. |
 | F5 | Doom quicksave, unchanged. The add-on's separate screenshot shortcut is moved to F13. |
-| F6 | NR on/off in the NR profile; off is full-resolution DLAA passthrough. It does not toggle the RTX lighting. The add-on owns this key and its current effect state. |
+| F6 | NR on/off in the NR profile; off retains the selected DLAA or DLSS reconstruction. It does not toggle RTX lighting or change the engine preset. The add-on owns this key and its current effect state. |
 | F7 | Ray-traced ambient occlusion only. |
 | F8 | Ray-traced contact shadows only. |
 | F9 | Doom quickload, restored if the old RTX preset had overwritten it. |
@@ -53,7 +79,7 @@ System Options also has all four individual lighting toggles, moving/animated ge
 
 **FPS Counter** defaults to **Top right** for fresh settings and follows window resizing, including ultrawide. Toggle it in System Options or use `com_showFPS 1` / `0`; existing saved choices are preserved. **Filmic Intensity** blends the SDR postprocessing effect from 0% (off) to 100% (original effect), in 5% steps. Native HDR bypasses this effect.
 
-**Next Launch Profile** preselects the launcher after quitting/reopening. Native/DLAA/NR initialization is a startup choice. Run setup in Upgrade mode to install omitted neural components. NR status describes the selected compatibility profile, not whether the external add-on is applying its effect. Advanced launches can pass `-NoLauncher` to use saved selections or `-Profile DLAA -Reconstruction Quality` (also TAA, DLAA, Balanced, Performance). `+set com_startInDoom3 0` restores the classic game selector when launching the engine directly.
+**Next Launch Profile** preselects the launcher after quitting/reopening. Native/DLAA/NR initialization is a startup choice. Run setup in Upgrade mode to install omitted neural components. NR status describes the selected compatibility profile, not whether the external add-on is applying its effect. Advanced launches can pass `-NoLauncher` to use saved selections or `-Profile NR -Reconstruction Quality` (also DLAA, Balanced, Performance). `-Profile DLAA` additionally allows TAA. NR defaults to DLAA regardless of an older SDK-only preference; each profile then remembers its own choice. `+set com_startInDoom3 0` restores the classic game selector when launching the engine directly.
 
 ## Five-minute test
 
