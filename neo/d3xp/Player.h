@@ -340,6 +340,7 @@ public:
 	// RB: hack to reinit flash light when switching between classic mode
 	bool					flashlightReset;
 	int						flashlightBattery;
+	float					flashlightBatteryFraction = 0.0f;
 	idEntityPtr<idWeapon>	flashlight;
 
 	idEntityPtr<idWeapon>	weapon;

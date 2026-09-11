@@ -314,7 +314,7 @@ try {
         if ($log -notmatch 'RT_DIAGNOSTIC_ERROR reason=missing-shader' -or $log -notmatch 'RT_TEST status=FAIL reason=initialization-or-trace' -or $log -match 'RT_BUILD|RT_TRACE') { throw 'Missing RT shader did not fail safely before GPU work.' }
     } elseif ($RayTracingDiagnostics -in @('Synthetic', 'Scene')) {
         $expectedTests = if ($RayTracingDiagnostics -eq 'Scene') { 3 } else { 2 }
-        if ($log -notmatch 'RT_DYNAMIC_TEST status=PASS phases=4 mismatches=0') { throw 'Dynamic ray insertion/movement/removal diagnostic failed.' }
+        if ($log -notmatch 'RT_DYNAMIC_TEST status=PASS phases=8 mismatches=0 hiddenCamera=1 worldLight=1 excludedLight=1 toggleRemoval=1') { throw 'Dynamic ray geometry/player-shadow exclusion diagnostic failed.' }
         if ([regex]::Matches($log, 'RT_TEST status=PASS phases=2 rays=24 mismatches=0').Count -ne $expectedTests -or $log -match 'RT_\w+ status=FAIL|RT_DIAGNOSTIC_ERROR') { throw 'Ray intersection or instance-update checks failed.' }
         if ($log -notmatch 'RT_SCENE status=SKIP reason=no-world') { throw 'Missing safe no-world RT diagnostic result.' }
         if ($RayTracingDiagnostics -eq 'Scene') {

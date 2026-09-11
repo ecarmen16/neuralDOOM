@@ -27,9 +27,14 @@ void main(uint3 tid : SV_DispatchThreadID)
     primary.Direction = (receiver - primary.Origin) / distance;
     primary.TMin = 0.01;
     primary.TMax = distance + max(0.5, distance * 0.001);
-    RayQuery<RAY_FLAG_FORCE_OPAQUE> surface;
+    RayQuery<RAY_FLAG_NONE> surface;
     surface.TraceRayInline(Scene, RAY_FLAG_NONE, 255, primary);
-    while (surface.Proceed()) {}
+    while (surface.Proceed())
+    {
+        if (surface.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE &&
+            RaySurfaceVisible(surface.CandidateInstanceID() + surface.CandidatePrimitiveIndex()))
+            surface.CommitNonOpaqueTriangleHit();
+    }
     if (surface.CommittedStatus() != COMMITTED_TRIANGLE_HIT ||
         abs(surface.CommittedRayT() - distance) > max(0.5, distance * 0.001)) return;
     float3 normal, receiverAlbedo, ignoredEmission;
@@ -48,9 +53,14 @@ void main(uint3 tid : SV_DispatchThreadID)
         ray.Direction = tangent * (r * cos(phi)) + bitangent * (r * sin(phi)) + normal * sqrt(1 - r * r);
         ray.TMin = 0.01;
         ray.TMax = CameraRadius.w;
-        RayQuery<RAY_FLAG_FORCE_OPAQUE> bounce;
+        RayQuery<RAY_FLAG_NONE> bounce;
         bounce.TraceRayInline(Scene, RAY_FLAG_NONE, 255, ray);
-        while (bounce.Proceed()) {}
+        while (bounce.Proceed())
+        {
+            if (bounce.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE &&
+                RaySurfaceVisible(bounce.CandidateInstanceID() + bounce.CandidatePrimitiveIndex()))
+                bounce.CommitNonOpaqueTriangleHit();
+        }
         if (bounce.CommittedStatus() != COMMITTED_TRIANGLE_HIT) continue;
         if (sampled) InterlockedAdd(Stats[2], 1);
         float3 hitNormal, hitAlbedo, emission;

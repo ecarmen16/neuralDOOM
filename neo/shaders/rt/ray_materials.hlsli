@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "ray_visibility.hlsli"
 // Shared static-world material and authored-light evaluation.
 cbuffer Parameters : register(b0)
 {
@@ -108,7 +109,8 @@ float3 Incident(float3 position, float3 normal)
                 if (shadow.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE)
                 {
                     uint vertex = Indices[(shadow.CandidateInstanceID() + shadow.CandidatePrimitiveIndex()) * 3];
-                    if (Materials[(uint)UVMaterials[vertex].z].diffuseS.z > 0) shadow.CommitNonOpaqueTriangleHit();
+                    if (RayShadowAllowed(shadow.CandidateInstanceID() + shadow.CandidatePrimitiveIndex(), asuint(light.color.w)) &&
+                        Materials[(uint)UVMaterials[vertex].z].diffuseS.z > 0) shadow.CommitNonOpaqueTriangleHit();
                 }
             }
             if (shadow.CommittedStatus() == COMMITTED_TRIANGLE_HIT) continue;

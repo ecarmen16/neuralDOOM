@@ -363,6 +363,7 @@ struct viewLight_t
 	};
 	byte* 					entityInteractionState;		// [numEntities]
 
+	int						lightId;					// immutable per-view shadow exclusion ID
 	idVec3					globalLightOrigin;			// global light origin used by backend
 	idPlane					lightProject[4];			// light project used by backend
 	idPlane					fogPlane;					// fog plane for backend fog volume rendering
@@ -411,10 +412,13 @@ struct rayDynamicSurface_t
 	int numVerts, numIndexes;
 	const idMaterial* material;
 	const float* shaderRegisters;
-	bool castsShadow, skinned;
+	bool castsShadow, skinned, shadowOnly;
+	int suppressShadowInLightID;
 };
 bool R_WantDynamicRayGeometry();
 extern idCVar r_rayTracingSkinnedGeometry;
+extern idCVar r_rayTracingDynamicGeometry;
+extern idCVar r_rayTracingPlayerShadows;
 
 struct viewEntity_t
 {

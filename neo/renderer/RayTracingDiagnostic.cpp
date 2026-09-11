@@ -7,6 +7,7 @@
 #include "StreamlineIntegration.h"
 #include "NeuralTemporal.h"
 #include "../framework/KeyInput.h"
+#include "../framework/Console.h"
 #include "../framework/Common_local.h"
 #include "../sys/DeviceManager.h"
 #include <cmath>
@@ -18,6 +19,7 @@ extern DeviceManager* deviceManager;
 extern idCVar r_useNewSsaoPass;
 
 idCVar r_rayTracingDynamicGeometry( "r_rayTracingDynamicGeometry", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "include frame-visible opaque moving entities in ray lighting" );
+idCVar r_rayTracingPlayerShadows( "r_rayTracingPlayerShadows", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "include hidden player body/head in ray shadows; requires g_showPlayerShadow and skinned geometry" );
 idCVar r_rayTracingSkinnedGeometry( "r_rayTracingSkinnedGeometry", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "include current skinned poses in dynamic ray geometry" );
 idCVar r_rayTracedAO( "r_rayTracedAO", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Experimental native ray-traced AO for static opaque world surfaces; requires USE_RAYTRACING and new SSAO" );
 static idCVar r_rayTracedAORadius( "r_rayTracedAORadius", "64", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Ray-traced AO radius in Doom world units", 1, 256 );
@@ -45,7 +47,7 @@ void RB_BakeTextureMatrixIntoTexgen( idPlane lightProject[3], const float* textu
 bool R_WantDynamicRayGeometry()
 {
 #if defined( USE_RAYTRACING )
-	return r_rayTracingDynamicGeometry.GetBool() && ( r_rayTracedAO.GetBool() || r_rayTracedGI.GetBool() || r_rayTracedReflections.GetBool() || r_rayTracedContactShadows.GetBool() );
+	return ( r_rayTracingDynamicGeometry.GetBool() || r_rayTracingPlayerShadows.GetBool() ) && ( r_rayTracedAO.GetBool() || r_rayTracedGI.GetBool() || r_rayTracedReflections.GetBool() || r_rayTracedContactShadows.GetBool() );
 #else
 	return false;
 #endif
@@ -55,7 +57,11 @@ bool R_RayTracingSettingsChanged()
 {
 	bool changed = false;
 #if defined( USE_RAYTRACING )
-	idCVar* settings[] = { &r_rayTracingDynamicGeometry, &r_rayTracingSkinnedGeometry, &r_rayTracedAO, &r_rayTracedAORadius, &r_rayTracedAOStrength, &r_rayTracedAOSamples,
+	const bool playerShadow = cvarSystem->GetCVarBool( "g_showPlayerShadow" );
+	static bool previousPlayerShadow = playerShadow;
+	changed |= playerShadow != previousPlayerShadow;
+	previousPlayerShadow = playerShadow;
+	idCVar* settings[] = { &r_rayTracingDynamicGeometry, &r_rayTracingSkinnedGeometry, &r_rayTracingPlayerShadows, &r_rayTracedAO, &r_rayTracedAORadius, &r_rayTracedAOStrength, &r_rayTracedAOSamples,
 		&r_rayTracedContactShadows, &r_rayTracedContactDistance, &r_rayTracedContactStrength,
 		&r_rayTracedGI, &r_rayTracedGIStrength, &r_rayTracedGIRadius, &r_rayTracedGISamples, &r_rayTracedGIEmissive, &r_rayTracingDebug, &r_rayTracedReflections, &r_rayTracedReflectionStrength,
 		&r_rayTracedReflectionSamples, &r_rayTracedReflectionRoughness, &r_rayTracedReflectionDistance };
@@ -75,6 +81,9 @@ namespace
 static const uint32 RT_DYNAMIC_VERTICES = 131072;
 static const uint32 RT_DYNAMIC_INDICES = 393216;
 static const uint32 RT_DYNAMIC_SURFACES = 128;
+static std::atomic<uint32> dynamicHiddenCount( 0 );
+struct rtShadowPolicy_t { uint32 shadowOnly, suppressLight; };
+static_assert( sizeof( rtShadowPolicy_t ) == 8, "Ray shadow policy must match HLSL uint2" );
 static std::atomic<uint32> dynamicSurfaceCount( 0 ), dynamicTriangleCount( 0 ), dynamicSkinnedCount( 0 ), dynamicSkippedCount( 0 );
 struct rtRay_t
 {
@@ -164,6 +173,16 @@ public:
 		indexDesc.debugName = "RT diagnostic indices";
 		indexBuffer = device->createBuffer( indexDesc );
 		if( !vertices || !indexBuffer ) { return false; }
+		{
+			nvrhi::BufferDesc policyDesc;
+			policyDesc.byteSize = ( indices.size() + ( gameplay ? RT_DYNAMIC_INDICES : 0 ) ) / 3 * sizeof( rtShadowPolicy_t );
+			policyDesc.structStride = sizeof( rtShadowPolicy_t );
+			policyDesc.initialState = nvrhi::ResourceStates::CopyDest;
+			policyDesc.keepInitialState = true;
+			policyDesc.debugName = "Ray triangle shadow policies";
+			shadowPolicies = device->createBuffer( policyDesc );
+			if( !shadowPolicies ) { return false; }
+		}
 
 		nvrhi::rt::GeometryTriangles triangles;
 		triangles.vertexBuffer = vertices;
@@ -191,6 +210,7 @@ public:
 		layoutDesc.bindings = {
 			nvrhi::BindingLayoutItem::RayTracingAccelStruct( 0 ),
 			nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 1 ),
+			nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 12 ),
 			nvrhi::BindingLayoutItem::StructuredBuffer_UAV( 0 )
 		};
 		layout = device->createBindingLayout( layoutDesc );
@@ -210,6 +230,11 @@ public:
 		list->open();
 		list->writeBuffer( vertices, positions.data(), positions.size() * sizeof( idVec3 ) );
 		list->writeBuffer( indexBuffer, indices.data(), indices.size() * sizeof( uint32 ) );
+		if( shadowPolicies )
+		{
+			std::vector<rtShadowPolicy_t> policies( indices.size() / 3, { 0, 0 } );
+			list->writeBuffer( shadowPolicies, policies.data(), policies.size() * sizeof( rtShadowPolicy_t ) );
+		}
 		list->beginTimerQuery( timer );
 		list->buildBottomLevelAccelStruct( blas, &geometry, 1, blasDesc.buildFlags );
 		list->buildTopLevelAccelStruct( tlas, instances.data(), instances.size(), tlasDesc.buildFlags );
@@ -245,16 +270,18 @@ public:
 		if( !dynamicEnabled ) { return true; }
 		std::vector<idVec3> points;
 		std::vector<uint32> elements;
-		uint32 count = 0, skinned = 0, skipped = 0;
+		uint32 count = 0, skinned = 0, skipped = 0, hidden = 0;
+		std::vector<rtShadowPolicy_t> policies;
 		if( uv ) { uv->clear(); }
 		if( accepted ) { accepted->clear(); }
-		if( r_rayTracingDynamicGeometry.GetBool() )
+		if( r_rayTracingDynamicGeometry.GetBool() || r_rayTracingPlayerShadows.GetBool() )
 		{
 			for( const viewEntity_t* entity = view->viewEntitys; entity; entity = entity->next )
 			{
 				for( const rayDynamicSurface_t* surface = entity->raySurfaces; surface; surface = surface->next )
 				{
-					if( ( shadowsOnly && !surface->castsShadow ) || ( surface->skinned && !r_rayTracingSkinnedGeometry.GetBool() ) ) { continue; }
+					if( !surface->shadowOnly && !r_rayTracingDynamicGeometry.GetBool() ) { continue; }
+					if( ( surface->shadowOnly && ( !r_rayTracingPlayerShadows.GetBool() || ( !shadowsOnly && !uv ) ) ) || ( shadowsOnly && !surface->castsShadow ) || ( surface->skinned && !r_rayTracingSkinnedGeometry.GetBool() ) ) { continue; }
 					if( count >= RT_DYNAMIC_SURFACES || points.size() + surface->numVerts > RT_DYNAMIC_VERTICES || elements.size() + surface->numIndexes > RT_DYNAMIC_INDICES ) { skipped++; continue; }
 					bool valid = true;
 					for( int v = 0; v < surface->numVerts; v++ ) { for( int c = 0; c < 3; c++ ) { valid &= std::isfinite( surface->positions[v][c] ); } }
@@ -263,11 +290,14 @@ public:
 					points.insert( points.end(), surface->positions, surface->positions + surface->numVerts );
 					for( int i = 0; i < surface->numIndexes; i++ ) { elements.push_back( offset + surface->indices[i] ); }
 					if( uv ) { for( int v = 0; v < surface->numVerts; v++ ) { const idVec2& st = surface->texcoords[v]; uv->push_back( idVec4( st.x, st.y, firstMaterial + count, 0 ) ); } }
+					policies.insert( policies.end(), surface->numIndexes / 3, { surface->shadowOnly ? 1u : 0u, static_cast<uint32>( surface->suppressShadowInLightID ) } );
+					hidden += surface->shadowOnly ? 1 : 0;
 					if( accepted ) { accepted->push_back( surface ); }
 					skinned += surface->skinned ? 1 : 0; count++;
 				}
 			}
 		}
+		dynamicHiddenCount = hidden;
 		dynamicSurfaceCount = count; dynamicTriangleCount = elements.size() / 3; dynamicSkinnedCount = skinned; dynamicSkippedCount = skipped;
 		if( elements.empty() && !hadDynamic ) { return true; }
 		std::vector<nvrhi::rt::InstanceDesc> instances( elements.empty() ? 1 : 2 );
@@ -280,7 +310,7 @@ public:
 			triangles.indexBuffer = indexBuffer; triangles.indexFormat = nvrhi::Format::R32_UINT;
 			triangles.indexOffset = staticIndexCount * sizeof( uint32 ); triangles.indexCount = RT_DYNAMIC_INDICES;
 			nvrhi::rt::GeometryDesc geometry;
-			geometry.setTriangles( triangles ).setFlags( nvrhi::rt::GeometryFlags::Opaque );
+			geometry.setTriangles( triangles ).setFlags( nvrhi::rt::GeometryFlags::None );
 			if( !dynamicBLAS )
 			{
 				nvrhi::rt::AccelStructDesc desc;
@@ -293,6 +323,7 @@ public:
 			geometry.setTriangles( triangles );
 			list->writeBuffer( vertices, points.data(), points.size() * sizeof( idVec3 ), staticVertexCount * sizeof( idVec3 ) );
 			list->writeBuffer( indexBuffer, elements.data(), elements.size() * sizeof( uint32 ), staticIndexCount * sizeof( uint32 ) );
+			list->writeBuffer( shadowPolicies, policies.data(), policies.size() * sizeof( rtShadowPolicy_t ), staticIndexCount / 3 * sizeof( rtShadowPolicy_t ) );
 			list->buildBottomLevelAccelStruct( dynamicBLAS, &geometry, 1, nvrhi::rt::AccelStructBuildFlags::PreferFastBuild );
 			instances[1].setBLAS( dynamicBLAS ).setInstanceID( staticIndexCount / 3 ).setInstanceMask( 255 ).setFlags( nvrhi::rt::InstanceFlags::TriangleCullDisable );
 		}
@@ -331,6 +362,7 @@ public:
 		bindings.bindings = {
 			nvrhi::BindingSetItem::RayTracingAccelStruct( 0, tlas ),
 			nvrhi::BindingSetItem::StructuredBuffer_SRV( 1, inputs ),
+			nvrhi::BindingSetItem::StructuredBuffer_SRV( 12, shadowPolicies ),
 			nvrhi::BindingSetItem::StructuredBuffer_UAV( 0, outputs )
 		};
 		nvrhi::BindingSetHandle bindingSet = device->createBindingSet( bindings, layout );
@@ -364,10 +396,11 @@ public:
 	nvrhi::rt::IAccelStruct* Scene() const { return tlas; }
 	nvrhi::IBuffer* Positions() const { return vertices; }
 	nvrhi::IBuffer* Indices() const { return indexBuffer; }
+	nvrhi::IBuffer* ShadowPolicies() const { return shadowPolicies; }
 
 private:
 	nvrhi::IDevice* device;
-	nvrhi::BufferHandle vertices, indexBuffer;
+	nvrhi::BufferHandle vertices, indexBuffer, shadowPolicies;
 	nvrhi::rt::AccelStructHandle blas, tlas, dynamicBLAS;
 	uint32 staticVertexCount = 0, staticIndexCount = 0;
 	bool dynamicEnabled = false, hadDynamic = false;
@@ -575,7 +608,31 @@ static void TestDynamicScene()
 		std::vector<rtHit_t> hits;
 		if( !built || !device->waitForIdle() || !scene.Trace( rays, hits ) || !CheckHit( hits[0], phase < 2 ? 1 : 0, phase == 0 ? 2 : ( phase == 1 ? 4 : 8 ), 0.001f ) ) { mismatches++; }
 	}
-	common->Printf( "RT_DYNAMIC_TEST status=%s phases=4 mismatches=%d\n", mismatches == 0 ? "PASS" : "FAIL", mismatches );
+	// Hidden body remains a shadow blocker, never a camera/reflection receiver.
+	view.viewEntitys = &entity; surface.castsShadow = true; surface.shadowOnly = true;
+	surface.suppressShadowInLightID = 77;
+	const bool playerShadows = r_rayTracingPlayerShadows.GetBool();
+	r_rayTracingPlayerShadows.SetBool( true );
+	nvrhi::CommandListParameters params; params.enableImmediateExecution = false;
+	nvrhi::CommandListHandle list = device->createCommandList( params );
+	list->open(); const bool built = scene.UpdateDynamic( list, &view, true ); list->close();
+	device->executeCommandList( list );
+	if( !built || !device->waitForIdle() ) { mismatches++; }
+	for( int mode = 1; mode <= 3; mode++ )
+	{
+		rays[0].padding[0] = mode == 1 ? 1 : 2;
+		rays[0].padding[1] = mode == 3 ? 77 : 78;
+		std::vector<rtHit_t> hits;
+		if( !scene.Trace( rays, hits ) || !CheckHit( hits[0], mode == 2 ? 1 : 0, mode == 2 ? 4 : 8, 0.001f ) ) { mismatches++; }
+	}
+	// Turning the feature off must remove the existing hidden BLAS instance.
+	r_rayTracingPlayerShadows.SetBool( false );
+	list->open(); const bool removed = scene.UpdateDynamic( list, &view, true ); list->close();
+	device->executeCommandList( list ); rays[0].padding[0] = 0;
+	std::vector<rtHit_t> hits;
+	if( !removed || !device->waitForIdle() || !scene.Trace( rays, hits ) || !CheckHit( hits[0], 0, 8, 0.001f ) ) { mismatches++; }
+	r_rayTracingPlayerShadows.SetBool( playerShadows );
+	common->Printf( "RT_DYNAMIC_TEST status=%s phases=8 mismatches=%d hiddenCamera=1 worldLight=1 excludedLight=1 toggleRemoval=1\n", mismatches == 0 ? "PASS" : "FAIL", mismatches );
 }
 
 static void TestStaticWorld()
@@ -782,8 +839,9 @@ struct rtContactConstants_t
 {
 	idRenderMatrix clipToWorld;
 	idVec4 cameraRadius, viewport, lightStrength, rectangle;
+	uint32 lightPolicy[4];
 };
-static_assert( sizeof( rtContactConstants_t ) == 128, "RT contact constants must match HLSL" );
+static_assert( sizeof( rtContactConstants_t ) == 144, "RT contact constants must match HLSL" );
 
 class RayTracedContacts
 {
@@ -813,7 +871,7 @@ public:
 		desc.bindings = { nvrhi::BindingLayoutItem::VolatileConstantBuffer( 0 ),
 			nvrhi::BindingLayoutItem::RayTracingAccelStruct( 0 ), nvrhi::BindingLayoutItem::Texture_SRV( 1 ),
 			nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 2 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 3 ),
-			nvrhi::BindingLayoutItem::Texture_SRV( 4 ), nvrhi::BindingLayoutItem::Texture_UAV( 0 ),
+			nvrhi::BindingLayoutItem::Texture_SRV( 4 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 12 ), nvrhi::BindingLayoutItem::Texture_UAV( 0 ),
 			nvrhi::BindingLayoutItem::Texture_UAV( 1 ), nvrhi::BindingLayoutItem::StructuredBuffer_UAV( 2 ) };
 		layout = device->createBindingLayout( desc );
 		if( !layout ) { return false; }
@@ -862,7 +920,7 @@ public:
 			bindings.bindings = { nvrhi::BindingSetItem::ConstantBuffer( 0, constants ),
 				nvrhi::BindingSetItem::RayTracingAccelStruct( 0, scene.Scene() ), nvrhi::BindingSetItem::Texture_SRV( 1, depth ),
 				nvrhi::BindingSetItem::StructuredBuffer_SRV( 2, scene.Positions() ), nvrhi::BindingSetItem::StructuredBuffer_SRV( 3, scene.Indices() ),
-				nvrhi::BindingSetItem::Texture_SRV( 4, beforeLight ), nvrhi::BindingSetItem::Texture_UAV( 0, color ),
+				nvrhi::BindingSetItem::Texture_SRV( 4, beforeLight ), nvrhi::BindingSetItem::StructuredBuffer_SRV( 12, scene.ShadowPolicies() ), nvrhi::BindingSetItem::Texture_UAV( 0, color ),
 				nvrhi::BindingSetItem::Texture_UAV( 1, visibility ), nvrhi::BindingSetItem::StructuredBuffer_UAV( 2, stats ) };
 			bindingSet = device->createBindingSet( bindings, layout );
 			if( !bindingSet ) { return false; }
@@ -894,6 +952,8 @@ public:
 		data.viewport = idVec4( view->viewport.x1, view->viewport.y1, view->viewport.GetWidth(), view->viewport.GetHeight() );
 		data.lightStrength = idVec4( light->globalLightOrigin.x, light->globalLightOrigin.y, light->globalLightOrigin.z, r_rayTracedContactStrength.GetFloat() );
 		data.rectangle = idVec4( x0, y0, width, height );
+		data.lightPolicy[0] = light->lightId;
+		data.lightPolicy[1] = data.lightPolicy[2] = data.lightPolicy[3] = 0;
 		list->writeBuffer( constants, &data, sizeof( data ) );
 		nvrhi::TextureSlice slice;
 		slice.setOrigin( x0, y0 ).setSize( width, height, 1 );
@@ -1012,7 +1072,7 @@ public:
 		layout.bindings = { nvrhi::BindingLayoutItem::VolatileConstantBuffer( 0 ), nvrhi::BindingLayoutItem::RayTracingAccelStruct( 0 ),
 			nvrhi::BindingLayoutItem::Texture_SRV( 1 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 2 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 3 ),
 			nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 4 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 5 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 6 ),
-			nvrhi::BindingLayoutItem::Texture_SRV( 7 ), nvrhi::BindingLayoutItem::Texture_SRV( 8 ), nvrhi::BindingLayoutItem::Sampler( 0 ), nvrhi::BindingLayoutItem::Sampler( 1 ),
+			nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 12 ), nvrhi::BindingLayoutItem::Texture_SRV( 7 ), nvrhi::BindingLayoutItem::Texture_SRV( 8 ), nvrhi::BindingLayoutItem::Sampler( 0 ), nvrhi::BindingLayoutItem::Sampler( 1 ),
 			nvrhi::BindingLayoutItem::Texture_UAV( 0 ), nvrhi::BindingLayoutItem::StructuredBuffer_UAV( 1 ) };
 		if( !Pipeline( "diffuse_bounce", layout, bounceLayout, bouncePipeline ) ) { return false; }
 		layout.bindings = { nvrhi::BindingLayoutItem::VolatileConstantBuffer( 0 ), nvrhi::BindingLayoutItem::Texture_SRV( 0 ),
@@ -1159,7 +1219,7 @@ public:
 				nvrhi::BindingSetItem::Texture_SRV( 1, depth ), nvrhi::BindingSetItem::StructuredBuffer_SRV( 2, scene.Positions() ),
 				nvrhi::BindingSetItem::StructuredBuffer_SRV( 3, scene.Indices() ), nvrhi::BindingSetItem::StructuredBuffer_SRV( 4, uvBuffer ),
 				nvrhi::BindingSetItem::StructuredBuffer_SRV( 5, materialBuffer ), nvrhi::BindingSetItem::StructuredBuffer_SRV( 6, lightBuffer ),
-				nvrhi::BindingSetItem::Texture_SRV( 7, atlas ), nvrhi::BindingSetItem::Texture_SRV( 8, surfaceRadiance ), nvrhi::BindingSetItem::Sampler( 0, wrapSampler ), nvrhi::BindingSetItem::Sampler( 1, clampSampler ),
+				nvrhi::BindingSetItem::StructuredBuffer_SRV( 12, scene.ShadowPolicies() ), nvrhi::BindingSetItem::Texture_SRV( 7, atlas ), nvrhi::BindingSetItem::Texture_SRV( 8, surfaceRadiance ), nvrhi::BindingSetItem::Sampler( 0, wrapSampler ), nvrhi::BindingSetItem::Sampler( 1, clampSampler ),
 				nvrhi::BindingSetItem::Texture_UAV( 0, bounce ), nvrhi::BindingSetItem::StructuredBuffer_UAV( 1, stats ) };
 			bounceBindings = device->createBindingSet( bindings, bounceLayout );
 			bindings.bindings = { nvrhi::BindingSetItem::ConstantBuffer( 0, constants ), nvrhi::BindingSetItem::Texture_SRV( 0, bounce ),
@@ -1262,7 +1322,7 @@ private:
 			nvrhi::BindingLayoutItem::RayTracingAccelStruct( 0 ), nvrhi::BindingLayoutItem::Texture_SRV( 1 ),
 			nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 2 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 3 ),
 			nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 4 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 5 ), nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 6 ),
-			nvrhi::BindingLayoutItem::Texture_SRV( 7 ), nvrhi::BindingLayoutItem::Texture_SRV( 8 ), nvrhi::BindingLayoutItem::Texture_SRV( 9 ),
+			nvrhi::BindingLayoutItem::StructuredBuffer_SRV( 12 ), nvrhi::BindingLayoutItem::Texture_SRV( 7 ), nvrhi::BindingLayoutItem::Texture_SRV( 8 ), nvrhi::BindingLayoutItem::Texture_SRV( 9 ),
 			nvrhi::BindingLayoutItem::Texture_SRV( 10 ), nvrhi::BindingLayoutItem::Texture_SRV( 11 ),
 			nvrhi::BindingLayoutItem::Sampler( 0 ), nvrhi::BindingLayoutItem::Sampler( 1 ), nvrhi::BindingLayoutItem::Texture_UAV( 0 ),
 			nvrhi::BindingLayoutItem::StructuredBuffer_UAV( 1 ), nvrhi::BindingLayoutItem::Texture_UAV( 2 ) };
@@ -1312,7 +1372,7 @@ private:
 					nvrhi::BindingSetItem::RayTracingAccelStruct( 0, scene.Scene() ), nvrhi::BindingSetItem::Texture_SRV( 1, depth ),
 					nvrhi::BindingSetItem::StructuredBuffer_SRV( 2, scene.Positions() ), nvrhi::BindingSetItem::StructuredBuffer_SRV( 3, scene.Indices() ),
 					nvrhi::BindingSetItem::StructuredBuffer_SRV( 4, uvBuffer ), nvrhi::BindingSetItem::StructuredBuffer_SRV( 5, materialBuffer ),
-					nvrhi::BindingSetItem::StructuredBuffer_SRV( 6, lightBuffer ), nvrhi::BindingSetItem::Texture_SRV( 7, atlas ),
+					nvrhi::BindingSetItem::StructuredBuffer_SRV( 6, lightBuffer ), nvrhi::BindingSetItem::StructuredBuffer_SRV( 12, scene.ShadowPolicies() ), nvrhi::BindingSetItem::Texture_SRV( 7, atlas ),
 					nvrhi::BindingSetItem::Texture_SRV( 8, surfaceRadiance ), nvrhi::BindingSetItem::Texture_SRV( 9, probeSpecular ),
 					nvrhi::BindingSetItem::Texture_SRV( 10, specularResponse ), nvrhi::BindingSetItem::Texture_SRV( 11, reflectionNormal ),
 					nvrhi::BindingSetItem::Sampler( 0, wrapSampler ), nvrhi::BindingSetItem::Sampler( 1, clampSampler ),
@@ -1487,6 +1547,7 @@ private:
 			item.originShadow = idVec4( light->globalLightOrigin.x, light->globalLightOrigin.y, light->globalLightOrigin.z,
 				!r_skipShadows.GetBool() && light->shadowLOD >= 0 && light->lightShader->LightCastsShadows() ? 1.0f : 0.0f );
 			item.color = idVec4( 0 );
+			memcpy( &item.color.w, &light->lightId, sizeof( uint32 ) );
 			for( int c = 0; c < 3; c++ ) { item.color[c] = idMath::ClampFloat( 0, 64, r_lightScale.GetFloat() * light->shaderRegisters[stage->color.registers[c]] ); }
 			idPlane planes[4];
 			memcpy( planes, light->lightProject, sizeof( planes ) );
@@ -1789,6 +1850,7 @@ CONSOLE_COMMAND_SHIP( rayTracingToggle, "Toggle AO, contact shadows, material bo
 	r_rayTracingDebug.SetInteger( 0 );
 	if( enabled ) { r_useSSAO.SetBool( true ); r_useNewSsaoPass.SetBool( true ); }
 	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "neuralHistoryReset\n" );
+	Con_ToggleFeedback( enabled ? "RTX lighting: ON requested (requires RT build/GPU)" : "RTX lighting: OFF" );
 	common->Printf( "Ray-traced lighting requested: %s (requires RT build and supported GPU)\n", enabled ? "ON" : "OFF" );
 }
 
@@ -1796,6 +1858,8 @@ CONSOLE_COMMAND_SHIP( rayTracingDebugCycle, "Cycle shaded scene, visibility, bou
 {
 	r_rayTracingDebug.SetInteger( ( r_rayTracingDebug.GetInteger() + 1 ) % 7 );
 	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "neuralHistoryReset\n" );
+	const char* views[] = { "Scene", "AO", "Contact shadows", "Material bounce", "Albedo", "Reflections", "Reflection roughness" };
+	Con_ToggleFeedback( va( "RTX view: %s", views[r_rayTracingDebug.GetInteger()] ) );
 	common->Printf( "Ray-tracing view %d: 0=scene, 1=AO, 2=contacts, 3=material bounce, 4=albedo, 5=reflections, 6=reflection roughness (enable the corresponding feature)\n", r_rayTracingDebug.GetInteger() );
 }
 
@@ -1847,7 +1911,7 @@ CONSOLE_COMMAND_SHIP( rayTracingScene, "Capture and validate static opaque world
 CONSOLE_COMMAND_SHIP( rayTracingDynamicStatus, "Report the last ray scene dynamic geometry counts", NULL )
 {
 #if defined( USE_RAYTRACING )
-	common->Printf( "RTDYNAMIC_STATUS surfaces=%u triangles=%u skinnedSurfaces=%u budgetSkipped=%u fullResolution=1 visibleOnly=1\n", dynamicSurfaceCount.load(), dynamicTriangleCount.load(), dynamicSkinnedCount.load(), dynamicSkippedCount.load() );
+	common->Printf( "RTDYNAMIC_STATUS surfaces=%u triangles=%u skinnedSurfaces=%u budgetSkipped=%u hiddenShadowSurfaces=%u fullResolution=1 visibleOnly=0\n", dynamicSurfaceCount.load(), dynamicTriangleCount.load(), dynamicSkinnedCount.load(), dynamicSkippedCount.load(), dynamicHiddenCount.load() );
 #else
 	common->Printf( "RTDYNAMIC_STATUS compiled=0\n" );
 #endif
@@ -1867,8 +1931,10 @@ static void R_ToggleLightingControl( idCVar& setting, const char* label )
 {
 #if defined( USE_RAYTRACING )
 	setting.SetBool( !setting.GetBool() );
+	Con_ToggleFeedback( va( "%s: %s (requested)", label, setting.GetBool() ? "ON" : "OFF" ) );
 	common->Printf( "%s: %s\n", label, setting.GetBool() ? "ON" : "OFF" );
 #else
+	Con_ToggleFeedback( va( "%s: unavailable in this build", label ) );
 	common->Printf( "%s: unavailable in this build\n", label );
 #endif
 }
@@ -1884,10 +1950,12 @@ CONSOLE_COMMAND_SHIP( neuralReconstructionToggle, "Cycle NR DLAA/DLSS presets, o
 	const int mode = nr ? 1 + R_NeuralReconstructionMode() % 4 : ( cvarSystem->GetCVarInteger( "r_neuralBackend" ) != 2 ? 1 : 0 );
 	if( !R_SetNeuralReconstructionMode( mode ) )
 	{
+		Con_ToggleFeedback( "Reconstruction unchanged: DLAA/DLSS unavailable" );
 		common->Printf( "Reconstruction unchanged: DLAA/DLSS is unavailable in this launch.\n" );
 		return;
 	}
 	const char* names[] = { "TAA (100%)", "DLAA (100%)", "DLSS Quality", "DLSS Balanced", "DLSS Performance" };
+	Con_ToggleFeedback( va( "Reconstruction: %s", names[mode] ) );
 	common->Printf( "Reconstruction: %s%s\n", names[mode], nr && mode >= 2 ? " (experimental NR combination)" : "" );
 }
 

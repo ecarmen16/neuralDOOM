@@ -125,6 +125,10 @@ foreach ($mode in 0..4) {
     $null = & $launcher -RepoRoot $fixture -Profile DLAA -Reconstruction $name -PrepareOnly 6>$null
     $generated = Get-Content -LiteralPath (Join-Path $fixture 'captures/dogfood/base/neural_dogfood.cfg') -Raw
     if ($generated -notmatch "(?m)^set r_neuralReconstructionMode $mode\r?$") { throw 'Launch quality was not persisted for the menu.' }
+    if ($mode -gt 0) {
+        $moving = if ($mode -eq 1) { 1 } else { 0 }
+        if ($generated -notmatch "(?m)^set r_rayTracingDynamicGeometry $moving\r?$") { throw 'SDK moving geometry default does not match reconstruction.' }
+    } elseif ($generated -match '(?m)^set r_rayTracingDynamicGeometry ') { throw 'TAA overwrote the moving geometry preference.' }
 }
 Write-Host 'PASS: explicit launch quality selections are written to the game session config.'
 
@@ -144,6 +148,8 @@ foreach ($mode in 1..4) {
             $launchArgs -join ' '
         }
         $generated = Get-Content -LiteralPath (Join-Path $fixture 'captures/dogfood/base/neural_dogfood.cfg') -Raw
+        $moving = if ($mode -eq 1) { 1 } else { 0 }
+        if ($generated -notmatch "(?m)^set r_rayTracingDynamicGeometry $moving\r?$") { throw 'NR moving geometry default does not match reconstruction.' }
         if ($argv -notmatch "\+set r_neuralBackend $expectedBackend(?: |$)" -or
             $generated -notmatch "(?m)^set r_neuralDLSSQuality $expectedQuality\r?$" -or
             $generated -notmatch "(?m)^set r_neuralNRReconstructionMode $mode\r?$") { throw 'NR reconstruction does not match the engine arguments and saved menu choice.' }

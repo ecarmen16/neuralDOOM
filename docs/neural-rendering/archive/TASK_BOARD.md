@@ -129,3 +129,30 @@ Codex should update statuses only from observed evidence and add links to report
 
 - DONE: reviewed accumulated renderer/setup changes, fixed DLAA joint history and object-motion jitter/depth, added automatic RTX history resets and shader bundle validation, guarded clean-build targets. All three RelWithDebInfo builds and offline/local readiness checks pass.
 - VERIFY: user visual comparisons and live regression checks on the final binaries; no new GPU run during this review. [Findings and three checks](REVIEW_2026-09-06.md).
+
+## 2026-09-11 - Final gate for the next push and PR
+
+- [x] Fading developer toggle overlay and independent flashlight difficulty implemented.
+- [x] Hidden player-body ray shadow coverage implemented with per-view/light exclusions.
+- [x] RelWithDebInfo build, CPU geometry/battery tests, shader contracts, eight-case GPU diagnostic and isolated map scenario pass.
+- [ ] User manually validates the branch build: Player Shadows and Flashlight Difficulty menu, toggle feedback, movement/body shadows, flashlight/muzzle flashes, mirrors/third person, transitions, visual artifacts and frame times.
+- [ ] After validation, prepare focused commits, push and PR; obtain latest-commit human review from ecarmen16 or eraser851. Final merge stays with a maintainer.
+- [ ] Decide whether to produce the first test release after manual validation; retain existing game-data/runtime distribution constraints.
+
+Build: `build-rt/RelWithDebInfo/neuralDoom.exe`; installed/private builds unchanged.
+Use Game Options -> Player Shadows with ray lighting and moving/skinned geometry
+enabled. `r_rayTracingPlayerShadows 0` isolates the new ray-body contribution while
+keeping native player shadows. See the latest IMPLEMENTATION_NOTES entry for exact
+source changes, tests, evidence and known limits.
+
+Manual update (2026-09-11): user accepted Doomguy shadow behavior as working
+perfectly. Other gameplay/UI checks remain in progress. Keep the final push/PR
+and release gates pending that remaining validation.
+
+Draft handoff update (2026-09-11): user requested the PR now after accepting player
+shadows. Open the tested implementation as a draft while other manual checks
+continue; the above wait-before-PR gate is superseded. Streamline-enabled build
+passed and the default NR/DLAA shortcut launched with both runtimes initialized.
+Installed engine/configuration were staged with backups by the existing helper;
+no local runtime files are tracked. Final manual validation and human review
+remain required before maintainer merge/release.

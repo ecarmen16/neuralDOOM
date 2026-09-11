@@ -28,6 +28,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "precompiled.h"
 #pragma hdrstop
+#include "Console.h"
 
 idCVar* idCVar::staticVars = NULL;
 
@@ -1093,6 +1094,9 @@ void idCVarSystemLocal::Toggle_f( const idCmdArgs& args )
 		common->Printf( "set %s = %f\n", args.Argv( 1 ), current );
 		cvar->Set( idStr( current ), false, false );
 	}
+#if !defined( DMAP )
+	Con_ToggleFeedback( va( "%s: %s", cvar->GetName(), cvar->GetString() ) );
+#endif
 }
 
 /*

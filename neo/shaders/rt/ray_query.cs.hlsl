@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "ray_visibility.hlsli"
 // Native intersection diagnostics; no lighting or temporal reconstruction.
 struct RayInput
 {
@@ -35,9 +36,19 @@ void main(uint3 threadID : SV_DispatchThreadID)
     ray.Direction = input.direction;
     ray.TMin = input.tMin;
     ray.TMax = input.tMax;
-    RayQuery<RAY_FLAG_FORCE_OPAQUE> query;
+    RayQuery<RAY_FLAG_NONE> query;
     query.TraceRayInline(Scene, RAY_FLAG_NONE, input.mask, ray);
-    while (query.Proceed()) {}
+    while (query.Proceed())
+    {
+        if (query.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE)
+        {
+            uint primitive = query.CandidateInstanceID() + query.CandidatePrimitiveIndex();
+            // 0 = ordinary diagnostic, 1 = camera, 2 = shadow for padding.y light ID.
+            if (input.padding.x == 0 || (input.padding.x == 1 && RaySurfaceVisible(primitive)) ||
+                (input.padding.x == 2 && RayShadowAllowed(primitive, input.padding.y)))
+                query.CommitNonOpaqueTriangleHit();
+        }
+    }
 
     RayHit result;
     result.hit = query.CommittedStatus() == COMMITTED_TRIANGLE_HIT ? 1 : 0;

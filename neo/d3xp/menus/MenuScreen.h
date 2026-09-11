@@ -1019,6 +1019,8 @@ public:
 			GAME_FIELD_AIM_ASSIST,
 			GAME_FIELD_ALWAYS_SPRINT,
 			GAME_FIELD_CLASSIC_FLASHLIGHT,
+			GAME_FIELD_FLASHLIGHT_DIFFICULTY,
+			GAME_FIELD_PLAYER_SHADOWS,
 			GAME_FIELD_MUZZLE_FLASHES,
 			MAX_GAME_FIELDS
 		};
@@ -1037,6 +1039,11 @@ public:
 		// retrieves a particular field for reading or updating
 		virtual idSWFScriptVar		GetField( const int fieldIndex ) const
 		{
+			if( fieldIndex == GAME_FIELD_FLASHLIGHT_DIFFICULTY )
+			{
+				const char* names[] = { "Easy", "Normal", "Hard", "Nightmare" };
+				return names[fields[fieldIndex].ToInteger()];
+			}
 			return fields[ fieldIndex ];
 		}
 

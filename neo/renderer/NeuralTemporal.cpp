@@ -36,6 +36,9 @@ bool R_SetNeuralReconstructionMode( int mode )
 	cvarSystem->SetCVarInteger( "r_antiAliasing", ANTI_ALIASING_TAA );
 	cvarSystem->SetCVarInteger( "r_neuralBackend", mode == 0 ? 0 : mode == 1 ? 2 : 3 );
 	cvarSystem->SetCVarInteger( "r_neuralDLSSQuality", mode >= 2 ? mode - 2 : 0 );
+	// Reduced-resolution DLSS exposes unstable dynamic reflection history.
+	// Apply a safe default on mode changes; the developer toggle remains usable.
+	if( mode > 0 ) { cvarSystem->SetCVarBool( "r_rayTracingDynamicGeometry", mode == 1 ); }
 	cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "neuralHistoryReset\n" );
 	return true;
 }

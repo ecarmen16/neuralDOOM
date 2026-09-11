@@ -154,6 +154,19 @@ private:
 	static idCVar		con_noPrint;
 };
 
+static idCVar con_toggleFeedback( "con_toggleFeedback", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "show fading developer toggle feedback" );
+struct toggleFeedback_t { idStr text; int time; };
+static idList<toggleFeedback_t> toggleFeedback;
+void Con_ToggleFeedback( const char* text )
+{
+	if( !con_toggleFeedback.GetBool() ) { return; }
+	if( toggleFeedback.Num() == 4 ) { toggleFeedback.RemoveIndex( 0 ); }
+	toggleFeedback_t item;
+	item.text = text;
+	item.time = Sys_Milliseconds();
+	toggleFeedback.Append( item );
+}
+
 static idConsoleLocal localConsole;
 idConsole* console = &localConsole;
 
@@ -1620,6 +1633,18 @@ void idConsoleLocal::Draw( bool forceFullScreen )
 	if( com_showFPS.GetBool() )
 	{
 		righty = DrawFPS( righty );
+	}
+	const int now = Sys_Milliseconds();
+	for( int i = 0; i < toggleFeedback.Num(); )
+	{
+		const int age = now - toggleFeedback[i].time;
+		if( !con_toggleFeedback.GetBool() || age >= 3500 ) { toggleFeedback.RemoveIndex( i ); continue; }
+		idStr message = toggleFeedback[i].text;
+		message.CapLength( Max( 1, LOCALSAFE_WIDTH / SMALLCHAR_WIDTH ) );
+		idVec4 tint( 1.0f, 1.0f, 1.0f, idMath::ClampFloat( 0.0f, 1.0f, ( 3500 - age ) / 1000.0f ) );
+		renderSystem->DrawSmallStringExt( LOCALSAFE_RIGHT - message.Length() * SMALLCHAR_WIDTH, righty + 2, message.c_str(), tint, true );
+		righty += SMALLCHAR_HEIGHT + 4;
+		i++;
 	}
 	if( com_showMemoryUsage.GetBool() )
 	{

@@ -277,8 +277,9 @@ void R_SetupDrawSurfShader( drawSurf_t* drawSurf, const idMaterial* shader, cons
 R_SnapshotDynamicRaySurface
 ===================
 */
-static void R_SnapshotDynamicRaySurface( viewEntity_t* entity, const srfTriangles_t* tri, const idMaterial* material, const float* registers, bool noShadow, bool skinnedModel )
+static void R_SnapshotDynamicRaySurface( viewEntity_t* entity, const srfTriangles_t* tri, const idMaterial* material, const float* registers, bool noShadow, bool skinnedModel, bool shadowOnly = false, int suppressLight = 0 )
 {
+	if( !( shadowOnly ? r_rayTracingPlayerShadows.GetBool() : r_rayTracingDynamicGeometry.GetBool() ) ) { return; }
 	if( !R_WantDynamicRayGeometry() || entity->weaponDepthHack || entity->modelDepthHack != 0 || entity->isGuiSurface ||
 		!tri || !tri->verts || !tri->indexes || !material->ReceivesLighting() || material->Coverage() != MC_OPAQUE ||
 		material->Deform() != DFRM_NONE || material->HasSubview() || material->IsPortalSky() || tri->numVerts <= 0 || tri->numIndexes <= 0 ||
@@ -311,8 +312,10 @@ static void R_SnapshotDynamicRaySurface( viewEntity_t* entity, const srfTriangle
 	memcpy( surface->indices, tri->indexes, tri->numIndexes * sizeof( triIndex_t ) );
 	surface->numVerts = tri->numVerts; surface->numIndexes = tri->numIndexes;
 	surface->material = material; surface->shaderRegisters = registers;
-	surface->castsShadow = !noShadow && material->SurfaceCastsShadow() && !material->TestMaterialFlag( MF_NOSELFSHADOW );
+	surface->castsShadow = !noShadow && material->SurfaceCastsShadow() && ( shadowOnly || !material->TestMaterialFlag( MF_NOSELFSHADOW ) );
 	surface->skinned = skinnedModel;
+	surface->shadowOnly = shadowOnly;
+	surface->suppressShadowInLightID = suppressLight;
 	surface->next = entity->raySurfaces; entity->raySurfaces = surface;
 	entity->rayVertexCount += tri->numVerts;
 }
@@ -378,6 +381,14 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 
 	// if the entity wasn't seen through a portal chain, it was added just for light shadows
 	const bool modelIsVisible = !vEntity->scissorRect.IsEmpty();
+	const bool shadowSuppressed = !r_skipSuppress.GetBool() && renderEntity->suppressShadowInViewID != 0 &&
+		renderEntity->suppressShadowInViewID == viewDef->renderView.viewID;
+	const int suppressLight = r_skipSuppress.GetBool() ? 0 : renderEntity->suppressShadowInLightID;
+	// Native light visibility already admitted these hidden body/head entities as
+	// shadow casters. Preserve their empty camera scissor and reuse the current pose.
+	const bool hiddenPlayerShadow = R_WantDynamicRayGeometry() && r_rayTracingPlayerShadows.GetBool() &&
+		!modelIsVisible && !shadowSuppressed && !renderEntity->noShadow &&
+		renderEntity->suppressSurfaceInViewID != 0 && renderEntity->suppressSurfaceInViewID == viewDef->renderView.viewID;
 	const bool addInteractions = modelIsVisible && ( !viewDef->isXraySubview || entityDef->parms.xrayIndex == 2 );
 	const int entityIndex = entityDef->index;
 
@@ -853,6 +864,13 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 		// base drawing surface
 		//--------------------------
 		const float* shaderRegisters = NULL;
+		if( hiddenPlayerShadow && !model->IsStaticWorldModel() && shader->SurfaceCastsShadow() )
+		{
+			drawSurf_t scratchSurf = {};
+			R_SetupDrawSurfShader( &scratchSurf, shader, renderEntity );
+			R_SnapshotDynamicRaySurface( vEntity, tri, shader, scratchSurf.shaderRegisters, false,
+				renderEntity->numJoints > 0, true, suppressLight );
+		}
 		drawSurf_t* baseDrawSurf = NULL;
 		if( surfaceDirectlyVisible && shader->IsDrawn() )
 		{
@@ -888,7 +906,7 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 			R_SetupDrawSurfShader( baseDrawSurf, shader, renderEntity );
 
 			shaderRegisters = baseDrawSurf->shaderRegisters;
-			if( !model->IsStaticWorldModel() ) { R_SnapshotDynamicRaySurface( vEntity, tri, shader, shaderRegisters, renderEntity->noShadow, renderEntity->numJoints > 0 ); }
+			if( !model->IsStaticWorldModel() ) { R_SnapshotDynamicRaySurface( vEntity, tri, shader, shaderRegisters, renderEntity->noShadow || shadowSuppressed, renderEntity->numJoints > 0, false, suppressLight ); }
 
 
 			// Check for deformations (eyeballs, flares, etc)

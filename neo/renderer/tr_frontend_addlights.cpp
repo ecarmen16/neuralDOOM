@@ -197,6 +197,7 @@ static void R_AddSingleLight( viewLight_t* vLight )
 	//--------------------------------------------
 	// copy data used by backend
 	//--------------------------------------------
+	vLight->lightId = light->parms.lightId;
 	vLight->globalLightOrigin = light->globalLightOrigin;
 	vLight->lightProject[0] = light->lightProject[0];
 	vLight->lightProject[1] = light->lightProject[1];
