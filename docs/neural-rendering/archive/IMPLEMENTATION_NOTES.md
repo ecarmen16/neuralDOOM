@@ -953,3 +953,43 @@ No runtime binaries, proprietary assets, shortcuts or local paths are included
 in the source change. Focused review found no further blocking issues after the
 previous binding-order fix. Next: finish manual UI/flashlight and NR playtesting,
 then request human review of the final commit before a maintainer merges.
+
+### 2026-09-11 - Profile icon and reduced-resolution moving-ray defaults
+
+- `LaunchPicker.ps1::Show-NeuralLaunchPicker` assigns the existing setup ICO to
+  the form and disposes its cloned icon on close. No new asset or dependency.
+- `NeuralTemporal.cpp::R_SetNeuralReconstructionMode` enables moving ray geometry
+  for DLAA and disables it for DLSS Quality/Balanced/Performance. TAA preserves
+  the current value; rejected mode changes do not alter it. The existing history
+  reset still runs. Developer override remains available after selection.
+- `Start-NeuralDoom-Dogfood.ps1` applies the same defaults when preparing SDK/NR
+  launches, including restored presets. These mode defaults supersede a saved
+  moving-geometry value on DLAA/DLSS selection. Direct raw backend cvar edits
+  remain developer controls and do not invoke the mode-selection defaults.
+- HDR stays OFF by default at the user's clarification. Existing NR transport
+  remains SDR; flashlight brightness remains Easy 115%, Normal 100%, Hard 85%,
+  Nightmare 70%, as accepted. No resource formats or coordinates changed.
+- Quick shimmer investigation: reflection history currently requires
+  `dynamicSurfaceCount == 0` in `RayTracingDiagnostic.cpp`. Dynamic geometry thus
+  disables temporal reflection accumulation even on static floors/metal. This is
+  a plausible contributor, not a proven complete cause. No speculative denoiser
+  or motion-vector change was made. Disabling moving geometry also removes the
+  new hidden-body ray shadows; native player shadows remain available.
+- Streamline-enabled RelWithDebInfo build PASS using `Build-RBDOOM.ps1
+  -BuildDirectory build-private-neural -Configuration RelWithDebInfo`.
+  Actual reconstruction-setter MSVC test PASS across SDK/NR modes, invalid and
+  unsupported changes, TAA preservation and return to DLAA. Launcher fixture
+  tests PASS for saved/explicit presets and the new defaults. Picker's existing
+  131-state test PASS; setup icon clone/native window handle check PASS under
+  Windows PowerShell (the launcher's runtime).
+- Final isolated SDK map run with SDR: `profile-fixes-final.log` under ignored
+  `captures/neural/profile-fixes-runtime/base`. Startup requested HDR 0 / SDR-8bit; the prior test player profile later restored its saved HDR request, with transport remaining SDR.
+  DLAA selection restored dynamic geometry including four hidden shadow surfaces;
+  manual off removed all dynamic surfaces. DLAA evaluations/presentations had
+  zero rejections. Completion marker and normal shutdown observed. An earlier
+  run exercised HDR fallback before the user withdrew that default change.
+- Focused diff review and whitespace checks PASS. Manual confirmation that the
+  DLSS workaround removes the reported shimmer remains pending. Next: measure
+  dynamic-aware reflection history/reprojection before lifting this default.
+- SDK-off RelWithDebInfo build also PASS using `Build-RBDOOM.ps1 -BuildDirectory
+  build-rt -Configuration RelWithDebInfo`.

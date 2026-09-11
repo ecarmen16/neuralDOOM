@@ -203,6 +203,9 @@ $playtestCommands = @(
 if ($Profile -ne 'Native') {
     $effectiveMode = if ($backend -eq 0) { 0 } elseif ($backend -eq 2) { 1 } else { $quality + 2 }
     $playtestCommands += 'set ' + $reconstructionCvar + ' ' + $effectiveMode
+    # Match in-game mode changes: DLAA enables moving geometry; upscaled DLSS
+    # starts with it off while dynamic reflection history is investigated.
+    if ($backend -ne 0) { $playtestCommands += 'set r_rayTracingDynamicGeometry ' + $(if ($backend -eq 2) { 1 } else { 0 }) }
 }
 if ($VerbosePreference -ne 'SilentlyContinue') { $playtestCommands += @('neuralBackendStatus', 'hdrStatus', 'rayTracingStatus') }
 # Versioned migration: apply in the game after its saved config has loaded.

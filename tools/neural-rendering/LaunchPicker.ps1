@@ -30,6 +30,12 @@ function Show-NeuralLaunchPicker {
             $PreferredProfile = ''; $PreferredMode = 1; $PreferredNRMode = 1
         }
         $picker = New-Object NeuralDoom.LaunchPicker($sdkAvailable, $nrAvailable, $PreferredProfile, $PreferredMode, $PreferredNRMode)
+        $pickerIcon = $null
+        $iconPath = Join-Path $PSScriptRoot 'assets/neuraldoom-setup.ico'
+        if (Test-Path -LiteralPath $iconPath) {
+            $sourceIcon = New-Object Drawing.Icon($iconPath)
+            try { $pickerIcon = $sourceIcon.Clone(); $picker.Icon = $pickerIcon } finally { $sourceIcon.Dispose() }
+        }
         $picker.add_SnapshotRequested({
             $dialog = New-Object Windows.Forms.SaveFileDialog
             try {
@@ -69,6 +75,9 @@ function Show-NeuralLaunchPicker {
             }
             if ($result -ne [Windows.Forms.DialogResult]::OK) { return $null }
             return [pscustomobject]@{ Profile = $picker.SelectedProfile; Mode = $picker.SelectedReconstruction }
-        } finally { $picker.Dispose() }
+        } finally {
+            $picker.Dispose()
+            if ($pickerIcon) { $pickerIcon.Dispose() }
+        }
     }
 }
