@@ -6,6 +6,8 @@ param(
     [ValidateSet('Native','DLAA','NR')][string]$Profile = 'Native',
     [string]$DlssDllPath,
     [string]$NRDllPath,
+    [switch]$IncludeD3HDP,
+    [string]$D3HDPArchivePath,
     [switch]$VerifyOnly,
     [switch]$SkipShortcut,
     [switch]$SkipStartMenu,
@@ -85,6 +87,10 @@ if ($neural) {
     $neuralExe | Set-Content -LiteralPath (Join-Path $RepoRoot 'build-streamline/neuraldoom-artifact-Release.txt') -Encoding UTF8
 }
 & (Join-Path $PSScriptRoot 'Setup-NeuralDoom.ps1') -RepoRoot $RepoRoot -GamePath $GamePath -LightingPackPath $LightingPackPath -Profile Native -Configuration Release -SkipD3HDP -SkipNRRuntime -NonInteractive:$NonInteractive
+if ($IncludeD3HDP) {
+    . (Join-Path $PSScriptRoot 'Setup-TexturePack.ps1')
+    Install-SetupTexturePack -RepoRoot $RepoRoot -ArchivePath $D3HDPArchivePath
+}
 . (Join-Path $PSScriptRoot 'Setup-NeuralComponents.ps1')
 Install-SetupNeuralComponents -RepoRoot $RepoRoot -Profile $Profile -DlssDllPath $DlssDllPath -NRDllPath $NRDllPath
 & (Join-Path $PSScriptRoot 'Start-NeuralDoom-Dogfood.ps1') -RepoRoot $RepoRoot -Profile $Profile -Configuration Release -PrepareOnly -RayTracedAO -RayTracedContactShadows -RayTracedGI -RayTracedReflections
