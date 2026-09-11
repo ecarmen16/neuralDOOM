@@ -6,7 +6,7 @@
 
 ## Subdued lighting preset
 
-For the 2026-09-07 brightness feedback, `exec neural_rtx_contrast.cfg` applies fixed exposure, ambient **0.375**, diffuse bounce strength **1.125**, and reflection blend **0.65**. These now match the conservative factory starting values; the normal launcher now migrates existing archived settings automatically once. It preserves HDR calibration, AO, contacts, ray samples and render resolution. Lower reflection blend restores more native probe specular, so it does not imply a uniform 35% darker image. The earlier offline config reset did not remain in the latest saved config; the launcher applies the migration inside the game and records completion after a successful exit. See [SETTINGS_REVIEW.md](SETTINGS_REVIEW.md) for the exposure bug and full audit.
+For the 2026-09-07 brightness feedback, `exec neural_rtx_contrast.cfg` applies fixed exposure, ambient **0.375**, diffuse bounce strength **1.125**, and reflection blend **0.65**. These now match the conservative factory starting values; the normal launcher now migrates existing archived settings automatically once. It preserves HDR calibration, AO, contacts, ray samples and render resolution. Lower reflection blend restores more native probe specular, so it does not imply a uniform 35% darker image. The earlier offline config reset did not remain in the latest saved config; the launcher applies the migration inside the game and records completion after a successful exit. See [SETTINGS_REVIEW.md](archive/SETTINGS_REVIEW.md) for the exposure bug and full audit.
 
 The active local `reshade.ini` NR section was reset by removing its saved tuning overrides so the installed add-on supplies its own defaults. Only NR enabled and upscaling disabled remain explicit, retaining full-resolution rendering. Other ReShade sections and earlier backups were preserved. This is distinct from setting every tuning slider to 1, which would not necessarily match the add-on's defaults.
 
@@ -73,4 +73,4 @@ Bounce, radiance snapshot and HDR composition use linear `RGBA16_FLOAT`. Rays an
 
 Diagnostics: `rayTracingReflectionStatus`, `rayTracingGIStatus`, `rayTracingContactStatus`, `rayTracingAOStatus`, `hdrStatus`. GPU coverage counters prove actual work, not subjective visual quality or hardware-independent performance. Build/runtime evidence is in `TEST_RESULTS.md`.
 
-The contrast preset now also selects fixed exposure and ambient 0.375. See [SETTINGS_REVIEW.md](SETTINGS_REVIEW.md) for the exposure correction, saved-setting migration and Material SSR scope.
+The contrast preset now also selects fixed exposure and ambient 0.375. See [SETTINGS_REVIEW.md](archive/SETTINGS_REVIEW.md) for the exposure correction, saved-setting migration and Material SSR scope.

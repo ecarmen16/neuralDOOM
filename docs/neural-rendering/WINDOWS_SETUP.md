@@ -1,6 +1,6 @@
 # Windows setup details
 
-For the native internal Release ZIP, use [INTERNAL_TESTING.md](../../INTERNAL_TESTING.md). Setup no longer accepts NR runtime path/URL copying or downloads; historical legacy instructions below are superseded by this restriction. Existing local compatibility profiles remain separate.
+For the released installer and portable ZIP, see the [player guide](../PLAYING.md). This page covers building from source. The installer can download the pinned optional components; the legacy source-setup DLL copying options are unsupported.
 
 ## Visual Studio
 
@@ -59,25 +59,6 @@ Verify:
 .\tools\ispc\bin\ispc.exe --version
 ```
 
-## Codex on native Windows
-
-Install/update through a current official method. The npm route is commonly:
-
-```powershell
-npm install -g @openai/codex
-codex login
-codex doctor --summary
-```
-
-The official Windows documentation recommends the stronger native `elevated` sandbox when available. In `%USERPROFILE%\.codex\config.toml`:
-
-```toml
-[windows]
-sandbox = "elevated"
-```
-
-If enterprise policy prevents it, use the documented fallback rather than disabling sandboxing. This starter never uses `--yolo` or `danger-full-access`.
-
 ## Doom 3 BFG game data
 
 Use a legally owned and updated Steam or GOG installation. Common Steam default:
@@ -99,13 +80,13 @@ Extract `base/_rbdoom_global_illumination_data.pk4` from the official RBDOOM 1.6
 .\tools\neural-rendering\Setup-NeuralDoom.ps1 -RepoRoot . -ValidateOnly
 ```
 
-This configures native DX12 ray tracing in `build-rt` and builds RelWithDebInfo. It does not require an NR DLL. Setup checks the exact executable and compiled shader hashes, game data and lighting candidates. Old manifests require a rebuild. Fresh-machine end-to-end installation remains a pending validation item; see [CHECKPOINT.md](CHECKPOINT.md).
+This configures native DX12 ray tracing in `build-rt` and builds RelWithDebInfo. It does not require an NR DLL. Setup checks the exact executable and compiled shader hashes, game data and lighting candidates. Old manifests require a rebuild. Fresh-machine end-to-end installation remains a pending validation item; see [CHECKPOINT.md](archive/CHECKPOINT.md).
 
 ## Optional DLAA and legacy neural rendering
 
 DLAA requires a separately configured official Streamline SDK build in `build-streamline`. Supplying `nvngx_dlssnr.dll` does not supply that SDK or its DLAA components.
 
-Use the complete internal Setup EXE for automatic NR installation: choose NR on the rendering page, leave DLL fields blank for pinned downloads, or select local NVIDIA-signed DLLs. Setup supplies the matching neural engine, official Streamline plugins, DLSS SR, the NR runtime, consumer add-on and renamed ReShade runtime without a DXGI proxy. Native and DLAA/DLSS profiles disable the compatibility layer. The legacy `Setup-NeuralDoom.ps1 -NRRuntimePath/-NRRuntimeUrl` options are rejected; they did not establish the complete stack. See [INTERNAL_TESTING.md](../../INTERNAL_TESTING.md) for upgrade, copy, uninstall and precise F-key controls.
+Use the released Setup EXE for automatic NR installation: choose NR on the rendering page, leave DLL fields blank for pinned downloads, or select local NVIDIA-signed DLLs. Setup supplies the matching neural engine, official Streamline plugins, DLSS SR, the NR runtime, consumer add-on and renamed ReShade runtime without a DXGI proxy. Native and DLAA/DLSS profiles disable the compatibility layer. The legacy `Setup-NeuralDoom.ps1 -NRRuntimePath/-NRRuntimeUrl` options are rejected; they did not establish the complete stack. See [the player guide](../PLAYING.md) for upgrade, copy, uninstall and precise F-key controls.
 
 ## Optional capture tools
 

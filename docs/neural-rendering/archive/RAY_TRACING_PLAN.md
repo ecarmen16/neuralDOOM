@@ -1,7 +1,9 @@
 # Native ray tracing and path tracing
 
-Current implementation: [RTX_LIGHTING.md](RTX_LIGHTING.md) covers AO, contact
-shadows and diffuse material bounce; [RAY_TRACED_REFLECTIONS.md](RAY_TRACED_REFLECTIONS.md)
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../README.md) for current guidance.
+
+Current implementation: [RTX_LIGHTING.md](../RTX_LIGHTING.md) covers AO, contact
+shadows and diffuse material bounce; [RAY_TRACED_REFLECTIONS.md](../RAY_TRACED_REFLECTIONS.md)
 covers native-material reflections. Supported visible opaque doors, props and
 characters participate. The 2026-09-07 [validation results](TEST_RESULTS.md)
 record automated RTX and reconstruction checks; broader visual acceptance and
@@ -28,7 +30,7 @@ The next implementation branch is `codex/rt-foundation`, prepared from the valid
 | Temporal/HDR | `_currentRenderHDR` is linear RGBA16F; depth, motion, normals/roughness, history epochs and separated overlay UI already exist. These are useful inputs, but require adapters and additional buffers for ray denoising. Native scRGB presentation is an independent output feature. |
 | Other backends | `DeviceManager_VK.cpp` has optional RT extension handling, controlled by `DeviceCreationParameters::enableRayTracingExtensions` (currently false by default). DX12 is the first validated target; shared scene and pass code should remain in NVRHI. Vulkan capability parity is not yet tested. |
 
-The configured Windows SDK 10.0.26100.0 DXC compiled the initial isolated `cs_6_5` probe. The subsequent RT-001A implementation now dispatches known rays and static-map panoramas on the GPU; see [RAY_TRACING_DIAGNOSTICS.md](RAY_TRACING_DIAGNOSTICS.md). It is an ephemeral diagnostic scene, not persistent gameplay RT.
+The configured Windows SDK 10.0.26100.0 DXC compiled the initial isolated `cs_6_5` probe. The subsequent RT-001A implementation now dispatches known rays and static-map panoramas on the GPU; see [RAY_TRACING_DIAGNOSTICS.md](../RAY_TRACING_DIAGNOSTICS.md). It is an ephemeral diagnostic scene, not persistent gameplay RT.
 
 ## Implementation sequence and acceptance gates
 

@@ -1,14 +1,14 @@
 # Neural Doom 3 project instructions
 
-This repository is an RBDOOM-3-BFG renderer-development branch prepared for Codex-assisted work on a future neural-rendering path. Read `docs/neural-rendering/DEV_PLAN.md`, `ARCHITECTURE.md`, `TEST_PLAN.md`, and `DECISIONS.md` before changing renderer code.
+This repository is an RBDOOM-3-BFG renderer-development branch prepared for Codex-assisted work on a future neural-rendering path. Read `docs/neural-rendering/archive/DEV_PLAN.md`, `ARCHITECTURE.md`, `TEST_PLAN.md`, and `DECISIONS.md` before changing renderer code.
 
 ## Mission
 
 Build a reversible, optional, well-instrumented temporal input path around the existing DX12/NVRHI renderer. First prove a clean upstream baseline; then expose reliable scene color, depth, motion vectors, jitter, exposure, reset state, masks, and UI separation. Integrate only official, redistributable SDK components in tracked source.
 
-## Milestone 1 workflow
+## Contribution workflow
 
-- Implement and push optimization work on `codex/milestone-1`. Review and playtest branch builds before opening a PR; do not open a planning or tracking PR.
+- Milestone 1 is merged. Use focused `codex/` branches for follow-up changes. Review and playtest renderer branch builds before opening a PR; do not open a planning or tracking PR.
 - Keep `main` at its reviewed checkpoint. After branch testing, require manual approval of the latest PR changes by `ecarmen16` or `eraser851`; new changes after approval require renewed review.
 - Do not approve, merge, enable auto-merge, or push/cherry-pick milestone changes into `main` as an agent. Leave the final merge to either maintainer. Actions made by automation using a maintainer's credentials are not human approval.
 - Keep `core.hooksPath=.githooks`; the pre-push hook rejects direct pushes to `main`. Do not bypass it. This local guard is not server-side branch protection.
@@ -70,10 +70,10 @@ Do not delete or restructure upstream renderer backends as part of this work. DX
 
 Update at least one of:
 
-- `docs/neural-rendering/IMPLEMENTATION_NOTES.md`
-- `docs/neural-rendering/TASK_BOARD.md`
+- `docs/neural-rendering/archive/IMPLEMENTATION_NOTES.md`
+- `docs/neural-rendering/archive/TASK_BOARD.md`
 - `docs/neural-rendering/DECISIONS.md`
-- `docs/neural-rendering/TEST_RESULTS.md`
+- `docs/neural-rendering/archive/TEST_RESULTS.md`
 
 Record:
 
@@ -99,4 +99,4 @@ Useful test cases include a static camera, camera rotation, lateral translation,
 
 ## First-session restriction
 
-For the initial reconnaissance task, do not edit renderer C/C++, shaders, CMake dependency lists, or game code. Build if possible, inspect, and produce `docs/neural-rendering/RECON_REPORT.md` with exact evidence. Documentation and helper-script corrections are allowed.
+For the initial reconnaissance task, do not edit renderer C/C++, shaders, CMake dependency lists, or game code. Build if possible, inspect, and produce `docs/neural-rendering/archive/RECON_REPORT.md` with exact evidence. Documentation and helper-script corrections are allowed.

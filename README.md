@@ -2,17 +2,17 @@
 
 neuralDoom modernizes **Doom 3 BFG Edition** on the RBDOOM-3-BFG source port, with optional ray-traced lighting, native HDR, neural reconstruction and ultrawide controls. It remains a hybrid renderer; full path tracing and NVIDIA Reflex are not implemented.
 
-**Milestone 1 preview:** NR + DLSS controls have passed builds and bounded preset tests; broader visual acceptance is ongoing. The latest preview also adds a refreshed launcher, independent settings resets and local settings snapshots. Reset/restart gameplay acceptance remains pending. Release tags identify their exact source on `codex/milestone-1`; `main` remains the maintainer-reviewed checkpoint.
+**Milestone 1 is released and merged into `main`.** Download the [latest installer](https://github.com/ecarmen16/neuralDoom/releases/latest). NR and reduced-resolution reconstruction remain experimental; see [known issues](docs/KNOWN_ISSUES.md) for visual limitations and pending gameplay validation.
 
 ## Install and play
 
-1. Download the setup EXE from [internal test releases](https://github.com/ecarmen16/neuralDoom/releases).
+1. Download the setup EXE from [releases](https://github.com/ecarmen16/neuralDoom/releases).
 2. Select your owned Doom 3 BFG installation and a separate destination. Setup downloads prerequisites, verified lighting data and the selected neural components. Existing installations support upgrade/repair, copy and uninstall.
 3. Open the installed shortcut. Choose a rendering profile, then **Play Doom 3** opens the Doom 3 menu directly. NR is the initial default when installed; later choices are remembered.
 
 Windows and a compatible DX12 GPU are required; RTX effects require hardware ray tracing. NVIDIA reconstruction requires supported NVIDIA hardware. The installer includes both engine configurations and corresponding source. Retail data and optional third-party runtimes are acquired during setup, not bundled.
 
-See [installation, mode tradeoffs and exact comparison keys](INTERNAL_TESTING.md), or the [five-minute playtest checklist](docs/neural-rendering/DOGFOOD_CHECKLIST.md).
+See [installation, mode tradeoffs and exact comparison keys](docs/PLAYING.md), or the [five-minute playtest checklist](docs/neural-rendering/DOGFOOD_CHECKLIST.md).
 
 ## Rendering choices
 
@@ -33,11 +33,11 @@ All profiles retain the same lighting controls. DLAA uses **100% input resolutio
 - A top-right **FPS Counter**, enabled for fresh settings and toggleable in System Options; saved choices survive resizing and relaunch.
 - **Filmic Intensity**, blending the SDR postprocessing effect from 0% to 100%. Native HDR bypasses it.
 
-F3 toggles reflections, F4 bounce, F6 NR, F7 AO, F8 contacts, and F11 all four lighting effects. F5/F9 remain quicksave/quickload. Engine actions can be remapped in Keyboard Bindings; [the full controls table](INTERNAL_TESTING.md#exact-comparison-controls) describes every key and limitation.
+F3 toggles reflections, F4 bounce, F6 NR, F7 AO, F8 contacts, and F11 all four lighting effects. F5/F9 remain quicksave/quickload. Engine actions can be remapped in Keyboard Bindings; [the full controls table](docs/PLAYING.md#exact-comparison-controls) describes every key and limitation.
 
 ## Build from source
 
-Active development is on `codex/milestone-1`; `main` tracks reviewed internal-test source. Start with the [Windows build guide](docs/neural-rendering/WINDOWS_SETUP.md). A native RTX build uses PowerShell:
+`main` contains the released Milestone 1 implementation. Use the release tag when building the exact installer source. Start with the [Windows build guide](docs/neural-rendering/WINDOWS_SETUP.md). A native RTX build uses PowerShell:
 
 ```powershell
 git clone --recursive https://github.com/ecarmen16/neuralDoom.git
@@ -47,9 +47,7 @@ cd neuralDoom
 .\tools\neural-rendering\Build-RBDOOM.ps1 -Configuration RelWithDebInfo
 ```
 
-The optional SDK build is separate and disabled by default. Use the [development plan](docs/neural-rendering/DEV_PLAN.md), [architecture](docs/neural-rendering/ARCHITECTURE.md), and [validation results](docs/neural-rendering/TEST_RESULTS.md) for implementation details. [Maintainer packaging](INTERNAL_TESTING.md#maintainer-packaging) covers the versioned ZIP, single-file EXE and verification steps. Releases are currently built and verified locally, then uploaded; GitHub does not automatically build the installer.
-
-Next focus: [NR + DLSS and rendering performance](docs/neural-rendering/NEURAL_PERFORMANCE_PLAN.md), before full path tracing. Testers can use the [short performance feedback checklist](docs/neural-rendering/PERFORMANCE_FEEDBACK.md).
+The optional SDK build is separate and disabled by default. The [documentation index](docs/README.md) links player guides, renderer internals, validation instructions and the historical development archive. [Maintainer packaging](INTERNAL_TESTING.md#maintainer-packaging) covers the versioned ZIP, single-file EXE and verification steps. Releases are built and verified locally, then uploaded; GitHub does not automatically build the installer.
 
 ## Attribution and licenses
 

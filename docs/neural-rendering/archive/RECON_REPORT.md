@@ -1,5 +1,7 @@
 # Renderer reconnaissance report
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../README.md) for current guidance.
+
 Date: 2026-08-31
 
 Branch: `feature/neural-rendering-spike`

@@ -1,5 +1,7 @@
 # Neural Doom 3 development plan
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../README.md) for current guidance.
+
 ## 1. Goal
 
 Create a maintainable route from RBDOOM-3-BFG's existing Direct3D 12 renderer to modern temporal reconstruction and, later, publicly documented neural rendering. The work should produce useful renderer improvements even if the current unofficial DLSS 5 experiment disappears.

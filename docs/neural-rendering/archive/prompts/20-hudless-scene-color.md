@@ -1,5 +1,7 @@
 # Codex task — HUD-free scene-color diagnostic
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../../README.md) for current guidance.
+
 Prerequisite: `RECON_REPORT.md` is complete and identifies exact pass ordering/resources. Read `AGENTS.md` and the latest implementation notes.
 
 Implement the smallest reviewable diagnostic that exposes the chosen HUD-free scene-color texture before UI composition. Do not add DLSS, Streamline, NGX, RenoDX, or feeder code.

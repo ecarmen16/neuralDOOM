@@ -1,10 +1,12 @@
 # neuralDoom modernization plan
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../README.md) for current guidance.
+
 Reviewed 2026-09-06. This is the next implementation backlog, not a claim that the proposed features have shipped.
 
 Implementation began later on 2026-09-06. See `UNATTENDED_WORKFLOW.md` and the dated implementation/test notes for delivered code and current evidence; the initial review below remains a historical snapshot.
 
-Later scope extension: native ray tracing and path tracing were added to the scope. [RAY_TRACING_PLAN.md](RAY_TRACING_PLAN.md) records actual GPU/compiler readiness and the staged scene, shadows, reflections, indirect-lighting and full-integrator work. [PROBE_LIGHTING.md](PROBE_LIGHTING.md) records the missing lighting-pack repair that establishes the reference for this work.
+Later scope extension: native ray tracing and path tracing were added to the scope. [RAY_TRACING_PLAN.md](RAY_TRACING_PLAN.md) records actual GPU/compiler readiness and the staged scene, shadows, reflections, indirect-lighting and full-integrator work. [PROBE_LIGHTING.md](../PROBE_LIGHTING.md) records the missing lighting-pack repair that establishes the reference for this work.
 
 ## Branch and baseline
 

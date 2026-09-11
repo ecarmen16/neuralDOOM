@@ -1,5 +1,7 @@
 # Community texture-pack evaluation
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../README.md) for current guidance.
+
 This document tracks external, local-only visual-content candidates for Neural Doom 3. Texture packs, models, retail data, generated resources, bundled executables, and their archives must remain outside Git. A candidate is not approved for redistribution merely because it works locally.
 
 ## Initial shortlist — 2026-09-02

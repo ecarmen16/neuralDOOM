@@ -146,7 +146,7 @@ cost. D-012's native-DLAA-first policy established a stable baseline, not a univ
 NR dependency. Existing DLSS presets are validated in the separate SDK profile;
 combining them with the pinned NR consumer still requires input/evaluation proof.
 
-**Consequence:** Follow [NEURAL_PERFORMANCE_PLAN.md](NEURAL_PERFORMANCE_PLAN.md).
+**Consequence:** Follow [NEURAL_PERFORMANCE_PLAN.md](archive/NEURAL_PERFORMANCE_PLAN.md).
 Keep NR + DLAA as the initial default and make reduced input resolution an explicit,
 persisted quality choice only after validation. F6 must retain the selected
 reconstruction when compatible modes arrive. Measure external overhead separately

@@ -1,5 +1,7 @@
 # Codex task — rigid or skinned motion-vector increment
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../../README.md) for current guidance.
+
 Choose **one** increment per run: rigid objects or MD5/skinned objects. Do not combine both unless the existing architecture makes them inseparable and the justification is documented before edits.
 
 For rigid objects:

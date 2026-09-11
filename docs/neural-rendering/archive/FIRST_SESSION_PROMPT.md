@@ -1,5 +1,7 @@
 # Codex session 1 — baseline and renderer reconnaissance
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../README.md) for current guidance.
+
 Work in the current RBDOOM-3-BFG repository. Read `AGENTS.md` and every file under `docs/neural-rendering/` that is referenced from it before acting.
 
 ## Hard restriction for this session
@@ -38,7 +40,7 @@ For every conclusion, cite exact repository-relative paths and symbol names. Inc
 
 Create or update only documentation/helper files:
 
-1. `docs/neural-rendering/RECON_REPORT.md` containing:
+1. `docs/neural-rendering/archive/RECON_REPORT.md` containing:
    - environment and build result;
    - upstream commit and branch;
    - frame/render-flow diagram;
@@ -50,9 +52,9 @@ Create or update only documentation/helper files:
    - top five architectural risks;
    - recommended first code change with acceptance criteria;
    - unresolved questions.
-2. `docs/neural-rendering/TASK_BOARD.md` with statuses updated from evidence.
+2. `docs/neural-rendering/archive/TASK_BOARD.md` with statuses updated from evidence.
 3. `docs/neural-rendering/DECISIONS.md` only when a decision is actually supported.
-4. `docs/neural-rendering/IMPLEMENTATION_NOTES.md` with the command transcript and machine-specific blockers.
+4. `docs/neural-rendering/archive/IMPLEMENTATION_NOTES.md` with the command transcript and machine-specific blockers.
 
 ## Finish conditions
 

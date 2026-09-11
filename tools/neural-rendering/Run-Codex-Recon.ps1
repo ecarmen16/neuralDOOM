@@ -12,7 +12,7 @@ if (-not (Test-CommandAvailable 'codex')) {
 }
 
 if ([string]::IsNullOrWhiteSpace($PromptFile)) {
-    $PromptFile = Join-Path $RepoRoot 'docs\neural-rendering\FIRST_SESSION_PROMPT.md'
+    $PromptFile = Join-Path $RepoRoot 'docs\neural-rendering\archive\FIRST_SESSION_PROMPT.md'
 }
 if ([string]::IsNullOrWhiteSpace($OutputFile)) {
     $OutputFile = Join-Path $RepoRoot 'docs\neural-rendering\CODEX_SESSION_1_LAST_MESSAGE.md'

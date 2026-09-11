@@ -1,5 +1,7 @@
 # Neural rendering performance plan
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../README.md) for current guidance.
+
 Planning checkpoint: 2026-09-07. Tested release baseline: `internal-d16dab5e`.
 Implementation branch: **`codex/milestone-1`**, from reviewed `main` at `d21c4445`.
 2026-09-08 checkpoint: SDK/native builds and bounded NR preset checks passed after
@@ -11,7 +13,7 @@ staged separately; the published release and existing player installation are un
 All work in this roadmap stays on the milestone branch. Implement, review and
 playtest before opening a PR; `ecarmen16` or `eraser851` must manually approve the latest
 changes and perform the merge. No agent merge, auto-merge or direct push to `main`.
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) for the local push guard and current
+See [CONTRIBUTING.md](../../../CONTRIBUTING.md) for the local push guard and current
 GitHub enforcement limitation. The planning documents already on `main` do not
 contain the optimization implementation.
 

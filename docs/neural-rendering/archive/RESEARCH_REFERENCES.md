@@ -1,5 +1,7 @@
 # Research references
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../README.md) for current guidance.
+
 Verified for planning on **August 30, 2026**. These projects and docs can change; Codex must re-check current official versions before integrating an SDK or relying on an API.
 
 ## Primary engine/base
