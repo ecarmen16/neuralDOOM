@@ -1,12 +1,12 @@
-# neuralDoom
+# neuralDOOM
 
-neuralDoom modernizes **Doom 3 BFG Edition** on the RBDOOM-3-BFG source port, with optional ray-traced lighting, native HDR, neural reconstruction and ultrawide controls. It remains a hybrid renderer; full path tracing and NVIDIA Reflex are not implemented.
+neuralDOOM modernizes **Doom 3 BFG Edition** on the RBDOOM-3-BFG source port, with optional ray-traced lighting, native HDR, neural reconstruction and ultrawide controls. It remains a hybrid renderer; full path tracing and NVIDIA Reflex are not implemented.
 
-**Milestone 1 is released and merged into `main`.** Download the [latest installer](https://github.com/ecarmen16/neuralDoom/releases/latest). NR and reduced-resolution reconstruction remain experimental; see [known issues](docs/KNOWN_ISSUES.md) for visual limitations and pending gameplay validation.
+**Milestone 1 is released and merged into `main`.** Download the [latest installer](https://github.com/ecarmen16/neuralDOOM/releases/latest). NR and reduced-resolution reconstruction remain experimental; see [known issues](docs/KNOWN_ISSUES.md) for visual limitations and pending gameplay validation.
 
 ## Install and play
 
-1. Download the setup EXE from [releases](https://github.com/ecarmen16/neuralDoom/releases).
+1. Download the setup EXE from [releases](https://github.com/ecarmen16/neuralDOOM/releases).
 2. Select your owned Doom 3 BFG installation and a separate destination. Setup downloads prerequisites, verified lighting data and the selected neural components. Existing installations support upgrade/repair, copy and uninstall.
 3. Open the installed shortcut. Choose a rendering profile, then **Play Doom 3** opens the Doom 3 menu directly. NR is the initial default when installed; later choices are remembered.
 
@@ -24,7 +24,7 @@ See [installation, mode tradeoffs and exact comparison keys](docs/PLAYING.md), o
 
 All profiles retain the same lighting controls. DLAA uses **100% input resolution**; only explicit DLSS presets lower it. NR remembers its reconstruction separately from the SDK-only profile. Exact dimensions appear in Rendering Status. Visual quality and performance depend on the scene; NR can change brightness and fine detail.
 
-## What neuralDoom adds
+## What neuralDOOM adds
 
 - Ray-traced material reflections, diffuse/emissive bounce, contact shadows and ambient occlusion, each independently adjustable and bindable. Supported visible opaque doors, props and characters participate in ray tracing.
 - Native DX12 HDR with separate scene/UI calibration, plus conservative Doom-oriented lighting defaults.
@@ -40,8 +40,8 @@ F3 toggles reflections, F4 bounce, F6 NR, F7 AO, F8 contacts, and F11 all four l
 `main` contains the released Milestone 1 implementation. Use the release tag when building the exact installer source. Start with the [Windows build guide](docs/neural-rendering/WINDOWS_SETUP.md). A native RTX build uses PowerShell:
 
 ```powershell
-git clone --recursive https://github.com/ecarmen16/neuralDoom.git
-cd neuralDoom
+git clone --recursive https://github.com/ecarmen16/neuralDOOM.git
+cd neuralDOOM
 .\tools\neural-rendering\Check-Prerequisites.ps1
 .\tools\neural-rendering\Configure-RBDOOM-DX12.ps1 -RayTracing ON
 .\tools\neural-rendering\Build-RBDOOM.ps1 -Configuration RelWithDebInfo
@@ -53,4 +53,4 @@ The optional SDK build is separate and disabled by default. The [documentation i
 
 Built on [RBDOOM-3-BFG](https://github.com/RobertBeckebans/RBDOOM-3-BFG) and id Software's GPL source release. [Upstream documentation](README-UPSTREAM.md), [GPL and additional terms](LICENSE.md), [license exceptions](LICENSE_EXCEPTIONS.md), and [dependency provenance](docs/neural-rendering/THIRD_PARTY_AND_LEGAL.md) are preserved. Experimental NR compatibility is not an official NVIDIA engine integration.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes. Retail assets, credentials, machine-specific paths and runtime binaries do not belong in tracked source. neuralDoom is not affiliated with or endorsed by id Software, Bethesda, NVIDIA, RBDOOM-3-BFG, ReShade or RenoDX.
+See [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes. Retail assets, credentials, machine-specific paths and runtime binaries do not belong in tracked source. neuralDOOM is not affiliated with or endorsed by id Software, Bethesda, NVIDIA, RBDOOM-3-BFG, ReShade or RenoDX.
