@@ -91,6 +91,9 @@ public:
 	virtual void			DestroyGraph( idDebugGraph* graph ) = 0;
 };
 
+// Transient developer feedback, drawn after the scene and below the FPS counter.
+void Con_ToggleFeedback( const char* text );
+
 extern idConsole* 	console;	// statically initialized to an idConsoleLocal
 
 #endif /* !__CONSOLE_H__ */

@@ -745,3 +745,211 @@ SDK-on Release, run the prepared regressions, measure the unchanged DLAA baselin
 then verify NR + Quality before Balanced/Performance. Test F6, resize, FOV,
 doors/characters, weapon effects, glass, save/load and persistence. Keep PR creation
 and any merge after branch playtesting; do not replace the published release.
+
+## 2026-09-11 - Developer toggle feedback and independent flashlight difficulty
+
+Branch: `codex/hotkey-feedback-flashlight-difficulty`. No PR or merge performed.
+
+### Changes
+
+- `neo/framework/Console.h`, `Console.cpp`: `Con_ToggleFeedback` and
+  `idConsoleLocal::Draw` queue at most four messages below the FPS display. Hold
+  for 2.5 seconds, fade alpha for 1 second, then remove. The archived
+  `con_toggleFeedback` defaults to 1; zero clears/hides feedback. Uses existing
+  small console glyphs and virtual-screen safe bounds, after scene/UI composition.
+  No render resources, coordinate conventions, shader formats or SDKs change.
+- `neo/framework/CVarSystem.cpp::Toggle_f`: report the actual resulting value,
+  including string cycles. Exclude this UI call from the standalone DMAP tool.
+- `neo/renderer/RayTracingDiagnostic.cpp`: named reconstruction, lighting,
+  dynamic/skinned geometry and debug-view commands report requested state or
+  unavailable status. Messages do not claim GPU activation. External F6/NR
+  interception is not an engine command and is not covered.
+- `neo/d3xp/Player.cpp::UpdateFlashlight`, `Player.h`: archived
+  `flashlight_difficulty` (0..3), independent of game skill. Keep battery capacity
+  and HUD normalization unchanged; scale consumption/recharge rates with a
+  fractional remainder so low rates do not round up. Clamp zero recharge time.
+  `Init` and `Restore` reset the transient remainder without altering save format.
+- `neo/d3xp/Weapon.cpp::MuzzleFlashLight`: scale flashlight-only RGB from the
+  original `flashColor` on each update; no cumulative multiplication. Both local
+  and world light definitions receive the scale. Multiplayer stays at 1.0.
+- `neo/d3xp/menus/MenuScreen.h`, `MenuScreen_Shell_GameOptions.cpp`: add
+  Flashlight Difficulty (SP), with labeled presets, load/commit/change tracking.
+  Reuse `idMenuWidget_SystemOptionsList` to scroll nine controls through eight
+  existing SWF rows and use absolute selection indices.
+
+| Setting | Battery duration | Full recharge | Light RGB scale |
+|---|---:|---:|---:|
+| Easy (0) | 40 s | 2.25 s | 1.15 |
+| Normal (1, default) | 30 s | 3 s | 1.00 |
+| Hard (2) | 20 s | 6 s | 0.85 |
+| Nightmare (3) | 15 s | 12 s | 0.70 |
+
+Times assume the existing 30000/3000 ms base cvars. Classic flashlight mode 1
+retains its unlimited battery. Multiplayer and explicitly unlimited drain remain
+unlimited. Custom base recharge times now use a fractional ratio rather than the
+old integer division/minimum 1x rate.
+
+### Validation
+
+- Configure: `./tools/neural-rendering/Configure-RBDOOM-DX12.ps1 -BuildDirectory build-rt -RayTracing ON` PASS.
+- Build: `./tools/neural-rendering/Build-RBDOOM.ps1 -BuildDirectory build-rt -Configuration RelWithDebInfo` PASS, including rbdmap; Streamline OFF.
+  Initial rbdmap link failure was corrected with the DMAP exclusion and rebuilt.
+- `tools/neural-rendering/Test-FlashlightDifficulty.py` compiles the actual battery
+  update block with MSVC fixtures: all presets at 4/8/16/33 ms ticks, depletion,
+  recharge clamps, classic, multiplayer, unlimited drain, zero charge time and
+  custom slow recharge PASS.
+- Isolated DX12 run using locally owned Steam BFG data and a separate save path:
+  `devmap game/mars_city2`, 1280x720, native TAA, ray effects and SDK disabled.
+  Named debug cycles and generic difficulty toggle executed; four queued messages
+  visually verified below FPS. Later capture verified expired messages removed;
+  `con_toggleFeedback 0` capture verified no notification and valid scene/HUD.
+  Log reached `FEEDBACK_RUNTIME_COMPLETE` and normal shutdown. Saved config
+  contains difficulty 3 and feedback 0. Artifacts under ignored
+  `captures/neural/feedback-runtime/`; no retail data added to source.
+- Focused diff review completed; corrected scrolling behavior and map compiler
+  linkage. `git diff --check` PASS; hooks path remains `.githooks`.
+- Limits: mid-fade alpha was not captured separately; game-menu mouse/controller
+  navigation, live beam brightness A/B, battery HUD during a full drain, and save
+  reload playtesting still need human gameplay review. CPU timing is verified,
+  but these captures do not establish final difficulty balance or shadow quality.
+  The existing private packaged/installed builds were not replaced.
+
+### Player-body shadow finding and narrow next task
+
+`idPlayer::Present`/client update already honor `g_showPlayerShadow` (default 0)
+for native body/head shadows. `g_showPlayerShadow 1` enables that existing path.
+`R_AddSingleModel` in `tr_frontend_addmodels.cpp` calls
+`R_SnapshotDynamicRaySurface` only inside the directly-visible base-surface path.
+The hidden first-person body therefore lacks reliable RTX scene coverage; this
+change does not claim to fix it. The native muzzle-light exclusion also matters.
+
+Next: collect hidden player body/head as bounded shadow casters without exposing
+first-person geometry to the camera; preserve per-view/per-light shadow exclusions
+in ray queries. Validate native versus RTX shadows under world lights, flashlight,
+weapon bob, animation, mirrors and third person before enabling by default.
+
+## 2026-09-11 - Hidden player-body ray shadow coverage (final pre-PR gate)
+
+Supersedes the missing-body finding immediately above. Implemented on the same
+focused branch; push, PR and release remain pending manual gameplay validation.
+
+### Implementation and contracts
+
+- `neo/renderer/tr_frontend_addmodels.cpp::R_AddSingleModel` collects the hidden
+  body/head only after native light visibility admits the entity as a shadow
+  caster. Its camera scissor remains empty. `R_SnapshotDynamicRaySurface` retains
+  current-pose skinning, model transforms, material filters, frame-owned copies
+  and existing vertex/index budgets. Per-view suppression is honored for both
+  visible and hidden surfaces. Hidden surfaces can cast onto other objects even
+  with `MF_NOSELFSHADOW`, since they are excluded as receivers in this ray scene.
+- `neo/renderer/RenderCommon.h::rayDynamicSurface_t`: add `shadowOnly` and
+  `suppressShadowInLightID`. `viewLight_t::lightId` is copied in
+  `tr_frontend_addlights.cpp::R_AddSingleLight`, avoiding backend reads of mutable
+  frontend light state.
+- `neo/renderer/RayTracingDiagnostic.cpp::RayQueryDiagnostic`: one structured
+  `uint2` (8 bytes) per triangle records hidden-only status and exact excluded
+  light ID. Static policies are zero; dynamic records follow static triangles,
+  using the existing instance ID + primitive index convention. Buffers use NVRHI
+  uploads/barriers and the existing BLAS/TLAS lifetime. Dynamic geometry is
+  nonopaque to allow candidate filtering; static geometry remains opaque.
+- `RayTracedContacts`: bind policy SRV at t12 and extend constants to 144 bytes
+  with a padded uint4 light ID. `RayTracedLighting::PrepareLights` preserves exact
+  light ID bits in otherwise-unused light color alpha; RGB energy is unchanged.
+- `neo/shaders/rt/ray_visibility.hlsli`: shared camera/surface and shadow policy
+  predicates. Contact primary rays, diffuse-bounce rays and reflection rays skip
+  hidden-only candidates. Shadow queries in `contact_shadows.cs.hlsl` and
+  `ray_materials.hlsli` respect per-light exclusion. `diffuse_bounce.cs.hlsl` and
+  `reflections.cs.hlsl` retain their existing receiver/depth agreement checks.
+  The AO collector omits hidden-only geometry to avoid a camera/body occlusion
+  halo. No depth, motion, color formats, render resolution or coordinate systems
+  change. No dependency or vendor runtime added.
+- `r_rayTracingPlayerShadows` defaults 1, but still requires native
+  `g_showPlayerShadow`, moving/skinned geometry and an active ray-lighting effect.
+  The native player-shadow default remains unchanged. Both player-shadow toggles
+  invalidate temporal history; turning off hidden geometry removes it from TLAS.
+- `neo/d3xp/menus/MenuScreen.h`, `MenuScreen_Shell_GameOptions.cpp`: add archived
+  native Player Shadows control with load/commit/change tracking; ten controls
+  scroll through the existing eight SWF rows.
+- `rayTracingDynamicStatus` reports `hiddenShadowSurfaces`. `TestDynamicScene`
+  and `ray_query.cs.hlsl` now test eight GPU cases, including hidden-camera
+  rejection, world-light hit, excluded-light miss and off-toggle removal.
+  `Test-NeuralDoom-Smoke.ps1` requires the expanded diagnostic marker.
+
+### Automated and runtime validation
+
+- Configure/build PASS: `Configure-RBDOOM-DX12.ps1 -BuildDirectory build-rt -RayTracing ON`
+  and `Build-RBDOOM.ps1 -BuildDirectory build-rt -Configuration RelWithDebInfo`.
+  DX12 ON, Vulkan OFF, Streamline OFF; no installed/private package replaced.
+- MSVC `Test-DynamicRayGeometry.py` PASS, including real frontend selection
+  predicates, view suppression, skinned pose, hidden policy copying, no-self-shadow
+  behavior, budgets, disabled paths and removal. Flashlight timing regression PASS.
+- `Test-PlayerShadowContract.py` PASS: four ordered NVRHI policy layouts/bindings,
+  four compiled DXIL t12 SRVs and 144-byte contact constants.
+  `Test-ReflectionShaderContract.py` PASS: 64 exact permutation lookups, MRT
+  signatures and compute contracts. `Test-RayLightingComposition.py` PASS.
+- Initial map validation found a contact binding-order mismatch. NVRHI fatal
+  handling exited with code 0 before reaching the completion marker; debugger
+  output identified the mismatch. Corrected it and added the binding-order test.
+  Exit status alone is not considered a runtime pass.
+- Final isolated DX12 run used local Steam data, native TAA, 1280x720 and
+  validation layers. Scenario explicitly unpaused gameplay after map startup and
+  applied settings after initial map/profile restoration. Log:
+  `captures/neural/player-shadow-runtime/base/shadows-gate.log` (ignored).
+  `PLAYER_SHADOW_GATE_COMPLETE` and normal shutdown observed.
+- GPU diagnostic: `RT_DYNAMIC_TEST status=PASS phases=8 mismatches=0`.
+- Body enabled: 12 dynamic surfaces / 4587 triangles, including 4 hidden skinned
+  surfaces. RTX-player toggle off: 8 / 979, hidden 0. Native player-shadow toggle
+  off: hidden 0. Restored and rotated 180 degrees: hidden 4. Skinning off: hidden
+  0. Moving geometry off: all dynamic geometry 0. No budget skips.
+- Rotated scene: contact shadow samples hit/modified 7; GI and reflections active,
+  all three sampled invalid counters 0. Captures visually inspected for valid
+  scene/HUD and feature-off fallback. These sampled counts establish execution,
+  not an aesthetic shadow-quality or performance benchmark.
+- Focused diff review checked light-state ownership, NVRHI binding order, buffer
+  indexing, hidden receiver exclusion, feature-off removal and no new binary
+  dependencies. `git diff --check` PASS.
+
+### Remaining gate
+
+Manual playtest is still required before the next push/PR: menu scrolling and
+persistence; flashlight brightness/drain/recharge feel; body/head shadows under
+several lights; walking, crouching, bob/recoil, flashlight and muzzle flashes;
+mirrors/third person; map/save transitions; artifact and frame-time comparison.
+Contact shadows retain their existing distance/fade and native-shadow composition;
+this is not a full replacement for raster shadows or a player-reflection feature.
+NR/Streamline combination and ultrawide gameplay are not claimed validated here.
+
+After the user validates this branch build, prepare the focused push and PR.
+Latest-commit human approval by ecarmen16 or eraser851 is still required before
+maintainer merge. A first test release remains a separate decision after that
+validation; no release or PR has been created by this task.
+
+### Manual player-shadow acceptance (2026-09-11)
+
+The user launched the current development build and reported that Doomguy's
+shadows work perfectly. Player-shadow visual acceptance is recorded; validation
+of the other changes remains in progress. A local Desktop shortcut named
+`neuralDOOM - Dev Playtest` opens this build at the menu, retaining the manual
+playtest settings/save directory. No PR, tag, release or published installer was
+created by this shortcut task.
+
+### Draft review handoff and NR launch (2026-09-11)
+
+Following player-shadow acceptance, the user requested the PR while the remaining
+manual checks continue. Prepare this implemented, built and playtested work as a
+draft; remaining gameplay/UI checks are readiness gates before maintainer merge.
+This supersedes the earlier instruction to wait for all manual checks before PR
+creation. Latest-commit human review remains required.
+
+The Streamline-enabled RelWithDebInfo build also passed:
+`Build-RBDOOM.ps1 -BuildDirectory build-private-neural -Configuration RelWithDebInfo`.
+The local playtest shortcut now uses the default NR full-resolution DLAA profile.
+The existing NR staging helper backed up the installed engine/configuration and
+staged the new executable beside the existing local runtime components. The
+playtest save overlay contains matching current shaders. Startup reported
+Streamline initialized and the explicit NR compatibility runtime loaded; this
+confirms initialization, not NR gameplay quality or performance validation.
+No runtime binaries, proprietary assets, shortcuts or local paths are included
+in the source change. Focused review found no further blocking issues after the
+previous binding-order fix. Next: finish manual UI/flashlight and NR playtesting,
+then request human review of the final commit before a maintainer merges.

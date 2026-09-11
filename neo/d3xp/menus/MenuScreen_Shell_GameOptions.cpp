@@ -54,7 +54,7 @@ void idMenuScreen_Shell_GameOptions::Initialize( idMenuHandler* data )
 
 	SetSpritePath( "menuGameOptions" );
 
-	options = new( TAG_SWF ) idMenuWidget_DynamicList();
+	options = new( TAG_SWF ) idMenuWidget_SystemOptionsList(); // Recycle the eight SWF rows when scrolling.
 	options->SetNumVisibleOptions( NUM_GAME_OPTIONS_OPTIONS );
 	options->SetSpritePath( GetSpritePath(), "info", "options" );
 	options->SetWrappingAllowed( true );
@@ -123,6 +123,24 @@ void idMenuScreen_Shell_GameOptions::Initialize( idMenuHandler* data )
 	control->SetOptionType( OPTION_SLIDER_TOGGLE );
 	control->SetLabel( "Classic Flashlight (SP)" );
 	control->SetDataSource( &systemData, idMenuDataSource_GameSettings::GAME_FIELD_CLASSIC_FLASHLIGHT );
+	control->SetupEvents( DEFAULT_REPEAT_TIME, options->GetChildren().Num() );
+	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_PRESS_FOCUSED, options->GetChildren().Num() );
+	options->AddChild( control );
+
+	control = new( TAG_SWF ) idMenuWidget_ControlButton();
+	control->SetOptionType( OPTION_SLIDER_TEXT );
+	control->SetLabel( "Flashlight Difficulty (SP)" );
+	control->SetDescription( "Harder settings drain faster, recharge slower and dim the beam. Classic flashlight keeps its unlimited battery." );
+	control->SetDataSource( &systemData, idMenuDataSource_GameSettings::GAME_FIELD_FLASHLIGHT_DIFFICULTY );
+	control->SetupEvents( DEFAULT_REPEAT_TIME, options->GetChildren().Num() );
+	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_PRESS_FOCUSED, options->GetChildren().Num() );
+	options->AddChild( control );
+
+	control = new( TAG_SWF ) idMenuWidget_ControlButton();
+	control->SetOptionType( OPTION_SLIDER_TOGGLE );
+	control->SetLabel( "Player Shadows" );
+	control->SetDescription( "Cast body and head shadows in first person. RTX lighting also requires moving and animated ray geometry." );
+	control->SetDataSource( &systemData, idMenuDataSource_GameSettings::GAME_FIELD_PLAYER_SHADOWS );
 	control->SetupEvents( DEFAULT_REPEAT_TIME, options->GetChildren().Num() );
 	control->AddEventAction( WIDGET_EVENT_PRESS ).Set( WIDGET_ACTION_PRESS_FOCUSED, options->GetChildren().Num() );
 	options->AddChild( control );
@@ -266,7 +284,7 @@ bool idMenuScreen_Shell_GameOptions::HandleAction( idWidgetAction& action, const
 
 			if( selectionIndex != options->GetFocusIndex() )
 			{
-				options->SetViewIndex( options->GetViewOffset() + selectionIndex );
+				options->SetViewIndex( selectionIndex );
 				options->SetFocusIndex( selectionIndex );
 			}
 
@@ -282,7 +300,7 @@ bool idMenuScreen_Shell_GameOptions::HandleAction( idWidgetAction& action, const
 				int selectionIndex = parms[3].ToInteger();
 				if( selectionIndex != options->GetFocusIndex() )
 				{
-					options->SetViewIndex( options->GetViewOffset() + selectionIndex );
+					options->SetViewIndex( selectionIndex );
 					options->SetFocusIndex( selectionIndex );
 				}
 			}
@@ -303,6 +321,8 @@ extern idCVar aa_targetAimAssistEnable;
 extern idCVar in_alwaysRun;
 extern idCVar g_checkpoints;
 extern idCVar ng_classicFlashlight;
+extern idCVar flashlight_difficulty;
+extern idCVar g_showPlayerShadow;
 extern idCVar g_muzzleFlash;
 
 /*
@@ -330,6 +350,8 @@ void idMenuScreen_Shell_GameOptions::idMenuDataSource_GameSettings::LoadData()
 	fields[ GAME_FIELD_AIM_ASSIST ].SetBool( aa_targetAimAssistEnable.GetBool() );
 	fields[ GAME_FIELD_ALWAYS_SPRINT ].SetBool( in_alwaysRun.GetBool() );
 	fields[ GAME_FIELD_CLASSIC_FLASHLIGHT ].SetBool( ng_classicFlashlight.GetBool() );
+	fields[ GAME_FIELD_PLAYER_SHADOWS ].SetBool( g_showPlayerShadow.GetBool() );
+	fields[ GAME_FIELD_FLASHLIGHT_DIFFICULTY ].SetInteger( flashlight_difficulty.GetInteger() );
 	fields[ GAME_FIELD_MUZZLE_FLASHES ].SetBool( g_muzzleFlash.GetBool() );
 	originalFields = fields;
 }
@@ -353,6 +375,8 @@ void idMenuScreen_Shell_GameOptions::idMenuDataSource_GameSettings::CommitData()
 	aa_targetAimAssistEnable.SetBool( fields[ GAME_FIELD_AIM_ASSIST ].ToBool() );
 	in_alwaysRun.SetBool( fields[ GAME_FIELD_ALWAYS_SPRINT ].ToBool() );
 	ng_classicFlashlight.SetBool( fields[ GAME_FIELD_CLASSIC_FLASHLIGHT ].ToBool() );
+	g_showPlayerShadow.SetBool( fields[ GAME_FIELD_PLAYER_SHADOWS ].ToBool() );
+	flashlight_difficulty.SetInteger( fields[ GAME_FIELD_FLASHLIGHT_DIFFICULTY ].ToInteger() );
 	g_muzzleFlash.SetBool( fields[ GAME_FIELD_MUZZLE_FLASHES ].ToBool() );
 
 	cvarSystem->SetModifiedFlags( CVAR_ARCHIVE );
@@ -368,7 +392,11 @@ idMenuScreen_Shell_GameOptions::idMenuDataSource_AudioSettings::AdjustField
 */
 void idMenuScreen_Shell_GameOptions::idMenuDataSource_GameSettings::AdjustField( const int fieldIndex, const int adjustAmount )
 {
-	if( fieldIndex == GAME_FIELD_FOV )
+	if( fieldIndex == GAME_FIELD_FLASHLIGHT_DIFFICULTY )
+	{
+		fields[fieldIndex].SetInteger( ( fields[fieldIndex].ToInteger() + adjustAmount % 4 + 4 ) % 4 );
+	}
+	else if( fieldIndex == GAME_FIELD_FOV )
 	{
 		fields[ fieldIndex ].SetInteger( idMath::ClampInt( MIN_FOV, MAX_FOV, fields[ fieldIndex ].ToInteger() + adjustAmount * 5 ) );
 	}
@@ -386,6 +414,8 @@ idMenuScreen_Shell_GameOptions::idMenuDataSource_AudioSettings::IsDataChanged
 bool idMenuScreen_Shell_GameOptions::idMenuDataSource_GameSettings::IsDataChanged() const
 {
 
+	if( fields[GAME_FIELD_PLAYER_SHADOWS].ToBool() != originalFields[GAME_FIELD_PLAYER_SHADOWS].ToBool() ) { return true; }
+	if( fields[GAME_FIELD_FLASHLIGHT_DIFFICULTY].ToInteger() != originalFields[GAME_FIELD_FLASHLIGHT_DIFFICULTY].ToInteger() ) { return true; }
 	if( fields[ GAME_FIELD_FOV ].ToInteger() != originalFields[ GAME_FIELD_FOV ].ToInteger() )
 	{
 		return true;

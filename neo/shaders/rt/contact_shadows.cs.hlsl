@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "ray_visibility.hlsli"
 // Attenuate only this light's raster contribution, retaining all previous light.
 cbuffer Parameters : register(b0)
 {
@@ -7,6 +8,7 @@ cbuffer Parameters : register(b0)
     float4 Viewport;
     float4 LightStrength;
     float4 Rectangle;
+    uint4 LightPolicy;
 };
 RaytracingAccelerationStructure Scene : register(t0);
 Texture2D<float> Depth : register(t1);
@@ -46,9 +48,14 @@ void main(uint3 tid : SV_DispatchThreadID)
     primary.Direction = toReceiver / distance;
     primary.TMin = 0.01;
     primary.TMax = distance + max(0.5, distance * 0.001);
-    RayQuery<RAY_FLAG_FORCE_OPAQUE> surface;
+    RayQuery<RAY_FLAG_NONE> surface;
     surface.TraceRayInline(Scene, RAY_FLAG_NONE, 255, primary);
-    while (surface.Proceed()) {}
+    while (surface.Proceed())
+    {
+        if (surface.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE &&
+            RaySurfaceVisible(surface.CandidateInstanceID() + surface.CandidatePrimitiveIndex()))
+            surface.CommitNonOpaqueTriangleHit();
+    }
     if (surface.CommittedStatus() != COMMITTED_TRIANGLE_HIT ||
         abs(surface.CommittedRayT() - distance) > max(0.5, distance * 0.001)) return;
     // Dynamic BLAS primitives follow the static triangles in the shared buffers.
@@ -70,9 +77,14 @@ void main(uint3 tid : SV_DispatchThreadID)
     ray.TMin = 0.01;
     ray.TMax = min(CameraRadius.w, lightDistance - 0.5);
     if (sampled) InterlockedAdd(Stats[1], 1);
-    RayQuery<RAY_FLAG_FORCE_OPAQUE> contact;
+    RayQuery<RAY_FLAG_NONE> contact;
     contact.TraceRayInline(Scene, RAY_FLAG_NONE, 255, ray);
-    while (contact.Proceed()) {}
+    while (contact.Proceed())
+    {
+        if (contact.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE &&
+            RayShadowAllowed(contact.CandidateInstanceID() + contact.CandidatePrimitiveIndex(), LightPolicy.x))
+            contact.CommitNonOpaqueTriangleHit();
+    }
     if (contact.CommittedStatus() != COMMITTED_TRIANGLE_HIT) return;
     if (sampled) InterlockedAdd(Stats[2], 1);
     float visibility = 1.0 - LightStrength.w * saturate(1.0 - contact.CommittedRayT() / CameraRadius.w);

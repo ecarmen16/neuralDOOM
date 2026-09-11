@@ -33,6 +33,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "../framework/Common_local.h"
 #include "PredictedValue_impl.h"
 
+idCVar flashlight_difficulty( "flashlight_difficulty", "1", CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "SP flashlight: 0 easy, 1 normal, 2 hard, 3 nightmare; independent of game difficulty", 0, 3 );
+
 idCVar flashlight_batteryDrainTimeMS( "flashlight_batteryDrainTimeMS", "30000", CVAR_INTEGER, "amount of time (in MS) it takes for full battery to drain (-1 == no battery drain)" );
 idCVar flashlight_batteryChargeTimeMS( "flashlight_batteryChargeTimeMS", "3000", CVAR_INTEGER, "amount of time (in MS) it takes to fully recharge battery" );
 idCVar flashlight_minActivatePercent( "flashlight_minActivatePercent", ".25", CVAR_FLOAT, "( 0.0 - 1.0 ) minimum amount of battery (%) needed to turn on flashlight" );
@@ -1991,6 +1993,7 @@ void idPlayer::Init()
 
 	achievementManager.Init( this );
 
+	flashlightBatteryFraction = 0.0f;
 	flashlightBattery = flashlight_batteryDrainTimeMS.GetInteger();		// fully charged
 	flashlightReset = false;
 
@@ -2892,6 +2895,7 @@ void idPlayer::Restore( idRestoreGame* savefile )
 	tempWeapon->SetIsPlayerFlashlight( true );
 	flashlight = tempWeapon;
 	savefile->ReadInt( flashlightBattery );
+	flashlightBatteryFraction = 0.0f; // transient sub-millisecond remainder; preserve save format
 
 	achievementManager.Restore( savefile );
 
@@ -6034,11 +6038,16 @@ void idPlayer::UpdateFlashlight()
 		{
 			if( flashlight_batteryDrainTimeMS.GetInteger() > 0 )
 			{
-				flashlightBattery -= ( gameLocal.time - gameLocal.previousTime );
-				if( flashlightBattery < 0 )
+				const float drain[] = { 0.75f, 1.0f, 1.5f, 2.0f };
+				flashlightBatteryFraction -= ( gameLocal.time - gameLocal.previousTime ) * drain[flashlight_difficulty.GetInteger()];
+				const int delta = idMath::Ftoi( flashlightBatteryFraction );
+				flashlightBattery += delta;
+				flashlightBatteryFraction -= delta;
+				if( flashlightBattery <= 0 )
 				{
 					FlashlightOff();
 					flashlightBattery = 0;
+					flashlightBatteryFraction = 0.0f;
 					if( idealWeapon == weapon_flashlight )
 					{
 						//GK: No battery no flashlight
@@ -6062,14 +6071,21 @@ void idPlayer::UpdateFlashlight()
 		{
 			if( flashlightBattery < flashlight_batteryDrainTimeMS.GetInteger() )
 			{
-				flashlightBattery += ( gameLocal.time - gameLocal.previousTime ) * Max( 1, ( flashlight_batteryDrainTimeMS.GetInteger() / flashlight_batteryChargeTimeMS.GetInteger() ) );
-				if( flashlightBattery > flashlight_batteryDrainTimeMS.GetInteger() )
+				const float recharge[] = { 0.75f, 1.0f, 2.0f, 4.0f };
+				const float chargeTime = Max( 1, flashlight_batteryChargeTimeMS.GetInteger() ) * recharge[flashlight_difficulty.GetInteger()];
+				flashlightBatteryFraction += ( gameLocal.time - gameLocal.previousTime ) * flashlight_batteryDrainTimeMS.GetFloat() / chargeTime;
+				const int delta = idMath::Ftoi( flashlightBatteryFraction );
+				flashlightBattery += delta;
+				flashlightBatteryFraction -= delta;
+				if( flashlightBattery >= flashlight_batteryDrainTimeMS.GetInteger() )
 				{
 					flashlightBattery = flashlight_batteryDrainTimeMS.GetInteger();
 				}
 			}
 		}
 	}
+
+	if( flashlightBattery == flashlight_batteryDrainTimeMS.GetInteger() ) { flashlightBatteryFraction = 0.0f; }
 
 	if( hud )
 	{

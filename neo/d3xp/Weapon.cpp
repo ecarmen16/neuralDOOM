@@ -1559,8 +1559,19 @@ void idWeapon::UpdateFlashPosition()
 idWeapon::MuzzleFlashLight
 ================
 */
+extern idCVar flashlight_difficulty;
 void idWeapon::MuzzleFlashLight()
 {
+	if( isPlayerFlashlight )
+	{
+		const float brightness[] = { 1.15f, 1.0f, 0.85f, 0.7f };
+		const float scale = common->IsMultiplayer() ? 1.0f : brightness[flashlight_difficulty.GetInteger()];
+		for( int i = 0; i < 3; i++ )
+		{
+			muzzleFlash.shaderParms[SHADERPARM_RED + i] = flashColor[i] * scale;
+			worldMuzzleFlash.shaderParms[SHADERPARM_RED + i] = flashColor[i] * scale;
+		}
+	}
 
 	if( !lightOn && ( !g_muzzleFlash.GetBool() || !muzzleFlash.lightRadius[0] ) )
 	{
