@@ -75,7 +75,7 @@ Local validation record:
 
 - The official RBDOOM v1.6.0 release's `_rbdoom_global_illumination_data.pk4` was inspected and installed only into the local game checkout. It contains generated lighting textures/grid data, remains ignored, and is not approved for repository or release bundling. Exact source, contents and measured fingerprints are in [PROBE_LIGHTING.md](PROBE_LIGHTING.md).
 - The new capability diagnostic uses the already vendored MIT-licensed NVRHI (`neo/extern/nvrhi/LICENSE.txt`) and adds no SDK dependency.
-- NRD is only a candidate in [RAY_TRACING_PLAN.md](RAY_TRACING_PLAN.md). Its current [NVIDIA RTX SDK license](https://raw.githubusercontent.com/NVIDIA-RTX/NRD/master/LICENSE.txt), including its open-source-combination restriction, requires compatibility/distribution review before incorporation. It must not be described as MIT merely because NVRHI is MIT. No NRD code or binary was downloaded or integrated.
+- NRD is only a candidate in [RAY_TRACING_PLAN.md](archive/RAY_TRACING_PLAN.md). Its current [NVIDIA RTX SDK license](https://raw.githubusercontent.com/NVIDIA-RTX/NRD/master/LICENSE.txt), including its open-source-combination restriction, requires compatibility/distribution review before incorporation. It must not be described as MIT merely because NVRHI is MIT. No NRD code or binary was downloaded or integrated.
 
 ## Dependency review template
 

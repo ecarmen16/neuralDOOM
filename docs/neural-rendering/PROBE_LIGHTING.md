@@ -38,7 +38,7 @@ rayTracingStatus
 
 `probeLightingStatus` waits for the game thread and reads existing CPU-side state. It reports world/map, probe counts, complete pairs, defaulted/unloaded images, per-area light-grid availability and selected probe image names/weights. Grids with no valid samples are counted as `empty`, independently of missing images in populated grids. `PROBE_SELECTION` counts both all fallback specular slots and only slots with positive blending weight. This is an on-demand audit, not a new per-frame pass, texture loader or change to selection behavior. Calling it before a map is loaded reports `world=0` safely.
 
-`rayTracingStatus` queries NVRHI's device capabilities and separately reports `sceneImplemented=0`. Hardware capability is not evidence of ray-traced lighting. See [RAY_TRACING_PLAN.md](RAY_TRACING_PLAN.md) for the staged implementation plan.
+`rayTracingStatus` queries NVRHI's device capabilities and separately reports `sceneImplemented=0`. Hardware capability is not evidence of ray-traced lighting. See [RAY_TRACING_PLAN.md](archive/RAY_TRACING_PLAN.md) for the staged implementation plan.
 
 Setup and prerequisite reports use `Get-NeuralLightingData.ps1` to flag absent lighting candidates. Presence of a nonempty pack with the expected filename or loose EXR/bimage files is inventory only; it does not establish validity, complete map coverage or the active mod's search-path precedence. Runtime diagnostics provide that evidence.
 
@@ -51,4 +51,4 @@ The smoke runner records probe/light-grid state and RT capabilities in `result.j
 
 ## Validation record
 
-Runtime/build results are recorded in the dated entry in [TEST_RESULTS.md](TEST_RESULTS.md). The earlier [LIGHTING_BASELINE.md](LIGHTING_BASELINE.md) measures the missing-pack state and must retain that qualification when comparing future lighting work.
+Runtime/build results are recorded in the dated entry in [TEST_RESULTS.md](archive/TEST_RESULTS.md). The earlier [LIGHTING_BASELINE.md](archive/LIGHTING_BASELINE.md) measures the missing-pack state and must retain that qualification when comparing future lighting work.

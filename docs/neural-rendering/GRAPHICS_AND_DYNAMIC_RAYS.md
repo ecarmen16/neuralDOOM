@@ -2,7 +2,7 @@
 
 Settings > System > System Options now includes reconstruction, current backend/resolution, independent RTX toggles, reflection/bounce/emissive strengths, moving/skinned geometry controls, Ray Quality and Doom Lighting Defaults. Scroll below Volume.
 
-Use the DLAA/DLSS launcher profile to switch live between native-resolution TAA/DLAA and optional DLSS Quality, Balanced or Performance. The Native build has no SDK; the NR profile keeps full-resolution DLAA as its input. Ray Quality independently selects 2/4/8/16 reflection and bounce rays, with twice as many AO rays. It never reduces rendering resolution. Defaults preserve GI 1.125, reflection blend 0.65 and the existing dark, fixed-exposure preset. The launcher seeds missing RTX preferences and respects saved on/off choices thereafter.
+Use the DLAA/DLSS launcher profile to switch live between native-resolution TAA/DLAA and optional DLSS Quality, Balanced or Performance. The Native build has no SDK; the NR profile defaults to full-resolution DLAA and also offers explicit DLSS presets. Ray Quality independently selects 2/4/8/16 reflection and bounce rays, with twice as many AO rays. It never reduces rendering resolution. Defaults preserve GI 1.125, reflection blend 0.65 and the existing dark, fixed-exposure preset. The launcher seeds missing RTX preferences and respects saved on/off choices thereafter.
 
 ## Dynamic geometry implementation
 

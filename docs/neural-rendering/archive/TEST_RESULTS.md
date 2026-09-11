@@ -1,5 +1,7 @@
 ## 2026-09-06 - Material reflection checkpoint and CPU-only validation
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../README.md) for current guidance.
+
 Code checkpoint: `a8ddea9be2daeea15da5a04b6701df993b33c25f` on `codex/rt-foundation`. Both source and game checkouts were synchronized and clean before the final build-manifest refresh. This subsequent results-only documentation commit changes no renderer code or compiled artifacts.
 
 | Configuration | Result | EXE SHA-256 | Manifest shaders |
@@ -21,7 +23,7 @@ Validation performed:
 
 Runtime boundary: **no GPU/gameplay test was performed for the reflection addition**, with manual visual acceptance pending. The preceding material-lighting playtest identified excessive bounce brightness. The GI default and the existing local saved value were changed from 1.5 to 1.125, with a local configuration backup. This is configuration evidence, not measured reflection image quality.
 
-The opt-in smoke harness now checks reflection coverage, full-resolution dimensions, live off/on/resume, resize and all seven debug views; that scenario remains unrun. Reflection material response, noise/trails, dynamic-object omissions, screen-edge fallback, 5120x1440 performance and Native/DLAA/HDR visual quality require the [three-check playtest](RAY_TRACED_REFLECTIONS.md#three-check-playtest). Static BSP-only geometry, approximate hit shading and limited current-view light lists remain explicit limitations. Next bounded implementation task: rigid dynamic ray instances for doors and props.
+The opt-in smoke harness now checks reflection coverage, full-resolution dimensions, live off/on/resume, resize and all seven debug views; that scenario remains unrun. Reflection material response, noise/trails, dynamic-object omissions, screen-edge fallback, 5120x1440 performance and Native/DLAA/HDR visual quality require the [three-check playtest](../RAY_TRACED_REFLECTIONS.md#three-check-playtest). Static BSP-only geometry, approximate hit shading and limited current-view light lists remain explicit limitations. Next bounded implementation task: rigid dynamic ray instances for doors and props.
 
 ---
 
@@ -51,7 +53,7 @@ See [the review and three-check playtest](REVIEW_2026-09-06.md). No new graphica
 
 ## 2026-09-06 — RTX material lighting, GPU pause checkpoint
 
-Implemented full-resolution textured diffuse bounce/emission, contact shadows, AO controls and bindable comparison commands in `RayTracingDiagnostic.cpp`, with opaque-light and pre-temporal hooks in `RenderBackend.cpp`/`RenderCommon.h`, updated capability text in `RenderSystem_init.cpp`, and SM6.5 shaders under `neo/shaders/rt`. Resource formats, coordinates, shading scope and controls are documented in [RTX_LIGHTING.md](RTX_LIGHTING.md).
+Implemented full-resolution textured diffuse bounce/emission, contact shadows, AO controls and bindable comparison commands in `RayTracingDiagnostic.cpp`, with opaque-light and pre-temporal hooks in `RenderBackend.cpp`/`RenderCommon.h`, updated capability text in `RenderSystem_init.cpp`, and SM6.5 shaders under `neo/shaders/rt`. Resource formats, coordinates, shading scope and controls are documented in [RTX_LIGHTING.md](../RTX_LIGHTING.md).
 
 `Build-RBDOOM.ps1 -BuildDirectory build-rt -Configuration RelWithDebInfo` passed. Native smoke `smoke-20260906-192933-7ef79bd1` passed with AO, contacts, material GI, live off/on, debug views, example key bindings and 1280×720 → 1920×1080 resize under native DX12/NVRHI validation. GPU samples reported zero invalid contact/GI values. The earlier native DX12 error 538 was caused by NVRHI retaining a framebuffer binding across the HDR snapshot copy; clearing the command-list state after the copy and invalidating the engine vertex-buffer cache fixed the reproduced error. No submodule changes were needed.
 
@@ -114,7 +116,7 @@ cvar directly. This results-only commit does not rebuild the tested binaries.
 persistent opt-in AO pass. `RenderBackend.cpp` applies it before ambient lighting;
 `RenderSystem_init.cpp` clears map/device ownership. The new SM 6.5 AO shader,
 resource formats, depth/normal conventions, fallbacks and controls are documented
-in [RAY_TRACED_AO.md](RAY_TRACED_AO.md). The RTX launcher requests native HDR (Auto)
+in [RAY_TRACED_AO.md](../RAY_TRACED_AO.md). The RTX launcher requests native HDR (Auto)
 and supports both Native and DLAA. No new binary dependency is tracked.
 
 Initial Native `RelWithDebInfo` configure/build passed. The first runtime attempt

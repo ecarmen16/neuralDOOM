@@ -1,5 +1,7 @@
 # Rendering settings review — 2026-09-07
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../README.md) for current guidance.
+
 Goal: preserve Doom 3 shadow contrast while retaining full-resolution material lighting and DLAA. These are conservative starting values, not a claim of exact 2004 renderer matching. Visual comparison remains pending manual testing.
 
 ## Findings and changes

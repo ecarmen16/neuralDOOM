@@ -1,5 +1,7 @@
 # Renderer reconnaissance checklist
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../README.md) for current guidance.
+
 Codex should cite repository-relative paths and exact symbols for each completed item.
 
 ## Build/platform

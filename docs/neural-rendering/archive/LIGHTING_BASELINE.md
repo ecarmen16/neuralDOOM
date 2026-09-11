@@ -1,8 +1,10 @@
 # Lighting measurement baseline
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../README.md) for current guidance.
+
 Branch: `codex/lighting-diagnostics`, based on the native HDR prototype.
 
-Follow-up: [PROBE_LIGHTING.md](PROBE_LIGHTING.md) records the restored official lighting pack and empty-grid loader fix. The measurements below retain their original missing-pack conditions. Later Native/DLAA ultrawide captures with loaded probes are recorded separately in `TEST_RESULTS.md`.
+Follow-up: [PROBE_LIGHTING.md](../PROBE_LIGHTING.md) records the restored official lighting pack and empty-grid loader fix. The measurements below retain their original missing-pack conditions. Later Native/DLAA ultrawide captures with loaded probes are recorded separately in `TEST_RESULTS.md`.
 
 ## Acceptance and scope
 

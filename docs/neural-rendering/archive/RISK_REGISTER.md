@@ -1,5 +1,7 @@
 # Risk register
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../README.md) for current guidance.
+
 | ID | Risk | Likelihood | Impact | Mitigation / proof needed |
 |---|---|---:|---:|---|
 | R1 | Current community Neural Rendering runtime/API changes or disappears | High | High | Make the feeder experiment disposable; build around engine-owned temporal inputs and official SDKs. |

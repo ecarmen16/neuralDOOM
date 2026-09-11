@@ -7,14 +7,9 @@ neuralDoom is the downstream project; RBDOOM-3-BFG remains its upstream source. 
 - `origin`: the configured downstream repository; inspect it with `git remote -v`.
 - `upstream`: `https://github.com/RobertBeckebans/RBDOOM-3-BFG.git`.
 - `main`: reviewed downstream checkpoints.
-- `codex/…`: focused development branches. Do not rewrite upstream history to rename the project.
+- `codex/...`: focused development branches. Do not rewrite upstream history to rename the project.
 
-Milestone 1 optimization work uses **`codex/milestone-1`**. Implement, review and
-playtest branch builds before opening a PR. Do not open a planning/tracking PR.
-The latest changes require manual approval from `ecarmen16`
-or `eraser851`; subsequent changes require another review. Those maintainers
-perform the final merge. Agents must not approve, merge, enable auto-merge or
-push milestone work directly to `main`, including through a maintainer's account.
+Milestone 1 is merged into `main`. Use focused `codex/…` branches for follow-up work and open implementation PRs after relevant verification. The latest PR changes require manual approval from `ecarmen16` or `eraser851`; subsequent changes require renewed review. Those maintainers perform the final merge. Agents must not approve, merge, enable auto-merge or push directly to `main`.
 
 Install the repository's commit and push checks once per checkout:
 
@@ -31,13 +26,7 @@ The hook checks staged whitespace and staged source content. Game resources, cap
 
 The pre-push hook rejects updates and deletions targeting `main`; publish a
 development branch and use the manually reviewed PR instead. Do not bypass the
-hook. On 2026-09-07 GitHub returned HTTP 403 for branch protection/rulesets on this
-private repository and required GitHub Pro or public visibility. Server-side
-enforcement is therefore unavailable under the current plan. Keep the repository
-private; the local hook and contributor policy are not equivalent to protection
-on GitHub or on another checkout without hooks installed. If the account gains
-support, require PR reviews from the maintainers, dismiss stale approvals, and
-prevent direct/force pushes before claiming server enforcement.
+hook. The repository is public. Local hooks are not server-side branch protection; verify GitHub rules before relying on remote enforcement.
 
 ## Build and verify
 

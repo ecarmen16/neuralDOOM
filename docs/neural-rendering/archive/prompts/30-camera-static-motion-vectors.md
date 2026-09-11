@@ -1,5 +1,7 @@
 # Codex task — camera/static motion-vector prototype
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../../README.md) for current guidance.
+
 Prerequisites: renderer recon and HUD-free scene diagnostic are complete. Do not add a vendor SDK.
 
 Implement an OFF-by-default motion-vector target and debug visualization for static world geometry plus camera motion only.

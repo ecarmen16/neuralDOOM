@@ -1,5 +1,7 @@
 # Task board
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../README.md) for current guidance.
+
 Statuses: `BLOCKED`, `READY`, `IN PROGRESS`, `VERIFY`, `DONE`, `DEFERRED`.
 
 ## Current focus
@@ -13,7 +15,7 @@ before Reflex, frame generation and full path tracing. Baseline installer:
 reviewed `main` at `d21c4445`. Review and playtest branch builds before opening a PR;
 only `ecarmen16` or `eraser851` may manually approve and merge the latest changes.
 No optimization implementation is merged into `main` by this branch setup.
-Use [PERFORMANCE_FEEDBACK.md](PERFORMANCE_FEEDBACK.md) for current-release feedback.
+Use [PERFORMANCE_FEEDBACK.md](../PERFORMANCE_FEEDBACK.md) for current-release feedback.
 
 2026-09-08: branch SDK/native builds and bounded GPU checks passed after fixing
 the DLSS input viewport origin. NR evaluated with all three reduced-input presets
@@ -38,7 +40,7 @@ open. The older tables retain implementation history and broader unfinished gate
 
 ### Earlier modernization implementation / 2026-09-06
 
-Working branch: `codex/rt-foundation`, prepared from the completed `codex/probe-lighting` checkpoint. See [PROBE_LIGHTING.md](PROBE_LIGHTING.md) for the lighting-pack investigation and empty-grid fix, and [RAY_TRACING_PLAN.md](RAY_TRACING_PLAN.md) for the next implementation gates. [LIGHTING_BASELINE.md](LIGHTING_BASELINE.md) retains the earlier missing-pack GPU measurements; [NATIVE_HDR.md](NATIVE_HDR.md) retains the HDR implementation and validation boundary.
+Working branch: `codex/rt-foundation`, prepared from the completed `codex/probe-lighting` checkpoint. See [PROBE_LIGHTING.md](../PROBE_LIGHTING.md) for the lighting-pack investigation and empty-grid fix, and [RAY_TRACING_PLAN.md](RAY_TRACING_PLAN.md) for the next implementation gates. [LIGHTING_BASELINE.md](LIGHTING_BASELINE.md) retains the earlier missing-pack GPU measurements; [NATIVE_HDR.md](../NATIVE_HDR.md) retains the HDR implementation and validation boundary.
 
 | ID | Status | Task | Exit evidence |
 |---|---|---|---|
@@ -57,10 +59,10 @@ Working branch: `codex/rt-foundation`, prepared from the completed `codex/probe-
 | RT-REFLECTIONS | VERIFY | Full-resolution native-material reflections, probe replacement, temporal/spatial filter and 25% lower GI default | Native RT, DLAA and RT-OFF builds plus offline shader contracts; GPU playtest pending. See RAY_TRACED_REFLECTIONS.md. |
 
 The implemented diagnostics and exact resource contract are in
-[RAY_TRACING_DIAGNOSTICS.md](RAY_TRACING_DIAGNOSTICS.md). The short manual
-pass is [DOGFOOD_CHECKLIST.md](DOGFOOD_CHECKLIST.md), launched with
+[RAY_TRACING_DIAGNOSTICS.md](../RAY_TRACING_DIAGNOSTICS.md). The short manual
+pass is [DOGFOOD_CHECKLIST.md](../DOGFOOD_CHECKLIST.md), launched with
 `Launch-NeuralDoom-RTX.cmd` in the game checkout. The first gameplay effect is
-documented in [RAY_TRACED_AO.md](RAY_TRACED_AO.md). Full instance/material scene
+documented in [RAY_TRACED_AO.md](../RAY_TRACED_AO.md). Full instance/material scene
 registration, moving occluders and path tracing remain open.
 
 See `UNATTENDED_WORKFLOW.md` for the implemented controls and test commands, and the 2026-09-06 entry in `TEST_RESULTS.md` for exact evidence and failures.

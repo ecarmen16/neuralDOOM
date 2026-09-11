@@ -1,5 +1,7 @@
 # Public preview audit - 2026-09-11
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../README.md) for current guidance.
+
 The maintainer requested publication of the latest installer/source and repository
 visibility change. This is a preview, not a declaration of completed gameplay
 acceptance. `main` remains at its reviewed checkpoint; release tags identify the
@@ -36,7 +38,7 @@ including pinned submodule source and notices. Retail assets and optional
 ReShade/RenoDX/NVIDIA runtimes are not in the release. Setup acquires optional
 components on the player's machine; NR is explicitly experimental and is not an
 official NVIDIA engine API. Runtime rebundling remains unapproved as documented
-in [THIRD_PARTY_AND_LEGAL.md](THIRD_PARTY_AND_LEGAL.md). Repository visibility
+in [THIRD_PARTY_AND_LEGAL.md](../THIRD_PARTY_AND_LEGAL.md). Repository visibility
 does not relax these constraints or approve a combined runtime bundle.
 
 Snapshots are personal saved-setting exports, not public base presets. The

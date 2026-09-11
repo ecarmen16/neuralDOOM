@@ -1,7 +1,7 @@
 # Workspace layout
 
 The repository root contains source and build tools. Historical development
-plans remain under `docs/neural-rendering` for technical reference.
+plans remain under `docs/neural-rendering/archive` for technical reference.
 
 - `releases/`: generated setup EXE, alternative ZIP and checksum sidecars.
 - `captures/neural/`: ignored local validation evidence and download caches.
@@ -11,5 +11,5 @@ plans remain under `docs/neural-rendering` for technical reference.
   compiler caches and local manifests can contain absolute paths.
 
 Install test packages into a separate directory. Keep owned game data and local
-runtime components outside tracked source. See `INTERNAL_TESTING.md` for the
+runtime components outside tracked source. See [the player guide](../PLAYING.md) for the
 installer flow and comparison controls.

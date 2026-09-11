@@ -1,5 +1,7 @@
 # Codex task — official Streamline/DLAA integration plan or increment
 
+> Historical development record. Instructions and status describe that checkpoint; use the [documentation index](../../../README.md) for current guidance.
+
 Begin only after ND3-210 through ND3-280 are verified and the user has explicitly approved an official SDK integration.
 
 First re-check current official NVIDIA Streamline/DLSS documentation, release, supported features, and license. Do not use an extracted, leaked, private, or third-party-repacked SDK/runtime.
