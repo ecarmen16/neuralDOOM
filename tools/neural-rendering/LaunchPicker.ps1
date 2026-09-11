@@ -30,6 +30,28 @@ function Show-NeuralLaunchPicker {
             $PreferredProfile = ''; $PreferredMode = 1; $PreferredNRMode = 1
         }
         $picker = New-Object NeuralDoom.LaunchPicker($sdkAvailable, $nrAvailable, $PreferredProfile, $PreferredMode, $PreferredNRMode)
+        $picker.add_SnapshotRequested({
+            $dialog = New-Object Windows.Forms.SaveFileDialog
+            try {
+                . (Join-Path $PSScriptRoot 'Save-NeuralSettingsSnapshot.ps1')
+                $directory = Get-NeuralSettingsResetPath $RepoRoot 'settings-snapshots'
+                New-Item -ItemType Directory -Path $directory -Force | Out-Null
+                $dialog.Title = 'Save personal settings snapshot'
+                $dialog.Filter = 'Settings snapshot (*.zip)|*.zip'
+                $dialog.DefaultExt = 'zip'; $dialog.AddExtension = $true
+                $dialog.InitialDirectory = $directory
+                $dialog.FileName = 'neuralDoom-settings-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.zip'
+                if ($dialog.ShowDialog($picker) -ne [Windows.Forms.DialogResult]::OK) { return }
+                $saved = Save-NeuralSettingsSnapshot -RepoRoot $RepoRoot -Destination $dialog.FileName
+                $notes = if ($saved.Warnings.Count) { "`n`n" + ($saved.Warnings -join "`n") } else { '' }
+                $null = [Windows.Forms.MessageBox]::Show($picker,
+                    "Settings snapshot saved:`n$($saved.Path)`n`nYour settings are unchanged. This personal ZIP may contain local paths; it is not a preset to ship publicly.$notes",
+                    'Snapshot saved', [Windows.Forms.MessageBoxButtons]::OK, [Windows.Forms.MessageBoxIcon]::Information)
+            } catch {
+                $null = [Windows.Forms.MessageBox]::Show($picker, $_.Exception.Message, 'Could not save snapshot',
+                    [Windows.Forms.MessageBoxButtons]::OK, [Windows.Forms.MessageBoxIcon]::Warning)
+            } finally { $dialog.Dispose() }
+        })
         try {
             $result = $picker.ShowDialog()
             if ($result -eq [Windows.Forms.DialogResult]::Retry) {

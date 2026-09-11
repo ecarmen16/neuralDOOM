@@ -1624,3 +1624,27 @@ to user testing. No live user settings were reset.
 Next: test both reset actions and Restart Now locally, then choose the preferred
 look before revising baseline values. The remaining six downstream review
 findings and two retained renderer problems remain separate work.
+
+## 2026-09-11 - Personal settings snapshots and public preview preparation
+
+`Save-NeuralSettingsSnapshot.ps1::Save-NeuralSettingsSnapshot` exports allowlisted
+saved game/binding and ReShade/NR settings into a new ZIP with SHA-256 manifest.
+It excludes profile progress, saves, runtimes and generated launch commands;
+blocks active Doom, pending resets, linked paths and overwriting an existing ZIP;
+and reports an absent optional effects preset. `LaunchPicker.cs/.ps1` expose a
+save-only event/dialog without closing or changing the chosen rendering modes.
+`Reset-NeuralSettings.ps1` shares its existing mutex guard with action-specific
+wording. Current settings and shipped baseline values are unchanged.
+
+The Git ignore/source gate now rejects personal settings and snapshot artifacts.
+`Test-PublicHistory.py` adds read-only all-ref object inventory/privacy reporting,
+complementing redacted Gitleaks. See PUBLIC_READINESS.md for audit scope and limits.
+`InternalSetup.cs::SetupWindow` initializes an automatically selected upgrade's
+destination correctly, fixing review finding 6 before publishing the preview.
+
+PowerShell 5.1/7 snapshot fixtures, 131 hidden picker states, hidden default-upgrade
+navigation, source/privacy tests and focused diff review passed. The picker was
+rendered to a bitmap without launching a game. No renderer/shader/resource-format
+or dependency change occurred. Release builds/package verification are required
+at the final clean source commit. Runtime reset/restart acceptance and selecting
+a sanitized, maintainer-approved baseline remain the next player-validation task.

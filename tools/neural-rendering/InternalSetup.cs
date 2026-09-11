@@ -148,7 +148,7 @@ class SetupWindow : Form {
         }
         profile = neuralAvailable ? "NR" : "Native";
         gamePath = FindBFG(); FindInstallations();
-        if (installations.Count > 0) { existingPath = installations[0]; installMode = "Upgrade"; }
+        if (installations.Count > 0) { existingPath = installations[0]; installPath = existingPath; installMode = "Upgrade"; }
         ShowPage(0);
     }
     Button MakeButton(string text, int x, int y, int width, bool primary) {

@@ -143,6 +143,14 @@ try {
 
 $picker = New-Object NeuralDoom.LaunchPicker($true, $true, 'NR', 4, 2)
 try {
+    $snapshot = @($picker.Controls | Where-Object { $_ -is [Windows.Forms.Button] -and $_.Text -eq 'Save snapshot...' })
+    if ($snapshot.Count -ne 1 -or $snapshot[0].DialogResult -ne 'None') { throw 'Snapshot action is missing or changes the dialog result.' }
+    Assert-TextFits $snapshot[0].Text $snapshot[0].Font $snapshot[0].ClientSize $false 'snapshot button'
+    $script:snapshotRequests = 0
+    $picker.add_SnapshotRequested({ $script:snapshotRequests++ })
+    [Windows.Forms.Button].GetMethod('OnClick', $flags).Invoke($snapshot[0], @([EventArgs]::Empty)) | Out-Null
+    if ($script:snapshotRequests -ne 1 -or $picker.DialogResult -ne 'None') { throw 'Snapshot request closed the picker or failed to notify the host.' }
+    Assert-PickerState $picker 'NR' 2 $true $true
     $reset = @($picker.Controls | Where-Object { $_ -is [Windows.Forms.Button] -and $_.Text -eq 'Restore defaults...' })
     if ($reset.Count -ne 1 -or $reset[0].DialogResult -ne 'None' -or $reset[0] -eq $picker.AcceptButton -or $reset[0] -eq $picker.CancelButton) { throw 'Reset can execute as an implicit dialog action.' }
     Assert-TextFits $reset[0].Text $reset[0].Font $reset[0].ClientSize $false 'reset button'

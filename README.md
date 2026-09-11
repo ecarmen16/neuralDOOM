@@ -2,7 +2,7 @@
 
 neuralDoom modernizes **Doom 3 BFG Edition** on the RBDOOM-3-BFG source port, with optional ray-traced lighting, native HDR, neural reconstruction and ultrawide controls. It remains a hybrid renderer; full path tracing and NVIDIA Reflex are not implemented.
 
-**Milestone 1 development branch:** NR + DLSS controls are implemented in source but have not been built or runtime-tested. The published `internal-d16dab5e` build remains unchanged and uses NR + DLAA only. Branch testing precedes a PR and maintainer-approved merge.
+**Milestone 1 preview:** NR + DLSS controls have passed builds and bounded preset tests; broader visual acceptance is ongoing. The latest preview also adds a refreshed launcher, independent settings resets and local settings snapshots. Reset/restart gameplay acceptance remains pending. Release tags identify their exact source on `codex/milestone-1`; `main` remains the maintainer-reviewed checkpoint.
 
 ## Install and play
 
@@ -18,7 +18,7 @@ See [installation, mode tradeoffs and exact comparison keys](INTERNAL_TESTING.md
 
 | Profile | What it does |
 |---|---|
-| **NR + DLAA / DLSS** | Defaults to native-resolution DLAA. This branch adds explicit DLSS Quality/Balanced/Performance choices, pending runtime validation. F6 toggles NR while preserving reconstruction. Uses embedded compatibility components without a DXGI proxy; native HDR is unavailable. |
+| **NR + DLAA / DLSS** | Defaults to native-resolution DLAA; explicit DLSS Quality/Balanced/Performance choices are experimental. F6 toggles NR while preserving reconstruction. Uses embedded compatibility components without a DXGI proxy; native HDR is unavailable. |
 | **DLAA / DLSS** | Native-resolution DLAA, or DLSS Quality, Balanced and Performance for reduced rendering cost. Output/HUD stay native; native HDR is available. NR is not loaded. |
 | **Native RTX** | Engine TAA and our ray-traced lighting without NVIDIA reconstruction or NR. Native HDR is available. |
 

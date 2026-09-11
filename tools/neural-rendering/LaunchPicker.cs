@@ -65,6 +65,7 @@ namespace NeuralDoom
         int sdkMode, nrMode;
         bool updatingModes;
         static readonly Color Accent = Color.FromArgb(240, 103, 65);
+        public event EventHandler SnapshotRequested;
         public string SelectedProfile
         {
             get { for (int i = 0; i < profiles.Length; i++) if (profiles[i] != null && profiles[i].Checked) return profileIds[i]; return "Native"; }
@@ -125,9 +126,12 @@ namespace NeuralDoom
                 if (MessageBox.Show(this, "Restore the shipped game, video, controls, audio and ReShade / NR settings?\n\nSaved games and progress are preserved. Your current settings will be backed up first. Close the game before resetting.\n\nYou can choose a rendering profile again afterward.", "Restore defaults", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) == DialogResult.OK)
                     DialogResult = DialogResult.Retry;
             };
-            AddLabel("ENTER  PLAY     ESC  CLOSE", 245, 591, 340, 20, new Font("Consolas", 8), Color.FromArgb(118, 126, 138));
-            Button cancel = MakeButton("Cancel", 597, 578, 105, false); cancel.TabIndex = 3; cancel.DialogResult = DialogResult.Cancel;
-            Button play = MakeButton("PLAY DOOM 3", 716, 578, 156, true); play.TabIndex = 4; play.DialogResult = DialogResult.OK;
+            Button snapshot = MakeButton("Save snapshot...", 211, 578, 170, false); snapshot.TabIndex = 3;
+            snapshot.AccessibleDescription = "Save the last written game and ReShade / NR settings to a personal ZIP. Close Doom 3 first. Settings are not changed.";
+            tips.SetToolTip(snapshot, "Save settings after exiting the game. Snapshot ZIPs stay local; they are not shipped defaults.");
+            snapshot.Click += delegate { if (SnapshotRequested != null) SnapshotRequested(this, EventArgs.Empty); };
+            Button cancel = MakeButton("Cancel", 597, 578, 105, false); cancel.TabIndex = 4; cancel.DialogResult = DialogResult.Cancel;
+            Button play = MakeButton("PLAY DOOM 3", 716, 578, 156, true); play.TabIndex = 5; play.DialogResult = DialogResult.OK;
             AcceptButton = play; CancelButton = cancel;
             int preferred = Array.IndexOf(profileIds, preferredProfile);
             if (preferred < 0 || !profiles[preferred].Enabled) preferred = profiles[2].Enabled ? 2 : profiles[1].Enabled ? 1 : 0;

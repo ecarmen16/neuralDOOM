@@ -18,12 +18,12 @@ function Get-NeuralSettingsResetPath {
 }
 
 function New-NeuralSettingsResetGuard {
-    param([string]$Name = 'DOOM3')
+    param([string]$Name = 'DOOM3', [string]$Action = 'restoring defaults')
     # Hold the named object throughout the transaction so the engine's own
     # single-instance check also prevents a launch racing this operation.
     $created = $false
     $guard = New-Object Threading.Mutex($false, $Name, [ref]$created)
-    if (-not $created) { $guard.Dispose(); throw 'Close Doom 3 before restoring defaults.' }
+    if (-not $created) { $guard.Dispose(); throw "Close Doom 3 before $Action." }
     return $guard
 }
 

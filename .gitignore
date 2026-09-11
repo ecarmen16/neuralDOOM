@@ -75,3 +75,7 @@ __pycache__/
 /internal-package.json
 /SOURCE_REVISION.txt
 /third-party-notices/
+/settings-snapshots/
+/ReShadePreset.ini
+/base/D3BFGConfig.cfg
+.neuraldoom-snapshot-*.tmp

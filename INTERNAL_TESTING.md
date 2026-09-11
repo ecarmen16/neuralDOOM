@@ -3,7 +3,8 @@
 Milestone 1 adds experimental NR + DLSS controls. Branch builds, control tests and
 bounded NR preset runs passed on 2026-09-08 after correcting the input viewport.
 Use the separate branch playtest installation for visual/motion acceptance and
-performance feedback. The published `internal-d16dab5e` installer remains unchanged.
+performance feedback. Each release tag identifies its exact preview source;
+older installers remain available separately.
 
 ## Install or manage
 
@@ -36,6 +37,25 @@ Advanced ZIP installation remains available through `Install-InternalTest.cmd -P
 The package contains our native and SDK-enabled engines, compiled shaders and corresponding source. Retail assets, lighting packs, ReShade/RenoDX and NVIDIA runtime DLLs are excluded. Optional components are acquired during setup; sources, hashes and license limitations are recorded in the installed notices and `docs/neural-rendering/THIRD_PARTY_AND_LEGAL.md`.
 
 ## Exact comparison controls
+
+### Personal settings snapshots and resets
+
+After exiting Doom 3 normally, use **Save snapshot...** in the launcher to save
+a ZIP under `settings-snapshots` or another local folder. It captures saved game
+configuration/bindings, ReShade/NR configuration and the referenced effects
+preset when present, with a checksum manifest. Unsaved launcher selections are
+not applied. Savegames, profile progress, runtime DLLs, shaders and screenshots
+are excluded. Snapshot files may contain local paths: keep them personal, out
+of Git and release packages. This is a save-only export, not an automatic restore
+or public baseline-preset feature.
+
+Launcher **Restore defaults...** includes ReShade/NR. The independent in-game
+**System Options > Restore Game / Video Defaults** resets game/video/audio/controls
+while retaining external ReShade settings. Both preserve saves and progress.
+Finish a pending reset by launching and exiting before taking a new snapshot.
+Shipped defaults remain unchanged until the maintainer confirms the preferred
+settings after a full reset; a later sanitized baseline should omit personal
+paths, bindings and progress flags as appropriate.
 
 These defaults occupy keys unused by the normal game. Custom bindings are preserved. All engine actions below can be remapped in **Settings > Controls > Keyboard Bindings**, under **Renderer Comparisons**. Animated geometry has a bindable action but no extra default key.
 
