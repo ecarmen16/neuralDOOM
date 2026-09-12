@@ -4,7 +4,7 @@ Milestone 1 includes experimental rendering features. Successful builds and auto
 
 ## Visual limitations
 
-- Reduced-resolution DLSS presets can introduce pulsing or apparent movement on floors and other materials. Compare DLAA at native input resolution, then disable NR with F6 while preserving reconstruction to help isolate the effect.
+- Reduced-resolution DLSS presets can introduce pulsing or apparent movement on floors and other materials. The v0.1.1 changes reduce this with DLSS Performance preset K and stable reflection sampling while upscaling. Residual grain or patterns in motion remain possible. Compare DLAA at native input resolution, then disable NR with F6 while preserving reconstruction to help isolate the effect.
 - F11 lighting comparisons can reveal dark patches on some surfaces. Unsupported reflected materials replacing valid probe lighting is a confirmed code defect and a possible explanation; the specific reported scenes have not been verified.
 - Mirrors, glass, smoke and animated emissives still need broader motion testing. Temporal mask framebuffer restoration, unused DLSS mask inputs and conditional material-stage selection remain open findings.
 - NR can alter brightness and fine detail. Native HDR is unavailable with NR; use Native RTX or the DLAA/DLSS profile for native HDR.

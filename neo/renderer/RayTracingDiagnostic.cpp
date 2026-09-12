@@ -36,6 +36,7 @@ static idCVar r_rayTracedGISamples( "r_rayTracedGISamples", "4", CVAR_RENDERER |
 static idCVar r_rayTracedGIEmissive( "r_rayTracedGIEmissive", "2", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Emissive material contribution to indirect lighting", 0, 8 );
 
 static idCVar r_rayTracedReflections( "r_rayTracedReflections", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "Full-resolution reflections using native material roughness and normal maps" );
+static idCVar r_rayTracingReflectionStableNoise( "r_rayTracingReflectionStableNoise", "1", CVAR_RENDERER | CVAR_BOOL, "Stable reflection sampling for upscaled DLSS; 0 restores animated sampling" );
 static idCVar r_rayTracedReflectionStrength( "r_rayTracedReflectionStrength", "0.65", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Blend from native probe specular to traced reflections", 0, 1 );
 static idCVar r_rayTracedReflectionSamples( "r_rayTracedReflectionSamples", "4", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "Reflection rays per full-resolution eligible pixel", 1, 16 );
 static idCVar r_rayTracedReflectionRoughness( "r_rayTracedReflectionRoughness", "0.7", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "Maximum reflection roughness, with a 0.15 fade into native probes", 0.1, 1 );
@@ -64,7 +65,7 @@ bool R_RayTracingSettingsChanged()
 	idCVar* settings[] = { &r_rayTracingDynamicGeometry, &r_rayTracingSkinnedGeometry, &r_rayTracingPlayerShadows, &r_rayTracedAO, &r_rayTracedAORadius, &r_rayTracedAOStrength, &r_rayTracedAOSamples,
 		&r_rayTracedContactShadows, &r_rayTracedContactDistance, &r_rayTracedContactStrength,
 		&r_rayTracedGI, &r_rayTracedGIStrength, &r_rayTracedGIRadius, &r_rayTracedGISamples, &r_rayTracedGIEmissive, &r_rayTracingDebug, &r_rayTracedReflections, &r_rayTracedReflectionStrength,
-		&r_rayTracedReflectionSamples, &r_rayTracedReflectionRoughness, &r_rayTracedReflectionDistance };
+		&r_rayTracedReflectionSamples, &r_rayTracedReflectionRoughness, &r_rayTracedReflectionDistance, &r_rayTracingReflectionStableNoise };
 	for( idCVar* setting : settings )
 	{
 		changed |= setting->IsModified();
@@ -1398,7 +1399,8 @@ private:
 		reflectionCB.previousCamera = historyValid ? previousReflectionCamera : cb.cameraRadius;
 		reflectionCB.options = idVec4( r_rayTracedReflectionSamples.GetInteger(), r_rayTracedReflectionStrength.GetFloat(),
 			r_rayTracedReflectionRoughness.GetFloat(), r_rayTracedReflectionDistance.GetFloat() );
-		reflectionCB.historyOptions = idVec4( historyValid ? 1 : 0, view->taaFrameCount & 0xffff, r_rayTracingDebug.GetInteger(), 0 );
+		const bool stableSamples = r_rayTracingReflectionStableNoise.GetBool() && view->neuralBackendMode == 3;
+		reflectionCB.historyOptions = idVec4( historyValid ? 1 : 0, stableSamples ? 0 : view->taaFrameCount & 0xffff, r_rayTracingDebug.GetInteger(), 0 );
 		list->writeBuffer( reflectionConstants, &reflectionCB, sizeof( reflectionCB ) );
 		list->clearBufferUInt( reflectionStats, 0 );
 		const int index = reflectionFrames & 1;

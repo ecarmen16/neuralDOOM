@@ -5374,7 +5374,9 @@ bool idRenderBackend::EvaluateNeuralTemporalBackend( const viewDef_t* _viewDef, 
 	frame.outputWidth = renderSystem->GetWidth();
 	frame.outputHeight = renderSystem->GetHeight();
 	frame.cameraAspectRatio = float( frame.renderWidth ) / float( frame.renderHeight );
-	frame.frameIndex = renderSystem->GetFrameCount();
+	// The frontend can already be building another frame while this view renders.
+	// Use the same immutable frame identity as its jitter and motion inputs.
+	frame.frameIndex = _viewDef->taaFrameCount;
 	frame.stereoEye = stereoEye;
 	frame.backendMode = _viewDef->neuralBackendMode;
 	frame.dlssQuality = _viewDef->neuralDLSSQuality;

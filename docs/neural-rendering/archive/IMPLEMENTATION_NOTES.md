@@ -1017,3 +1017,178 @@ Runtime PASS: isolated SDK map run completed and shut down normally. With MRG of
 4 hidden skinned body/head surfaces (3608 triangles) remained; Player Shadows off
 removed all 4; re-enabling restored all 4. Reflections remained active with zero
 sampled invalid values. Evidence: ignored profile-fixes-runtime/base/body-independence.log.
+
+### LOCAL ONLY - Dynamic reflection history experiment (not for PR #4)
+
+The local working tree enables history independently of the presence of dynamic
+ray surfaces. `reflections.cs.hlsl` marks dynamic primary receivers or reflected
+hits with negative roughness in the existing RGBA16F guide; magnitude stays the
+original roughness, so there is no allocation/layout change. `reflection_filter`
+uses magnitude for spatial roughness comparisons, keeps dynamic/static samples
+separate, and rejects history for current or previous dynamic pixels. Existing
+normal, depth, roughness and neighborhood-clamp rejection remains. The composite
+shows roughness magnitude and offers a dynamic mask view. World-space camera
+reprojection conventions are unchanged; moving geometry does not gain guessed
+motion vectors. Hidden shadow-only body surfaces never become reflection hits.
+
+`r_rayTracingReflectionHistoryDynamic`: 0 = PR baseline, 1 = local experiment
+(default, not archived), 2 = red dynamic / green static / black unsupported mask.
+Changing it resets temporal history through the existing settings tracker.
+`RTREFLECTION_HISTORY` reports whether history is eligible. The experiment can
+retain static reflection history with MRG either on or off; MRG still defaults
+off when selecting upscaled DLSS in the committed PR policy.
+
+Build PASS: `Build-RBDOOM.ps1 -BuildDirectory build-private-neural -Configuration
+RelWithDebInfo`. Shader contract PASS for all 64 permutations and compute layouts.
+Isolated SDK DLSS Performance run: input 640x360, output 1280x720, MRG on with 47
+surfaces. Baseline history eligible=0; experiment eligible=1. Both had zero sampled
+invalid reflection values, and SDK evaluations had zero rejections. Completion
+marker and normal shutdown observed. Scene and mask screenshots visually checked.
+These checks prove execution, not elimination of shimmer or absence of ghosting.
+Runtime log/captures: ignored profile-fixes-runtime/base/shimmer-local.log and
+screenshots/shimmer_*.png. Strict mask conservatively excludes all dynamic-BLAS
+receivers/hits even if an individual prop currently stands still. Changing shadow
+illumination can still be temporally filtered; neighborhood clamping limits but
+does not prove absence of trails. NR gameplay visual comparison remains pending.
+
+Keep this diff uncommitted/unpushed. Next: user compares the same reflective floor
+with DLSS + F2 (MRG on), toggling the experiment between 0 and 1, including camera
+motion and moving reflected objects. Move to a separate branch after the current
+PR merge if accepted. No asset/runtime distribution changes.
+
+### Local experiment feedback - root cause still unconfirmed
+
+User reports no visible improvement from the reflection-history toggle. Fuzz is
+present with MRG OFF, strongest in DLSS Performance, weaker in Balanced, minimal
+in Quality and absent in DLAA; shadowed/dark materials improve when approached or
+lit by the flashlight. Do not treat the reflection-history experiment as a fix.
+
+Source inspection found the enabled Filmic Post FX pass uses 16-level animated
+dithering at the user's saved 0.6 blend. It runs after reconstruction, so the
+DLSS-mode dependence is not by itself explained by this pass. Animated shadow
+sampling and SSAO also remain candidate inputs. Requested same-scene NR-off and
+Filmic-off comparisons before changing defaults or adding another renderer fix.
+An isolated capture attempt did not start while the user's game was running;
+no capture results are claimed. Existing local diff remains uncommitted/unpushed.
+
+### LOCAL ONLY - Frame identity and Performance preset follow-up
+
+The user's capture session logged `eErrorDuplicatedConstants`. Inspection found
+`EvaluateNeuralTemporalBackend` taking the Streamline frame ID from mutable
+`renderSystem->GetFrameCount()` despite frontend command construction overlapping
+backend rendering (`SwapCommandBuffers` documents this). It now uses the queued
+view's `taaFrameCount`, matching its jitter/motion inputs. This removes that
+mutable-counter dependency; it does not prove every possible duplicate submission
+is fixed. `NeuralTemporalStreamline.cpp` reports successful reset counts alongside
+frame ID to distinguish convergence/reset problems from lighting noise.
+
+Added a local non-archived Performance preset selector: 0 K, 1 M. Previously
+Performance always requested M while DLAA/Quality/Balanced requested K. Preset
+changes reconfigure DLSS and reset its history. Initial testing kept default M;
+after the comparison below the local default is K. Reflection-history experiment
+is retained in the uncommitted diff but now defaults OFF after negative feedback.
+No shader resource format, motion convention, SDK version or resolution ratio
+changes in this follow-up.
+
+A first noise matrix accidentally captured the opening cinematic and was rejected
+as hangar evidence. The corrected matrix forces first person at an existing
+mars_city1 probe location (1131 -1293 75, yaw 285), freezes game simulation, and
+captures the dark hangar wall/floor. It runs with NR disabled, DLSS Performance,
+MRG off, and user-like lighting options. Filmic-off removes some animated noise
+but not all. Sequential SSAO/reflection exclusions did not uniquely identify a
+lighting pass; early 7-frame screenshot pairs are not sufficient convergence proof.
+
+The final preset comparison waits 180 frames before each screenshot. Both
+Performance presets use 800x450 input / 1600x900 output; Filmic OFF, MRG OFF, same
+stationary view. Mean absolute frame-pair RGB differences (8-bit PNG units):
+- Dark wall region x300:1000,y250:550: M 0.0221, K 0.0008,
+  Balanced K 0.0011, DLAA K 0.0008.
+- Metal floor x50:1150,y650:780: M 0.1357, K 0.0740,
+  Balanced K 0.0698, DLAA K 0.0491.
+Wall mean brightness M/K was 2.7567/2.7692, so the reduction is not simply a darker
+output. This small stationary comparison supports testing K, not a claim that
+all shimmer is fixed. Camera motion, detail retention, NR interaction and actual
+frame-time cost still require validation. Final run had 1618 successful DLSS
+presentations, zero rejections, normal shutdown; reset counts rose at mode and
+screenshot boundaries, not every steady frame. Screenshots visually inspected.
+Evidence: ignored profile-fixes-runtime/base/preset-test.log and
+screenshots/preset_*.png. Build command: `Build-RBDOOM.ps1 -BuildDirectory
+build-private-neural -Configuration RelWithDebInfo`, PASS. Focused diff review
+checked optional SDK guards, mode-switch resets, queued frame ownership and
+unchanged default PR source. This entire follow-up remains uncommitted/unpushed.
+
+### LOCAL ONLY - Stable reflection samples for upscaled DLSS
+
+User confirms K greatly improves near surfaces, but distant noise persists with
+a still camera and becomes worse with MRG. Repeated hangar comparison under K:
+MRG off/on floor frame-pair difference 0.1431/0.1762; selective history 0.1772;
+fixed shadow jitter 0.1810. The selective history experiment remains OFF. More
+reflection samples reduced noise somewhat, but were not adopted as a default.
+
+A separate controlled MRG-on comparison kept eight reflection samples and changed
+only the frame component of the reflection random seed. Animated vs stable:
+wall 0.0147 -> 0.0008; floor 0.1935 -> 0.0048 (same previously documented ROIs,
+8-bit mean absolute differences, 180 frames settling before each capture).
+Floor mean brightness 17.0390 -> 17.0369. Zero sampled invalid reflection values,
+900 successful DLSS presentations, zero rejections, completion and normal exit.
+Images visually inspected; log stable-noise.log and screenshots/stable_*.png in
+ignored profile-fixes-runtime/base. Tests use SDK-only Performance, not NR.
+
+`r_rayTracingReflectionStableNoise` now defaults 1 locally, only effective when
+`view->neuralBackendMode == 3` (upscaled DLSS). It fixes HistoryOptions.y to zero,
+retaining per-pixel/sample randomization and the original ray count. DLAA/native
+retain their original frame-varying sequence. Setting it to 0 restores the prior
+behavior; the existing settings tracker resets history when it changes. No
+resource/layout or coordinate changes. Build-RBDOOM.ps1 -BuildDirectory
+build-private-neural -Configuration RelWithDebInfo PASS. Shader code is unchanged
+for this experiment. Focused review checked backend-mode gating and toggle reset.
+
+Tradeoff: fixed directions may expose spatial grain/bias or patterns in motion;
+this is a local mitigation, not a dynamic reflection denoiser. User should test
+camera movement and reflected moving objects in NR before accepting it. The
+original separate body-shadow PR remains untouched. All experiments remain
+uncommitted/unpushed; no settings are changed in tracked release defaults.
+
+### 2026-09-12 - Prepare accepted shimmer mitigations for v0.1.1
+
+The maintainer reports the local fixes look good and requests a PR and v0.1.1.
+This supersedes the local-only hold above for the accepted changes:
+
+- `NeuralTemporalStreamline.cpp`: Performance defaults to preset K; the
+  non-archived `r_neuralDLSSPerformancePreset 1` comparison selects M and resets
+  history. Status includes successful reset count and last submitted frame.
+- `RenderBackend.cpp::EvaluateNeuralTemporalBackend`: use the queued view's
+  `taaFrameCount`, matching its jitter and motion inputs, instead of a mutable
+  frontend frame counter.
+- `RayTracingDiagnostic.cpp`: stable reflection frame seed for upscaled DLSS
+  only, with `r_rayTracingReflectionStableNoise 0` restoring animated sampling.
+  Setting changes reset history. Native/DLAA sampling and ray counts stay intact.
+
+The rejected dynamic-history experiment and its four shader edits are excluded;
+their complete local diff is preserved in an ignored patch. Existing conservative
+dynamic-history rejection remains. No resource formats, bindings, coordinate
+conventions, SDK/runtime versions or redistributable payloads change.
+
+Validation: Configure-RBDOOM-DX12.ps1 with RayTracing ON, then Build-RBDOOM.ps1
+with Configuration RelWithDebInfo, pass for build-private-neural (SDK ON) and
+build-rt (SDK OFF). Reflection shader contracts pass all 64 engine permutations
+and the three compute layouts. A bounded SDK Mars City test with MRG enabled
+completed 1,260 presentations with zero rejections, switching Performance K/M,
+DLAA and native TAA. Stable sampling ON/OFF screenshots were inspected. At
+1600x900 output / 800x450 input, stationary frame-pair differences decreased from
+0.0261 to 0.0019 for the wall and 0.3075 to 0.0260 for the floor (8-bit RGB mean
+absolute differences; same regions as the earlier test). This demonstrates
+reduced stationary noise, not artifact-free motion or an FPS gain.
+
+The SDK-off native RTX build also completed a bounded Mars City run with
+reflections OFF then ON at 1280x720, zero sampled invalid reflection values,
+screenshots inspected and normal shutdown (v011-native.log). Existing missing
+image warnings remain; no new DLSS rejection was observed in the SDK run.
+
+Evidence is under ignored captures/neural/profile-fixes-runtime/base, with
+v011-validation.log and screenshots/v011_*.png. Standard smoke tests skipped
+because their source-root game-data prerequisite was absent; the bounded test
+used existing installed data with isolated saves and logs. Focused review checks
+optional SDK guards, preset-change resets, immutable view ownership and
+feature-off behavior. Next: maintainer review/merge, then build v0.1.1 from the
+merged tag and verify the four release assets.
