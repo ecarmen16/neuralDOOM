@@ -33,7 +33,27 @@ All profiles retain the same lighting controls. DLAA uses **100% input resolutio
 - A top-right **FPS Counter**, enabled for fresh settings and toggleable in System Options; saved choices survive resizing and relaunch.
 - **Filmic Intensity**, blending the SDR postprocessing effect from 0% to 100%. Native HDR bypasses it.
 
-F3 toggles reflections, F4 bounce, F6 NR, F7 AO, F8 contacts, and F11 all four lighting effects. F5/F9 remain quicksave/quickload. Engine actions can be remapped in Keyboard Bindings; [the full controls table](docs/PLAYING.md#exact-comparison-controls) describes every key and limitation.
+## F-key controls
+
+These are the default bindings; existing custom bindings are preserved. Engine comparison keys show a fading message below the FPS counter with the requested setting or selected mode.
+
+| Key | Action |
+|---|---|
+| **F1** | **NR profile:** cycle DLAA → DLSS Quality → Balanced → Performance → DLAA. **DLAA / DLSS profile:** switch between native-resolution TAA and DLAA, leaving any DLSS upscale preset. No change in Native RTX. |
+| **F2** | Toggle moving ray geometry: whether visible opaque doors, props and characters participate in ray tracing. Doomguy's body shadows remain independent of this toggle. |
+| **F3** | Toggle ray-traced material reflections. |
+| **F4** | Toggle ray-traced diffuse bounce lighting. |
+| **F5** | Quicksave. |
+| **F6** | Toggle NR in the NR profile, keeping the selected DLAA / DLSS mode. This key belongs to the external NR add-on; the engine cannot report its on/off state. |
+| **F7** | Toggle ray-traced ambient occlusion (AO). |
+| **F8** | Toggle ray-traced contact shadows. |
+| **F9** | Quickload. |
+| **F10** | Cycle diagnostic views: scene → AO → contact shadows → material bounce → albedo → reflections → reflection roughness → scene. Enable the corresponding effect to see its diagnostic. |
+| **F11** | Toggle all four RTX lighting effects together: reflections, bounce, AO and contact shadows. If any is on, turn all off; otherwise turn all on. Geometry settings and DLAA / DLSS / NR are unchanged. |
+| **F12** | Take a Doom screenshot. |
+| **F13** | Optional NR comparison screenshot pair, for keyboards or macro pads that provide F13. |
+
+Remap engine comparison actions under **Settings > Controls > Keyboard Bindings > Renderer Comparisons**. If an older configuration is missing these bindings, use **System Options > Install Free RTX Keys** to fill unused keys. See [the full controls guide](docs/PLAYING.md#exact-comparison-controls) for details.
 
 ## Build from source
 
@@ -47,7 +67,7 @@ cd neuralDOOM
 .\tools\neural-rendering\Build-RBDOOM.ps1 -Configuration RelWithDebInfo
 ```
 
-The optional SDK build is separate and disabled by default. The [documentation index](docs/README.md) links player guides, renderer internals, validation instructions and the historical development archive. [Maintainer packaging](INTERNAL_TESTING.md#maintainer-packaging) covers local builds. The [release workflow](docs/neural-rendering/CLOUD_RELEASES.md) builds both engines and the installer on GitHub's standard Windows runners when a version tag is pushed, then attaches verified assets to a draft release for publication. It becomes available once merged; the first hosted run remains pending.
+The optional SDK build is separate and disabled by default. The [documentation index](docs/README.md) links player guides, renderer internals, validation instructions and the historical development archive. [Maintainer packaging](INTERNAL_TESTING.md#maintainer-packaging) covers local builds. The [release workflow](docs/neural-rendering/CLOUD_RELEASES.md) builds both engines and the installer on GitHub's standard Windows runners when a version tag is pushed, then attaches verified assets to the existing release or creates a draft if none exists.
 
 ## Attribution and licenses
 
