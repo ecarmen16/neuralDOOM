@@ -1,89 +1,14 @@
-# Architecture notes
+# Renderer architecture
 
-## 1. Intended layering
+neuralDOOM extends RBDOOM-3-BFG's DX12 renderer through NVRHI. Ray-traced lighting augments rasterized materials; this is a hybrid renderer, not a full path tracer.
 
-```text
-Game/frontend scene submission
-        |
-        v
-Existing RBDOOM renderer + NVRHI passes
-        |
-        +--> world/opaque/lighting/transparency
-        |
-        +--> HUD-free scene color candidates
-        +--> depth
-        +--> motion vectors
-        +--> reactive/transparency masks
-        +--> exposure, jitter, dimensions, reset state
-        |
-        v
-Engine-owned temporal/neural interface
-        |
-        +--> Null/debug backend
-        +--> Official Streamline/DLSS backend (optional)
-        +--> Future official DLSS 5 backend (optional)
-        |
-        v
-Remaining post-processing / weapon policy / UI composition
-        |
-        v
-Tonemap/HDR output and present, according to measured pass ordering
-```
+## Rendering and reconstruction
 
-The exact placement of tonemapping, bloom, viewmodel, and UI must be decided from source and GPU captures. Preserve access to multiple scene-color stages until the official API specifies the appropriate input space.
+The renderer captures scene color, depth, motion and temporal state for the optional reconstruction backend. Native rendering remains available without Streamline. DLAA uses native input resolution; DLSS presets reduce input dimensions while output and HUD retain display resolution.
 
-## 2. Candidate frame contract
+D3D12 and vendor-specific calls stay in their adapters. The optional NR profile loads the compatibility components through the engine and uses SDR output. It is separate from the Streamline reconstruction backend and is not an official native NR API integration.
 
-This is a design sketch, not drop-in code. Use actual RBDOOM/NVRHI naming, ownership, math types, and lifecycle patterns after reconnaissance.
-
-```cpp
-struct NeuralFrameInputs {
-    nvrhi::TextureHandle sceneColor;
-    nvrhi::TextureHandle depth;
-    nvrhi::TextureHandle motionVectors;
-    nvrhi::TextureHandle reactiveMask;
-    nvrhi::TextureHandle transparencyMask;
-    nvrhi::TextureHandle hudlessColor;
-
-    idRenderMatrix currentViewProjection;
-    idRenderMatrix previousViewProjection;
-
-    idVec2 jitter;
-    float exposure;
-
-    int renderWidth;
-    int renderHeight;
-    int outputWidth;
-    int outputHeight;
-
-    bool resetHistory;
-};
-
-class idNeuralRenderer {
-public:
-    virtual ~idNeuralRenderer() = default;
-    virtual bool Initialize() = 0;
-    virtual void Resize(int renderWidth, int renderHeight,
-                        int outputWidth, int outputHeight) = 0;
-    virtual bool Evaluate(const NeuralFrameInputs& inputs,
-                          nvrhi::TextureHandle output) = 0;
-    virtual void ResetHistory() = 0;
-    virtual void Shutdown() = 0;
-};
-```
-
-Possible implementations:
-
-```text
-NeuralRenderer_None
-NeuralRenderer_DebugCopy
-NeuralRenderer_StreamlineDLSS
-NeuralRenderer_DLSS5Official   # only after a public SDK exists
-```
-
-## 3. Resource inventory template
-
-Codex should fill this from the actual source before implementation.
+## Temporal resources
 
 | Resource | Producer/pass | Format | Resolution | Color/depth space | Lifetime | Consumer | Known hazards |
 |---|---|---|---|---|---|---|---|
@@ -95,99 +20,16 @@ Codex should fill this from the actual source before implementation.
 | Exposure | `TonemapPass::exposureBuffer` plus scalar | typed `R32_UINT` buffer containing float bits | one value/frame | manual scale is `exp2(r_exposure)`; buffer carries adapted luminance | persistent GPU buffer | temporal backend | current evaluation sees most recently completed adaptation |
 | Output | `_taaResolved` | `RGBA16_FLOAT` | current native output size | linear HDR before tone map/UI | frame | later tone map/post/UI | backend `false` return preserves TAA fallback |
 
-## 4. Motion-vector math checklist
+Motion vectors use current-to-previous pixel displacement with positive Y down. The queued view owns the frame identity used for jitter, motion inputs and DLSS submission. History resets on mode changes, viewport changes and scene discontinuities.
 
-Do not finalize formulas until matrix and API conventions are confirmed. The conceptual calculation is:
+The Streamline adapter defaults DLAA, Quality, Balanced and Performance to preset K. `r_neuralDLSSPerformancePreset 1` selects M for comparison and resets history. Upscaled DLSS uses a stable reflection frame seed; `r_rayTracingReflectionStableNoise 0` restores animated sampling. Native and DLAA retain animated reflection sampling.
 
-```text
-current_clip  = CurrentViewProjection  * CurrentModel  * position
-previous_clip = PreviousViewProjection * PreviousModel * previous_position
+## Ray-traced lighting
 
-current_ndc  = current_clip.xy  / current_clip.w
-previous_ndc = previous_clip.xy / previous_clip.w
-velocity     = convention(previous_ndc, current_ndc, jitter, dimensions)
-```
+Reflections, diffuse bounce, ambient occlusion and contact shadows have independent controls. Reflection hits replace matching probe specular; misses retain probe lighting. Moving opaque geometry and player body shadows have separate inclusion controls. See [dynamic ray geometry](GRAPHICS_AND_DYNAMIC_RAYS.md) and [reflection resources](RAY_TRACED_REFLECTIONS.md).
 
-Questions that require measured answers:
+Stable reflection samples reduce temporal noise but can retain spatial grain or patterns in motion. Dynamic secondary-hit reprojection is not implemented. See [known issues](../KNOWN_ISSUES.md) for current limitations.
 
-- Does the consumer expect current-to-previous or previous-to-current velocity?
-- Are vectors in pixels, normalized UV, or NDC units?
-- Is Y positive up or down?
-- Are current/previous jitter offsets included in matrices, removed explicitly, or passed separately?
-- Is depth reversed Z? Is it device depth or linear depth?
-- How are off-screen, behind-camera, newly spawned, and disoccluded pixels encoded?
-- Is velocity at input/render resolution or output resolution?
-- How are dynamic-resolution changes represented?
+## Optional-feature failures
 
-## 5. Object-history ownership
-
-### Static world
-
-Camera history is sufficient only for truly static geometry.
-
-### Rigid objects
-
-Persist previous model transforms at a stable object/surface identity. Spawn/despawn and teleport events must invalidate history.
-
-### MD5/skinned objects
-
-Camera-only vectors are wrong. Candidate approaches:
-
-- previous and current joint palettes in the velocity-capable vertex shader;
-- previous skinned positions retained in a suitable buffer;
-- a dedicated velocity pass reusing current and prior pose inputs.
-
-Choose based on the existing skinning path, memory cost, command structure, and shader architecture.
-
-### Particles and procedural material animation
-
-Many effects lack meaningful geometric previous positions. Use a reactive/history-bias policy rather than inventing false precision. Audit:
-
-- smoke and fire;
-- muzzle flashes and explosions;
-- projectile sprites/trails;
-- glass and alpha-blended surfaces;
-- scrolling/animated material stages;
-- emissive pulses and flickering lights;
-- video/cinematic surfaces;
-- in-world GUI surfaces.
-
-## 6. Viewmodel and UI policy
-
-Three viable viewmodel strategies:
-
-1. Reconstruct world only, then render weapon and HUD afterward.
-2. Reconstruct world and weapon separately, then composite.
-3. Feed weapon with dedicated depth/velocity into the shared pass.
-
-The first is the simplest but may lose desirable neural treatment on the weapon. The third is most integrated but risks projection/depth discontinuities. Make the decision from captures and tests.
-
-HUD/menu pixels should normally be composed after temporal/neural reconstruction. In-world GUIs are scene content and need separate classification.
-
-## 7. D3D12 and NVRHI boundary
-
-The shared renderer should pass NVRHI handles and metadata. The optional backend may need to unwrap:
-
-- `ID3D12Device`;
-- direct command queue;
-- active command list or an SDK-compatible recording point;
-- `ID3D12Resource` objects for inputs/output;
-- resource states and barriers;
-- swapchain/output information when required.
-
-Keep this escape hatch in one adapter. Do not spread raw D3D12 ownership assumptions through shared render code.
-
-## 8. Failure behavior
-
-Every backend evaluation should have an explicit fallback:
-
-- unsupported GPU or driver;
-- SDK feature unavailable;
-- resource mismatch;
-- resize/recreation in progress;
-- evaluate call failure;
-- invalid exposure or dimensions;
-- missing motion-vector/mask resource;
-- device removal.
-
-A failed optional feature must return to a valid baseline path, log a useful reason once, and avoid partial-frame corruption.
+Unavailable SDKs, unsupported hardware and rejected evaluations must retain a working native path. Resource ownership and synchronization remain with the existing renderer and NVRHI. Runtime components and game assets are acquired separately under the policies in [dependency provenance](THIRD_PARTY_AND_LEGAL.md).

@@ -26,7 +26,7 @@ Each run gets a unique ignored `captures/neural/smoke-*` directory with disposab
 
 Probe/grid state and native ray-tracing API capabilities are recorded on each run. `-ExpectedProbeLighting Local` requires complete map probe pairs and an active local selection; `Fallback` requires absent map probes and the compiled lobby fallback. `Any` (default) records either. See [PROBE_LIGHTING.md](PROBE_LIGHTING.md) for content inventory and interpretation; a supported RT API does not mean an RT scene is implemented.
 
-PASS means these automated checks passed. It does not certify absence of ghosting, clipping in every HUD state, or subjective image quality. SKIP is reserved for known missing prerequisites (SDK-OFF, absent staged SDK DLLs, missing local map data). Runtime feature failures remain FAIL so unexpected GPU/SDK regressions are visible. The sandbox may deny SDK/driver access even when native DX12 runs; record both attempts rather than silently treating failed DLAA as a pass.
+PASS means these automated checks passed. It does not certify absence of ghosting, clipping in every HUD state, or subjective image quality. SKIP is reserved for known missing prerequisites (SDK-OFF, absent staged SDK DLLs, missing local map data). Runtime feature failures remain FAIL so unexpected GPU/SDK regressions are visible.
 
 Windows startup arguments have a 1024-byte engine limit. Scenario settings live in the generated cfg, and the runner rejects an overlong command line. Screenshots now use `fs_savepath` on Windows/Linux as they already did on macOS; normal user screenshots move to the configured save folder's `base/screenshots` directory.
 
@@ -41,9 +41,8 @@ These archived cvars apply to the gameplay HUD only. The first centers ordinary 
 
 New-config defaults are `swf_hudMaxAspect 1.777778` (Auto, centered 16:9) and `swf_hudScale 1` (original size). Controls are live and do not change world-camera or weapon FOV. Menus, PDA/world GUIs, absolute-edge anchors, and full-screen overlay bounds retain their existing placement. HUD scaling also scales centered HUD elements, including the crosshair. The SWF mouse-coordinate conversion uses the last rendered HUD scale. Split-screen render calls retain their existing layout.
 
-The smoke runner's HUD settings are disposable and do not change existing saved preferences. System Options exposes HUD Layout (Full width, Auto 16:9, Centered 21:9) and HUD Size (50-150% in 5% steps). Leaving the menu archives changes without requesting a restart. Layout is recomputed from the current viewport every frame, so resizing needs no separate apply action. Existing saved values, including full width, are preserved. Broader interaction, notification, and motion review remains pending.
+The smoke runner's HUD settings are disposable and do not change existing saved preferences. System Options exposes HUD Layout (Full width, Auto 16:9, Centered 21:9) and HUD Size (50-150% in 5% steps). Leaving the menu archives changes without requesting a restart. Layout is recomputed from the current viewport every frame, so resizing needs no separate apply action. Existing saved values, including full width, are preserved.
 
-
-## Native HDR prototype
+## Native HDR
 
 See [NATIVE_HDR.md](NATIVE_HDR.md) for the saved System Options controls, output negotiation, GPU readback checks and SDR diagnostic mode. HDR is OFF by default. Run game checks sequentially; a second instance is rejected by the engine.
