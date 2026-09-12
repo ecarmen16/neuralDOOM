@@ -21,6 +21,7 @@ Historical plans and evidence from the work leading to Milestone 1. These record
 - [Task Board](TASK_BOARD.md)
 - [Test Results](TEST_RESULTS.md)
 - [Texture Pack Evaluation](TEXTURE_PACK_EVALUATION.md)
+- [Texture Installer Validation](TEXTURE_INSTALLER_TEST.md)
 
 ## Historical session prompts
 

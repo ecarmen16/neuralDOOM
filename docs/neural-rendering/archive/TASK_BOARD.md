@@ -60,7 +60,7 @@ Working branch: `codex/rt-foundation`, prepared from the completed `codex/probe-
 
 The implemented diagnostics and exact resource contract are in
 [RAY_TRACING_DIAGNOSTICS.md](../RAY_TRACING_DIAGNOSTICS.md). The short manual
-pass is [DOGFOOD_CHECKLIST.md](../DOGFOOD_CHECKLIST.md), launched with
+pass is [TEST_PLAN.md](../TEST_PLAN.md), launched with
 `Launch-NeuralDoom-RTX.cmd` in the game checkout. The first gameplay effect is
 documented in [RAY_TRACED_AO.md](../RAY_TRACED_AO.md). Full instance/material scene
 registration, moving occluders and path tracing remain open.

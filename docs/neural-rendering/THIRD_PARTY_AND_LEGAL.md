@@ -54,7 +54,7 @@ The experimental `renodx-dlss5.addon64` and `nvngx_dlssnr.dll` remain unapproved
 
 ### D3HDP BFG Lite
 
-Local texture-installer branch (2026-09-11): the optional setup page credits **H3llBaron and the Doom 3 modding community** and links the original project. It downloads or imports a pinned BFG Lite archive on the user's machine and preserves the original readme and credit documents under `notices/D3HDP-BFG-Lite`. This local acquisition does not grant permission to redistribute the pack; no assets are included in our installer payload or source. The local overlay experiment and validation limits are documented in [TEXTURE_INSTALLER_TEST.md](TEXTURE_INSTALLER_TEST.md).
+Local texture-installer branch (2026-09-11): the optional setup page credits **H3llBaron and the Doom 3 modding community** and links the original project. It downloads or imports a pinned BFG Lite archive on the user's machine and preserves the original readme and credit documents under `notices/D3HDP-BFG-Lite`. This local acquisition does not grant permission to redistribute the pack; no assets are included in our installer payload or source. The local overlay experiment and validation limits are documented in [archived texture-installer validation](archive/TEXTURE_INSTALLER_TEST.md).
 
 | Field | Answer |
 |---|---|

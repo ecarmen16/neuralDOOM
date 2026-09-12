@@ -60,7 +60,7 @@ then `Build-RBDOOM.ps1 -BuildDirectory build-rt -Configuration RelWithDebInfo`.
 `Test-NeuralDoom-Smoke.ps1 -BuildDirectory build-rt -RayTracedAO -GpuProfile`
 checks actual shaded receivers, live OFF/ON, GPU progress, captures and optional
 resize. `rt_off.png` records the raster comparison. See `TEST_RESULTS.md` for
-measured evidence and `DOGFOOD_CHECKLIST.md` for the short visual check.
+measured evidence and `TEST_PLAN.md` for visual validation.
 
 Next: add stable mesh/instance/material registration and moving/cutout occluders
 before implementing authored-light ray shadows. This prototype does not close

@@ -15,9 +15,9 @@ These are tracked limitations, not claims that every material or scene exhibits 
 
 Exit the game normally before saving a launcher settings snapshot. Snapshots export saved configuration, including ReShade/NR settings; they do not capture unsaved launcher selections and have no automatic restore feature. Finish a pending reset by launching and exiting before creating a snapshot.
 
-The launcher reset includes ReShade/NR. The in-game reset changes game settings, including video, audio and controls. Both preserve saves and progress. Full in-game reset/restart acceptance remains pending; shipped defaults have not been replaced with a maintainer's personal tuning.
+The launcher reset includes ReShade/NR. The in-game reset changes game settings, including video, audio and controls. Both preserve saves and progress. Reset/restart behavior still needs broader validation across configurations.
 
-Use the setup EXE's Upgrade / repair option for an existing installation. The default upgrade destination defect found during review is fixed in M1, as are stale launch settings replayed by Restart Now and the reviewed menu-arrow offset defect. Setup logs are under local application data in `neuralDoom/SetupLogs`; game logs are under the installation's `captures/dogfood/base` directory. Review logs for personal paths before sharing them.
+Use the setup EXE's **Upgrade / repair** option for an existing installation. For log locations and what to include in an issue, see [reporting a problem](PLAYING.md#reporting-a-problem).
 
 See the [player guide](PLAYING.md) for installation, controls and reset details.
 
@@ -35,4 +35,4 @@ Still open at M1:
 - Legacy SSAO (`r_useNewSSAOPass 0`) has viewport assumptions incompatible with reduced-resolution rendering. The default modern path avoids this issue.
 - Optional auto-exposure has inconsistent histogram encoding/decoding. Fixed exposure is the shipped default.
 
-The [archived validation results](neural-rendering/archive/TEST_RESULTS.md) distinguish source/CPU checks from runtime observations. These findings have not been revalidated by this documentation-only cleanup.
+See the [archived validation results](neural-rendering/archive/TEST_RESULTS.md) for build checks and runtime observations supporting these findings.

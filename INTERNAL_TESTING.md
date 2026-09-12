@@ -8,15 +8,11 @@ See [installation and upgrade instructions](docs/PLAYING.md#install-or-manage).
 
 ## Exact comparison controls
 
-See [rendering controls](docs/PLAYING.md#exact-comparison-controls) and [snapshots and resets](docs/PLAYING.md#personal-settings-snapshots-and-resets).
-
-## Five-minute test
-
-See the [short test guide](docs/PLAYING.md#five-minute-test).
+See [rendering controls](docs/PLAYING.md#exact-comparison-controls) and [snapshots and resets](docs/PLAYING.md#settings-snapshots-and-resets).
 
 ## Maintainer packaging
 
-For a hosted build, see [GitHub release automation](docs/neural-rendering/CLOUD_RELEASES.md). Pushing a version tag builds an installer and prepares a draft release after the workflow is merged. The manual local process follows.
+For a hosted build, see [GitHub release automation](docs/neural-rendering/CLOUD_RELEASES.md). Pushing a version tag builds an installer and attaches assets to the existing release, or creates a draft if none exists. The manual local process follows.
 
 Commit source, synchronize the local build checkout to that exact commit, configure DX12 with `-RayTracing ON` and SDK off, then run `Build-RBDOOM.ps1 -Configuration Release -BuildDirectory <native-build-rt>`. From a Python 3 environment:
 

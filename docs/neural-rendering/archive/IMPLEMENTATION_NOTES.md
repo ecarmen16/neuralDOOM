@@ -626,7 +626,7 @@ The reported DLAA settings crash faults on the initial object/hash-table read in
 
 ## 2026-09-07 - Graphics controls and dynamic ray geometry
 
-Implemented both approved tasks. See [GRAPHICS_AND_DYNAMIC_RAYS.md](../GRAPHICS_AND_DYNAMIC_RAYS.md) for exact symbols/files, buffer conventions, budgets and limitations, and [DOGFOOD_CHECKLIST.md](../DOGFOOD_CHECKLIST.md) for the three user checks. The launcher now preserves saved reconstruction and RTX toggle choices; no manual config application or preference reset is needed. Temporal smoke assertions query actual main-thread history state because frontend Printf messages are debugger-only on Windows. Build/runtime evidence is recorded in TEST_RESULTS.md.
+Implemented both approved tasks. See [GRAPHICS_AND_DYNAMIC_RAYS.md](../GRAPHICS_AND_DYNAMIC_RAYS.md) for exact symbols/files, buffer conventions, budgets and limitations, and [TEST_PLAN.md](../TEST_PLAN.md) for contributor validation. The launcher now preserves saved reconstruction and RTX toggle choices; no manual config application or preference reset is needed. Temporal smoke assertions query actual main-thread history state because frontend Printf messages are debugger-only on Windows. Build/runtime evidence is recorded in TEST_RESULTS.md.
 
 
 ## 2026-09-07 - Internal Release and safe renderer controls

@@ -29,7 +29,7 @@ must not be attributed to a later binary. The graphical installer has compile,
 payload, UI-worker success/failure and cancellation checks; fresh-machine
 installation and visual acceptance remain required.
 
-Use [DOGFOOD_CHECKLIST.md](../DOGFOOD_CHECKLIST.md) for a repeatable manual test.
+Use [TEST_PLAN.md](../TEST_PLAN.md) for a repeatable manual test.
 Keep raw logs, saves, captures and local configuration backups outside tracked
 source. Historical implementation plans remain reference material, not a claim
 that every proposed feature has shipped.

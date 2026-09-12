@@ -1,7 +1,6 @@
-# Short performance feedback checklist
+# Reporting performance problems
 
-Use the current internal release. NR + DLSS is planned and is **not available yet**.
-Keep feedback local until reviewed; no tester names or personal paths are needed.
+Use the [latest release](https://github.com/ecarmen16/neuralDOOM/releases/latest) and [open an issue](https://github.com/ecarmen16/neuralDOOM/issues) with the details below. NR supports DLAA and experimental DLSS presets; both require SDR output.
 
 1. Record build/version, GPU/driver, resolution, refresh rate, HDR state, frame cap
    and enabled RTX effects. Enable **System Options > FPS Counter** if needed.

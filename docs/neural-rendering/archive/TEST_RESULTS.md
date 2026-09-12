@@ -880,7 +880,7 @@ or frame-rate claim is established by this checkpoint.
 
 RT-001A / ND3-661 on `codex/rt-foundation`, based on `5fab1f08`. The planned scope included
 continued unattended development and a concise later playtest. See
-`RAY_TRACING_DIAGNOSTICS.md` for the resource contract and `DOGFOOD_CHECKLIST.md`
+`RAY_TRACING_DIAGNOSTICS.md` for the resource contract and `TEST_PLAN.md`
 for the manual pass. This checkpoint adds on-demand GPU diagnostics, not gameplay
 ray-traced lighting or a persistent RT scene.
 
