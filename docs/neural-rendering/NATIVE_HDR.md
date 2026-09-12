@@ -1,12 +1,6 @@
-# Native HDR presentation prototype
+# Native HDR presentation
 
-Update 2026-09-06: with Windows HDR enabled, the final DLAA/RTAO run
-verified active native scRGB output at 4800x1350 and after resize to 2560x720,
-with finite, nonnegative presentation below the configured highlight ceiling.
-See the first gameplay AO entry in `TEST_RESULTS.md`. Physical monitor
-calibration and preferred brightness still need manual visual review.
-
-Implemented on `codex/native-hdr`, based on the `9174f4ca` modernization checkpoint. HDR is optional and defaults OFF. The source repository is now the neuralDoom task checkout; the existing game installation remains a separate build/test checkout with matching source. No runtime, game data or SDK payload is part of this change.
+HDR is optional and defaults OFF. NR requires SDR; native HDR is available in the Native RTX and DLAA / DLSS profiles.
 
 ## Controls and behavior
 
@@ -27,7 +21,7 @@ Settings > System > System Options exposes HDR Output, HDR Scene White, HDR Peak
 - DX12 requests `RGBA16_FLOAT` / `DXGI_FORMAT_R16G16B16A16_FLOAT` and negotiates `DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709` using the swapchain's support flag and `SetColorSpace1`. Initial creation/color-space failure retries SDR. Resize reapplies the color space and can fall back to an 8-bit swapchain if reapplication fails.
 - Output discovery uses the monitor containing the window and fresh DXGI output metadata at startup and resize, plus every 120 frames while scRGB transport is selected. The default SDR path does not poll DXGI each frame. `GetDesc1` reports current desktop HDR state, bits per color and reported peak luminance. Reported peak is diagnostic information, not automatic calibration. No Windows HDR setting is changed.
 - On a Windows HDR display, the existing linear HDR scene/TAA/DLAA result feeds the HDR tone curve before the SDR LUT or SDR clipping. The ACES-style shoulder scales with reference white and peak luminance. The SDR path retains its existing shader branch.
-- `_currentRenderLDR` and its HUD-free diagnostic copy use FP16 when scRGB transport is selected. For this prototype they contain extended gamma-2.2-encoded values normalized to UI white, retaining legacy HUD blending conventions. They are not scene-linear textures. The final swapchain blit decodes gamma, converts nits to scRGB units and bounds presentation to the configured ceiling. Intermediate blits do not apply this conversion.
+- `_currentRenderLDR` and its HUD-free diagnostic copy use FP16 when scRGB transport is selected. They contain extended gamma-2.2-encoded values normalized to UI white, retaining legacy HUD blending conventions. They are not scene-linear textures. The final swapchain blit decodes gamma, converts nits to scRGB units and bounds presentation to the configured ceiling. Intermediate blits do not apply this conversion.
 - scRGB presentation uses linear BT.709 primaries. On Windows HDR, 1.0 represents 80 nits. On SDR, final output is bounded to 0-1. HDR UI reference white does not alter scene exposure.
 - SDR filmic/CAS processing and its 8-bit scratch target are bypassed during HDR tone mapping. Selected retro/CRT modes and SMAA retain their SDR behavior. The temporary embedded ReShade/NR bridge keeps the 8-bit SDR transport; native Streamline DLAA remains eligible for HDR. Vulkan continues to use its existing SDR path.
 
@@ -44,7 +38,7 @@ The smoke runner can select output, require active HDR or SDR fallback, request 
 .\tools\neural-rendering\Test-NeuralDoom-Smoke.ps1 -BuildDirectory build-streamline -Profile DLAA -DisplayOutput AutoHDR -HDRDiagnostic
 ```
 
-Use `-ExpectedHDR Active` for the eventual HDR-enabled desktop test. Diagnostic success is not evidence that Windows HDR is active. Tests are serialized because the engine permits one instance; the runner reports an existing instance before launching. Detailed runs and limitations are recorded in TEST_RESULTS.md.
+Use `-ExpectedHDR Active` to test an HDR-enabled desktop. Diagnostic success is not evidence that Windows HDR is active. Tests are serialized because the engine permits one instance; the runner reports an existing instance before launching.
 
 ## Primary references
 

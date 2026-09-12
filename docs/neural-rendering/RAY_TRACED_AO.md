@@ -1,4 +1,4 @@
-# Native ray-traced ambient occlusion prototype
+# Ray-traced ambient occlusion
 
 `Launch-NeuralDoom-RTX.cmd` starts the verified Native or DLAA playtest with
 `r_rayTracedAO 1`, SSAO enabled, the new SSAO pass selected and native HDR (Auto)
@@ -48,8 +48,8 @@ separate work.
 
 ## Scope and validation
 
-This deliberately covers static opaque map geometry only. Doors, props,
-characters, cutouts, deformed geometry, glass and sky are not ray occluders.
+The ray scene includes static opaque maps and supported visible moving geometry
+when enabled. Cutouts, deformed geometry, glass and sky remain excluded.
 Raster SSAO remains for receivers missing from this scene; the depth agreement
 check is an approximation, not a material/instance identity buffer. Fixed sparse
 rays can create bands and triangle-normal seams. Radius/bias and frame cost need
@@ -59,9 +59,4 @@ Build with `Configure-RBDOOM-DX12.ps1 -BuildDirectory build-rt -RayTracing ON`,
 then `Build-RBDOOM.ps1 -BuildDirectory build-rt -Configuration RelWithDebInfo`.
 `Test-NeuralDoom-Smoke.ps1 -BuildDirectory build-rt -RayTracedAO -GpuProfile`
 checks actual shaded receivers, live OFF/ON, GPU progress, captures and optional
-resize. `rt_off.png` records the raster comparison. See `TEST_RESULTS.md` for
-measured evidence and `TEST_PLAN.md` for visual validation.
-
-Next: add stable mesh/instance/material registration and moving/cutout occluders
-before implementing authored-light ray shadows. This prototype does not close
-the full RT-001B/RT-002 scene-completeness gate.
+resize. See [renderer validation](TEST_PLAN.md) for visual test scenarios.

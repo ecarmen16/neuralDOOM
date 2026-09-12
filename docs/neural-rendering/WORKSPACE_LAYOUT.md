@@ -1,7 +1,6 @@
 # Workspace layout
 
-The repository root contains source and build tools. Historical development
-plans remain under `docs/neural-rendering/archive` for technical reference.
+The repository root contains source and build tools.
 
 - `releases/`: generated setup EXE, alternative ZIP and checksum sidecars.
 - `captures/neural/`: ignored local validation evidence and download caches.

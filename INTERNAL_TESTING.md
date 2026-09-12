@@ -1,4 +1,4 @@
-# Maintainer packaging
+# Release packaging
 
 Player instructions have moved to the [installation, settings and controls guide](docs/PLAYING.md). This filename is retained for existing release tooling and links.
 
@@ -10,7 +10,7 @@ See [installation and upgrade instructions](docs/PLAYING.md#install-or-manage).
 
 See [rendering controls](docs/PLAYING.md#exact-comparison-controls) and [snapshots and resets](docs/PLAYING.md#settings-snapshots-and-resets).
 
-## Maintainer packaging
+## Release packaging
 
 For a hosted build, see [GitHub release automation](docs/neural-rendering/CLOUD_RELEASES.md). Pushing a version tag builds an installer and attaches assets to the existing release, or creates a draft if none exists. The manual local process follows.
 

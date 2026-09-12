@@ -80,7 +80,7 @@ Extract `base/_rbdoom_global_illumination_data.pk4` from the official RBDOOM 1.6
 .\tools\neural-rendering\Setup-NeuralDoom.ps1 -RepoRoot . -ValidateOnly
 ```
 
-This configures native DX12 ray tracing in `build-rt` and builds RelWithDebInfo. It does not require an NR DLL. Setup checks the exact executable and compiled shader hashes, game data and lighting candidates. Old manifests require a rebuild. Fresh-machine end-to-end installation remains a pending validation item; see [CHECKPOINT.md](archive/CHECKPOINT.md).
+This configures native DX12 ray tracing in `build-rt` and builds RelWithDebInfo. It does not require an NR DLL. Setup checks the exact executable and compiled shader hashes, game data and lighting candidates. Old manifests require a rebuild.
 
 ## Optional DLAA and legacy neural rendering
 

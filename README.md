@@ -70,7 +70,7 @@ cd neuralDOOM
 .\tools\neural-rendering\Build-RBDOOM.ps1 -Configuration RelWithDebInfo
 ```
 
-The optional SDK build is separate and disabled by default. The [documentation index](docs/README.md) links player guides, renderer internals, validation instructions and the historical development archive. [Maintainer packaging](INTERNAL_TESTING.md#maintainer-packaging) covers local builds. The [release workflow](docs/neural-rendering/CLOUD_RELEASES.md) builds both engines and the installer on GitHub's standard Windows runners when a version tag is pushed, then attaches verified assets to the existing release or creates a draft if none exists.
+The optional SDK build is separate and disabled by default. The [documentation index](docs/README.md) links player guides, renderer internals and validation instructions. [Release packaging](INTERNAL_TESTING.md#release-packaging) covers local builds. The [release workflow](docs/neural-rendering/CLOUD_RELEASES.md) builds both engines and the installer on GitHub's standard Windows runners when a version tag is pushed, then attaches verified assets to the existing release or creates a draft if none exists.
 
 ## Attribution and licenses
 

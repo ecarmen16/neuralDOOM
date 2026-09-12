@@ -9,7 +9,7 @@ neuralDoom is the downstream project; RBDOOM-3-BFG remains its upstream source. 
 - `main`: reviewed downstream checkpoints.
 - `codex/...`: focused development branches. Do not rewrite upstream history to rename the project.
 
-Milestone 1 is merged into `main`. Use focused `codex/…` branches for follow-up work and open implementation PRs after relevant verification. The latest PR changes require manual approval from `ecarmen16` or `eraser851`; subsequent changes require renewed review. Those maintainers perform the final merge. Agents must not approve, merge, enable auto-merge or push directly to `main`.
+Use focused `codex/…` branches for follow-up work and open implementation PRs after relevant verification. The latest PR changes require manual approval from `ecarmen16` or `eraser851`; subsequent changes require renewed review. Only those reviewers perform the final merge. Agents must not approve, merge, enable auto-merge or push directly to `main`.
 
 Install the repository's commit and push checks once per checkout:
 
@@ -37,7 +37,7 @@ paths. The source audit checks profile paths in both working and staged text;
 the release packager also checks source, executable and shader bytes, including
 UTF-16 strings. Run `Test-PublicPrivacy.py` when changing these gates.
 
-Use [the unattended workflow](docs/neural-rendering/UNATTENDED_WORKFLOW.md). Run `Test-NeuralBuildIdentity.ps1`, appropriate SDK-OFF/ON builds, relevant gameplay/layout checks, and `git diff --check`. Record actual validation and limitations in the neural-rendering notes before committing renderer changes.
+Use [the unattended workflow](docs/neural-rendering/UNATTENDED_WORKFLOW.md). Run `Test-NeuralBuildIdentity.ps1`, appropriate SDK-OFF/ON builds, relevant gameplay/layout checks, and `git diff --check`. Include actual validation and limitations in the pull request. Update technical reference docs only when behavior or interfaces change.
 
 Keep retail data and optional local components outside the source-only checkout. The established local game installation can remain a separate build/test checkout. Do not stage or distribute its ignored payloads. Existing save-folder/config names remain compatible so branding changes do not hide player saves.
 

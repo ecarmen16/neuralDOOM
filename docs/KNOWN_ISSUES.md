@@ -23,8 +23,6 @@ See the [player guide](PLAYING.md) for installation, controls and reset details.
 
 ## Developer limitations
 
-The [September 8 review](neural-rendering/archive/REVIEW_2026-09-08.md) preserves evidence and proposed corrections. Its original statement that none of the findings had been fixed describes the review date, not the release.
-
 Still open at M1:
 
 - Temporal mask passes leave the wrong framebuffer active for subsequent alpha/debug draws.
@@ -34,5 +32,3 @@ Still open at M1:
 - Material declaration reload can leave dangling ray-stage cache pointers. Avoid live material reload with ray lighting until corrected.
 - Legacy SSAO (`r_useNewSSAOPass 0`) has viewport assumptions incompatible with reduced-resolution rendering. The default modern path avoids this issue.
 - Optional auto-exposure has inconsistent histogram encoding/decoding. Fixed exposure is the shipped default.
-
-See the [archived validation results](neural-rendering/archive/TEST_RESULTS.md) for build checks and runtime observations supporting these findings.

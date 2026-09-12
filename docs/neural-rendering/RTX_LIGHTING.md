@@ -1,14 +1,12 @@
 # Full-resolution RTX material lighting
 
-**2026-09-06 reflection update:** Full-resolution rough reflections now use the native material response and replace matched probe specular. Default GI strength is 1.125, down 25%. See [reflection controls, contracts and the three-check playtest](RAY_TRACED_REFLECTIONS.md). GPU validation of this addition remains pending manual testing.
+Reflections use native material response and replace matched probe specular. See [reflection controls and contracts](RAY_TRACED_REFLECTIONS.md).
 
 `Launch-NeuralDoom-RTX.cmd` enables reflections, material bounce, contact shadows and AO. It supports Native and optional DLAA rendering, with native HDR output when Windows HDR is enabled. `Launch-NeuralDoom.cmd` preserves saved feature choices. Both select the exact CMake output and verify its build manifest. No ReShade bridge is required.
 
 ## Subdued lighting preset
 
-For the 2026-09-07 brightness feedback, `exec neural_rtx_contrast.cfg` applies fixed exposure, ambient **0.375**, diffuse bounce strength **1.125**, and reflection blend **0.65**. These now match the conservative factory starting values; the normal launcher now migrates existing archived settings automatically once. It preserves HDR calibration, AO, contacts, ray samples and render resolution. Lower reflection blend restores more native probe specular, so it does not imply a uniform 35% darker image. The earlier offline config reset did not remain in the latest saved config; the launcher applies the migration inside the game and records completion after a successful exit. See [SETTINGS_REVIEW.md](archive/SETTINGS_REVIEW.md) for the exposure bug and full audit.
-
-The active local `reshade.ini` NR section was reset by removing its saved tuning overrides so the installed add-on supplies its own defaults. Only NR enabled and upscaling disabled remain explicit, retaining full-resolution rendering. Other ReShade sections and earlier backups were preserved. This is distinct from setting every tuning slider to 1, which would not necessarily match the add-on's defaults.
+`exec neural_rtx_contrast.cfg` selects fixed exposure, ambient **0.375**, diffuse bounce strength **1.125**, and reflection blend **0.65**. It preserves HDR calibration, AO, contact shadows, ray samples and render resolution. Lower reflection blend restores more native probe specular rather than uniformly darkening the image.
 
 ## Controls
 
@@ -59,7 +57,7 @@ Every output pixel traces its own primary receiver and cosine-weighted diffuse b
 
 `RayTracedContacts` snapshots HDR before each eligible light and attenuates only that light's opaque contribution afterward. It respects shadow-caster material flags, skips parallel lights, and retains raster shadows. A full-resolution R8 visibility image supports comparison. Copying HDR requires invalidating both the engine graphics cache and NVRHI's cached framebuffer binding; native DX12 validation caught and verified the fix for this requirement.
 
-All rays currently intersect static opaque BSP geometry. Moving entities, the weapon, cutouts, glass, custom programs, video/GUI emission and blended vertex-color materials are not fully represented. Raster-depth agreement rejects unsupported primary receivers. Geometry normals are used for explicit offscreen lighting; the visible radiance cache includes native normal-map shading. Rough-specular reflections are described in [RAY_TRACED_REFLECTIONS.md](RAY_TRACED_REFLECTIONS.md); dynamic acceleration structures and a full path tracer remain future work. Four fixed rays can produce directional sampling artifacts; sample count is adjustable. Visual motion review remains a user playtest item.
+Rays intersect static opaque BSP geometry and supported visible moving geometry when enabled. The weapon, cutouts, glass, custom programs, video/GUI emission and blended vertex-color materials are not fully represented. Raster-depth agreement rejects unsupported primary receivers. Geometry normals are used for explicit offscreen lighting; the visible radiance cache includes native normal-map shading. Rough-specular reflections are described in [RAY_TRACED_REFLECTIONS.md](RAY_TRACED_REFLECTIONS.md); [dynamic geometry](GRAPHICS_AND_DYNAMIC_RAYS.md) has separate controls; full path tracing is not implemented. Four fixed rays can produce directional sampling artifacts; sample count is adjustable. Visual motion review remains a user playtest item.
 
 Bounce, radiance snapshot and HDR composition use linear `RGBA16_FLOAT`. Rays and bounce output run at the full viewport resolution, including 5120×1440; there is no half-resolution mode. A 3×3 depth-aware filter operates at full resolution and excludes rejected primary receivers. Existing TAA/DLAA follows the pass, then HDR tone mapping and HUD. Texture-cache resolution is independent of render resolution. Feature-off and RT-compiled-out paths allocate no new ray resources.
 
@@ -71,6 +69,4 @@ Bounce, radiance snapshot and HDR composition use linear `RGBA16_FLOAT`. Rays an
 2. Toggle F3 near reflective metal, then F4 to isolate diffuse bounce. Use F10 for reflection/roughness views; return it to scene mode for normal play.
 3. Walk past a doorway, rotate, fire, and resize or use 5120×1440 borderless. Check for trails, light leaks and stable HUD/FOV. F11 provides immediate rollback.
 
-Diagnostics: `rayTracingReflectionStatus`, `rayTracingGIStatus`, `rayTracingContactStatus`, `rayTracingAOStatus`, `hdrStatus`. GPU coverage counters prove actual work, not subjective visual quality or hardware-independent performance. Build/runtime evidence is in `TEST_RESULTS.md`.
-
-The contrast preset now also selects fixed exposure and ambient 0.375. See [SETTINGS_REVIEW.md](archive/SETTINGS_REVIEW.md) for the exposure correction, saved-setting migration and Material SSR scope.
+Diagnostics: `rayTracingReflectionStatus`, `rayTracingGIStatus`, `rayTracingContactStatus`, `rayTracingAOStatus`, `hdrStatus`. GPU coverage counters prove actual work, not subjective visual quality or hardware-independent performance.

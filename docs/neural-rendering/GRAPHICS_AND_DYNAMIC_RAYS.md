@@ -23,4 +23,4 @@ The frontend caps each entity at 32,768 copied vertices. Each ray scene accepts 
 - `r_rayTracingDynamicGeometry 0` restores static-only tracing; `r_rayTracingSkinnedGeometry 0` excludes animated geometry. Both are archived and reset temporal history when changed. `rayTracingDynamicStatus` reports accepted surfaces/triangles, skinned surfaces and backend budget exclusions.
 - `rayTracingDynamicTest` checks insertion, movement, no-shadow filtering and removal with GPU ray queries. `Test-DynamicRayGeometry.py` separately exercises actual CPU snapshot/gather source, including offsets, joint weights and invalid inputs.
 
-Next narrow task after visual feedback: measure dynamic BLAS cost and extend visibility/secondary-hit history without sacrificing Doom contrast. See TEST_RESULTS.md for build/runtime evidence and TEST_PLAN.md for contributor validation.
+See [renderer validation](TEST_PLAN.md) for test scenarios.

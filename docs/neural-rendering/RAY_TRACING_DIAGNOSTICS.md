@@ -1,10 +1,6 @@
 # Native ray intersection diagnostics
 
-RT-001A on `codex/rt-foundation`, based on `5fab1f08`. The optional native DX12
-prototype builds and queries acceleration structures on demand through the
-vendored NVRHI API. It has no per-frame RT pass, gameplay lighting contribution,
-new SDK or denoiser. The next gate is a persistent scene with stable mesh and
-instance registration; this diagnostic does not complete that gate.
+These commands build and query acceleration structures through NVRHI for isolated correctness checks. They run on demand and are separate from the gameplay lighting passes.
 
 ## Build and run
 
@@ -75,8 +71,4 @@ GPU work, followed by normal gameplay completion. The installed shader is intact
 `-ValidationLayers 1` is the existing NVRHI default; `2` also enables native DX12
 validation and requires the Windows graphics debug runtime.
 
-Actual unsupported hardware and device loss have not been injected. The runtime
-guard exists; only the local RTX 5090 has been exercised. Missing-shader recovery
-is not proof of recovery from an invalid shader/driver/device failure. See
-`TEST_RESULTS.md` for exact artifacts and remaining visual checks, and
-`TEST_PLAN.md` for manual validation.
+Missing-shader recovery does not establish recovery from driver or device loss. See [renderer validation](TEST_PLAN.md) for test scenarios.

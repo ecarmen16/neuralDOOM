@@ -1,6 +1,6 @@
 # Neural Doom 3 project instructions
 
-This repository is an RBDOOM-3-BFG renderer-development branch prepared for Codex-assisted work on a future neural-rendering path. Read `docs/neural-rendering/archive/DEV_PLAN.md`, `ARCHITECTURE.md`, `TEST_PLAN.md`, and `DECISIONS.md` before changing renderer code.
+Read `docs/neural-rendering/ARCHITECTURE.md`, `docs/neural-rendering/TEST_PLAN.md` and the relevant renderer reference before changing renderer code.
 
 ## Mission
 
@@ -10,7 +10,7 @@ Build a reversible, optional, well-instrumented temporal input path around the e
 
 - Milestone 1 is merged. Use focused `codex/` branches for follow-up changes. Review and playtest renderer branch builds before opening a PR; do not open a planning or tracking PR.
 - Keep `main` at its reviewed checkpoint. After branch testing, require manual approval of the latest PR changes by `ecarmen16` or `eraser851`; new changes after approval require renewed review.
-- Do not approve, merge, enable auto-merge, or push/cherry-pick milestone changes into `main` as an agent. Leave the final merge to either maintainer. Actions made by automation using a maintainer's credentials are not human approval.
+- Do not approve, merge, enable auto-merge, or push/cherry-pick milestone changes into `main` as an agent. Only ecarmen16 or eraser851 may perform the final merge. Actions using their credentials through automation are not human approval.
 - Keep `core.hooksPath=.githooks`; the pre-push hook rejects direct pushes to `main`. Do not bypass it. This local guard is not server-side branch protection.
 
 ## Non-negotiable legal and repository constraints
@@ -66,23 +66,13 @@ Do not delete or restructure upstream renderer backends as part of this work. DX
 - UI and the first-person weapon require explicit ordering decisions. Do not silently feed both through a temporal/neural pass.
 - Reset temporal history on map loads, teleports, camera cuts, resolution changes, large FOV changes, and other proven discontinuities.
 
-## Required documentation for every meaningful renderer task
+## Documentation
 
-Update at least one of:
-
-- `docs/neural-rendering/archive/IMPLEMENTATION_NOTES.md`
-- `docs/neural-rendering/archive/TASK_BOARD.md`
-- `docs/neural-rendering/DECISIONS.md`
-- `docs/neural-rendering/archive/TEST_RESULTS.md`
-
-Record:
-
-- Exact files and symbols changed.
-- Resource formats and coordinate conventions.
-- Build command and result.
-- Runtime validation performed.
-- Known artifacts and regressions.
-- A narrow next task.
+- Write documentation for players and contributors. Describe current behavior, interfaces, limitations and reproducible commands.
+- Do not commit conversation summaries, references to the user or maintainer in the third person, personal testing history, session prompts, task diaries, "local only" instructions or future-agent handoffs.
+- Put change-specific build/test results and review notes in the PR description. Keep raw logs, captures and temporary experiments in ignored local storage.
+- Update existing technical reference only when behavior, resource formats or coordinate conventions change. Do not recreate implementation notes, task boards or a development archive.
+- Delete obsolete documentation. Retain historical material only when it contains useful technical reference that is absent from current docs.
 
 ## Validation expectations
 
@@ -96,7 +86,3 @@ Before declaring a renderer task complete:
 6. Keep commits small and describe the verified behavior, not merely the implementation.
 
 Useful test cases include a static camera, camera rotation, lateral translation, a moving door/lift, a rigid physics object, an animated MD5 character, weapon bob/recoil, transparent glass, smoke, muzzle flashes, emissive animation, and a camera cut/map transition.
-
-## First-session restriction
-
-For the initial reconnaissance task, do not edit renderer C/C++, shaders, CMake dependency lists, or game code. Build if possible, inspect, and produce `docs/neural-rendering/archive/RECON_REPORT.md` with exact evidence. Documentation and helper-script corrections are allowed.

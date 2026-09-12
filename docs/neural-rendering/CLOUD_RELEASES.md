@@ -6,7 +6,7 @@ The `Build release installer` workflow uses standard `windows-2022` GitHub-hoste
 
 Once this workflow is merged into `main`:
 
-1. Finish testing and merge the release changes through the maintainer review process.
+1. Finish testing and merge the release changes through the pull-request review process.
 2. Create and push a version tag on that merged commit, for example `v0.2.0` or `milestone-2`. Tag names must start with `v` or `milestone-`, followed by a digit, and contain only letters, digits, dots, underscores and hyphens. Do not move a previously released tag.
 3. The workflow builds both Release engines, runs offline installer/settings checks, packages corresponding source and compiled shaders, and creates the single-file setup EXE.
 4. Open the resulting **draft release**. It contains the EXE, portable/source ZIP and a SHA-256 sidecar for each. Review the notes and publish it when ready. If you already published the release through GitHub when creating the tag, the action attaches the same four files to that release.
@@ -40,27 +40,6 @@ From a clean Windows checkout with VS2022, a Windows SDK, CMake, Git and Python 
 
 This downloads only the two build dependencies and writes artifacts under `releases/v0.2.0`. It does not upload anything. Use a new output version/directory for each attempt; the packager refuses to overwrite existing artifacts.
 
-The first hosted `v0.0.1` run failed in the public-source audit, before compilation.
-The audit searched for the checkout path literally; at a neutral drive root this
-matched both workflow paths and unrelated C strings ending in `r:` plus an escaped
-newline. The audit now omits volume roots from that exact-path search, retaining
-the checks for actual checkout directories, personal profiles and prohibited
-files. Empty profile paths are also excluded from literal searches.
+## Automated checks
 
-`Test-PublicSourceAudit.ps1` exercises a real temporary Git repository through a
-SUBST drive root, including personal-path rejection and staged-file isolation.
-The release runs this regression before building. Pull requests changing the
-workflow or audit run the regression and whole-repository mapped-root audit on
-Windows without building/uploading release assets.
-
-The failed run's nine false positives were reproduced locally; regression and
-mapped-root checks pass after the fix. Hosted run `34699982236` successfully built,
-tested and packaged both engines for `v0.1.0`. Its upload failed because the old
-workflow rejected published releases. All four artifacts were recovered from that
-run, checksum-verified and attached to `v0.1.0` without rebuilding or replacing assets.
-
-`Test-ReleaseAssetUpload.ps1` runs the actual upload helper with an offline GitHub
-CLI fixture. It covers missing/draft/published releases, partial and complete
-retries, immutable releases, conflicting/unverifiable assets, moved tags and
-invalid local artifacts. These checks run on workflow pull requests and before
-release builds.
+`Test-PublicSourceAudit.ps1` checks ordinary and mapped-root source audits. `Test-ReleaseAssetUpload.ps1` checks uploads to drafts and published releases, retries, matching hashes, immutable releases and invalid artifacts. Both run on workflow pull requests and before release builds.

@@ -54,7 +54,7 @@ The experimental `renodx-dlss5.addon64` and `nvngx_dlssnr.dll` remain unapproved
 
 ### D3HDP BFG Lite
 
-Local texture-installer branch (2026-09-11): the optional setup page credits **H3llBaron and the Doom 3 modding community** and links the original project. It downloads or imports a pinned BFG Lite archive on the user's machine and preserves the original readme and credit documents under `notices/D3HDP-BFG-Lite`. This local acquisition does not grant permission to redistribute the pack; no assets are included in our installer payload or source. The local overlay experiment and validation limits are documented in [archived texture-installer validation](archive/TEXTURE_INSTALLER_TEST.md).
+The optional texture setup page credits **H3llBaron and the Doom 3 modding community** and links the original project. It downloads or imports a pinned BFG Lite archive on the user's machine and preserves the original readme and credit documents under `notices/D3HDP-BFG-Lite`. This local acquisition does not grant permission to redistribute the pack; no assets are included in our installer payload or source.
 
 | Field | Answer |
 |---|---|
@@ -77,7 +77,7 @@ Local validation record:
 
 - The official RBDOOM v1.6.0 release's `_rbdoom_global_illumination_data.pk4` was inspected and installed only into the local game checkout. It contains generated lighting textures/grid data, remains ignored, and is not approved for repository or release bundling. Exact source, contents and measured fingerprints are in [PROBE_LIGHTING.md](PROBE_LIGHTING.md).
 - The new capability diagnostic uses the already vendored MIT-licensed NVRHI (`neo/extern/nvrhi/LICENSE.txt`) and adds no SDK dependency.
-- NRD is only a candidate in [RAY_TRACING_PLAN.md](archive/RAY_TRACING_PLAN.md). Its current [NVIDIA RTX SDK license](https://raw.githubusercontent.com/NVIDIA-RTX/NRD/master/LICENSE.txt), including its open-source-combination restriction, requires compatibility/distribution review before incorporation. It must not be described as MIT merely because NVRHI is MIT. No NRD code or binary was downloaded or integrated.
+- NRD is not integrated. Its current [NVIDIA RTX SDK license](https://raw.githubusercontent.com/NVIDIA-RTX/NRD/master/LICENSE.txt), including its open-source-combination restriction, requires compatibility/distribution review before incorporation. It must not be described as MIT merely because NVRHI is MIT. No NRD code or binary was downloaded or integrated.
 
 ## Dependency review template
 
@@ -170,13 +170,11 @@ Local acquisition record:
 - Local ignored target: `local-proprietary/streamline-v2.12.0/`.
 - The package and all DLLs remain untracked. Using the NGX/DLSS components is subject to NVIDIA's included terms; this engineering record is not legal advice.
 
-
 ## 2026-09-07 - Native internal Release package
 
 The internal package uses the SDK-free DX12/RTX Release configuration, with the corresponding tracked source and recursively pinned submodule source included in the same ZIP. Original GPL/additional-license/dependency notices remain alongside source. No new dependency is integrated. The packaging allowlist consists of this source, the exact native executable and manifest-verified compiled shaders. Unused upstream prebuilt formatter/OpenAL/FFmpeg binaries and import libraries are omitted. The documented build has FFMPEG off and uses Windows XAudio, not the omitted OpenAL binary.
 
 No retail resources, lighting/mod packs, NVIDIA DLLs, ReShade/RenoDX add-ons or PDBs are included. The installer imports owned game data and the separately obtained, fingerprint-verified lighting pack locally after extraction. It links to Microsoft's official VC++ x64 Redistributable when needed instead of redistributing a runtime installer. DLAA/NR distribution remains blocked as recorded above. Source setup no longer downloads/copies an NR runtime from an arbitrary path or URL.
-
 
 ## 2026-09-07 - Automatic publisher downloads
 

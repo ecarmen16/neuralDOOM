@@ -80,7 +80,7 @@ git diff --check
 git status --short
 ```
 
-Then run the smallest relevant runtime scenario and update `TEST_RESULTS.md`.
+Include the relevant runtime scenario, results and limitations in the pull request.
 
 ## 6. Performance capture
 
