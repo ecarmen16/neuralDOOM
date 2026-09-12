@@ -53,10 +53,16 @@ try {
         }
     }
 
-    $machinePaths = @(
-        $RepoRoot,
-        [Environment]::GetFolderPath('UserProfile')
-    )
+    $machinePaths = @([Environment]::GetFolderPath('UserProfile'))
+    # A checkout can be the root of a neutral SUBST build drive. A drive root
+    # identifies no private directory, and matching it finds ordinary text
+    # such as "buffer:" followed by an escaped newline. Keep auditing real
+    # checkout directories and personal profile paths, even on mapped drives.
+    $volumeRoot = [IO.Path]::GetPathRoot($RepoRoot)
+    if ($RepoRoot.TrimEnd('\', '/') -ne $volumeRoot.TrimEnd('\', '/')) {
+        $machinePaths += $RepoRoot
+    }
+    $machinePaths = @($machinePaths | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     $machinePaths = @($machinePaths | ForEach-Object { $_; $_.Replace('\', '/') } | Select-Object -Unique)
     foreach ($machinePath in $machinePaths) {
         $grepArgs = @('grep', '-I', '-n', '-i', '-F')
