@@ -24,6 +24,8 @@ apply to this source tree.
 	#include <sl_helpers.h>
 #endif
 
+static idCVar r_neuralDLSSPerformancePreset( "r_neuralDLSSPerformancePreset", "0", CVAR_RENDERER | CVAR_INTEGER, "DLSS Performance preset: 0 K (default), 1 M (comparison)", 0, 1 );
+
 class idStreamlineNeuralTemporalBackend : public idNeuralTemporalBackend
 {
 public:
@@ -95,7 +97,7 @@ public:
 			resetPending = true;
 		}
 		const int requestedQuality = idMath::ClampInt( 0, 2, frame.dlssQuality );
-		if( configuredMode != requestedMode || configuredQuality != requestedQuality || renderWidth != frame.renderWidth || renderHeight != frame.renderHeight || outputWidth != frame.outputWidth || outputHeight != frame.outputHeight )
+		if( configuredPerformancePreset != r_neuralDLSSPerformancePreset.GetInteger() || configuredMode != requestedMode || configuredQuality != requestedQuality || renderWidth != frame.renderWidth || renderHeight != frame.renderHeight || outputWidth != frame.outputWidth || outputHeight != frame.outputHeight )
 		{
 			optionsDirty = true;
 			resetPending = true;
@@ -115,7 +117,7 @@ public:
 			options.dlaaPreset = sl::DLSSPreset::ePresetK;
 			options.qualityPreset = sl::DLSSPreset::ePresetK;
 			options.balancedPreset = sl::DLSSPreset::ePresetK;
-			options.performancePreset = sl::DLSSPreset::ePresetM;
+			options.performancePreset = r_neuralDLSSPerformancePreset.GetInteger() == 0 ? sl::DLSSPreset::ePresetK : sl::DLSSPreset::ePresetM;
 			options.useAutoExposure = sl::Boolean::eTrue;
 			options.alphaUpscalingEnabled = sl::Boolean::eFalse;
 			const sl::Result optionsResult = slDLSSSetOptions( sl::ViewportHandle( 0 ), options );
@@ -126,6 +128,7 @@ public:
 			optionsDirty = false;
 			configuredMode = requestedMode;
 			configuredQuality = requestedQuality;
+			configuredPerformancePreset = r_neuralDLSSPerformancePreset.GetInteger();
 			configuredExposureScale = frame.exposureScale;
 		}
 		renderWidth = frame.renderWidth;
@@ -240,6 +243,7 @@ public:
 			return Reject( "slEvaluateFeature", result );
 		}
 
+		if( constants.reset == sl::Boolean::eTrue ) { resetFrames++; }
 		resetPending = false;
 		lastFrameIndex = frame.frameIndex;
 		presentedFrames++;
@@ -253,6 +257,7 @@ public:
 	{
 		common->Printf( "Neural temporal backend: Streamline DLSS, initialized %s, evaluated %llu, presented %llu, rejected %llu, epoch %llu, render %dx%d, output %dx%d, last %s\n",
 			initialized ? "yes" : "no", evaluatedFrames, presentedFrames, rejectedFrames, lastEpoch, renderWidth, renderHeight, outputWidth, outputHeight, lastResult );
+		common->Printf( "Streamline history: successfulResets=%llu lastFrame=%u performancePreset=%s\n", resetFrames, lastFrameIndex, configuredPerformancePreset == 0 ? "K" : "M" );
 	}
 
 private:
@@ -296,8 +301,10 @@ private:
 	uint64		rejectedFrames;
 	uint64		lastEpoch;
 	uint32		lastFrameIndex;
+	uint64		resetFrames = 0;
 	int			configuredMode;
 	int			configuredQuality = -1;
+	int			configuredPerformancePreset = -1;
 	float		configuredExposureScale;
 	int			renderWidth;
 	int			renderHeight;
