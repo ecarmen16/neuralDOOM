@@ -1148,3 +1148,47 @@ this is a local mitigation, not a dynamic reflection denoiser. User should test
 camera movement and reflected moving objects in NR before accepting it. The
 original separate body-shadow PR remains untouched. All experiments remain
 uncommitted/unpushed; no settings are changed in tracked release defaults.
+
+### 2026-09-12 - Prepare accepted shimmer mitigations for v0.1.1
+
+The maintainer reports the local fixes look good and requests a PR and v0.1.1.
+This supersedes the local-only hold above for the accepted changes:
+
+- `NeuralTemporalStreamline.cpp`: Performance defaults to preset K; the
+  non-archived `r_neuralDLSSPerformancePreset 1` comparison selects M and resets
+  history. Status includes successful reset count and last submitted frame.
+- `RenderBackend.cpp::EvaluateNeuralTemporalBackend`: use the queued view's
+  `taaFrameCount`, matching its jitter and motion inputs, instead of a mutable
+  frontend frame counter.
+- `RayTracingDiagnostic.cpp`: stable reflection frame seed for upscaled DLSS
+  only, with `r_rayTracingReflectionStableNoise 0` restoring animated sampling.
+  Setting changes reset history. Native/DLAA sampling and ray counts stay intact.
+
+The rejected dynamic-history experiment and its four shader edits are excluded;
+their complete local diff is preserved in an ignored patch. Existing conservative
+dynamic-history rejection remains. No resource formats, bindings, coordinate
+conventions, SDK/runtime versions or redistributable payloads change.
+
+Validation: Configure-RBDOOM-DX12.ps1 with RayTracing ON, then Build-RBDOOM.ps1
+with Configuration RelWithDebInfo, pass for build-private-neural (SDK ON) and
+build-rt (SDK OFF). Reflection shader contracts pass all 64 engine permutations
+and the three compute layouts. A bounded SDK Mars City test with MRG enabled
+completed 1,260 presentations with zero rejections, switching Performance K/M,
+DLAA and native TAA. Stable sampling ON/OFF screenshots were inspected. At
+1600x900 output / 800x450 input, stationary frame-pair differences decreased from
+0.0261 to 0.0019 for the wall and 0.3075 to 0.0260 for the floor (8-bit RGB mean
+absolute differences; same regions as the earlier test). This demonstrates
+reduced stationary noise, not artifact-free motion or an FPS gain.
+
+The SDK-off native RTX build also completed a bounded Mars City run with
+reflections OFF then ON at 1280x720, zero sampled invalid reflection values,
+screenshots inspected and normal shutdown (v011-native.log). Existing missing
+image warnings remain; no new DLSS rejection was observed in the SDK run.
+
+Evidence is under ignored captures/neural/profile-fixes-runtime/base, with
+v011-validation.log and screenshots/v011_*.png. Standard smoke tests skipped
+because their source-root game-data prerequisite was absent; the bounded test
+used existing installed data with isolated saves and logs. Focused review checks
+optional SDK guards, preset-change resets, immutable view ownership and
+feature-off behavior. Next: maintainer review/merge, then build v0.1.1 from the
+merged tag and verify the four release assets.
