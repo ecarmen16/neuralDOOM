@@ -16,6 +16,8 @@ on:
       - '.github/workflows/release-installer.yml'
       - 'tools/neural-rendering/Test-NeuralDoom-PublicSource.ps1'
       - 'tools/neural-rendering/Test-PublicSourceAudit.ps1'
+      - 'tools/neural-rendering/Publish-ReleaseAssets.ps1'
+      - 'tools/neural-rendering/Test-ReleaseAssetUpload.ps1'
 
 permissions:
   contents: read
@@ -45,6 +47,9 @@ jobs:
             & powershell.exe -NoProfile -ExecutionPolicy Bypass -File R:\tools\neural-rendering\Test-NeuralDoom-PublicSource.ps1 -RepoRoot R:\
             if ($LASTEXITCODE -ne 0) { throw 'Mapped-root repository audit failed.' }
           } finally { subst R: /D }
+      - name: Test release asset uploads and retries
+        shell: pwsh
+        run: ./tools/neural-rendering/Test-ReleaseAssetUpload.ps1
 
   build:
     if: github.event_name != 'pull_request'
@@ -88,6 +93,9 @@ jobs:
       - name: Test source audit path handling
         run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/neural-rendering/Test-PublicSourceAudit.ps1
 
+      - name: Test release asset uploads and retries
+        run: ./tools/neural-rendering/Test-ReleaseAssetUpload.ps1
+
       - name: Build, test and package both engines
         env:
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
@@ -112,7 +120,7 @@ jobs:
         run: |
           if ($env:NEURAL_BUILD_DRIVE_MAPPED -eq '1') { subst R: /D }
 
-  draft-release:
+  publish-assets:
     needs: build
     runs-on: windows-2022
     timeout-minutes: 10
@@ -125,7 +133,14 @@ jobs:
           name: release-installer
           path: release-assets
 
-      - name: Attach assets to a draft release
+      - name: Check out verified source for upload helper
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+          persist-credentials: false
+          path: upload-source
+
+      - name: Attach verified release assets
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -133,29 +148,5 @@ jobs:
           RELEASE_TAG: ${{ needs.build.outputs.tag }}
           SOURCE_COMMIT: ${{ needs.build.outputs.commit }}
         run: |
-          if ($env:RELEASE_TAG -notmatch '^(v[0-9][A-Za-z0-9._-]*|milestone-[0-9][A-Za-z0-9._-]*)$') { throw 'Invalid release tag.' }
-          $expected = @("neuralDOOM-$($env:RELEASE_TAG).zip", "neuralDOOM-Setup-$($env:RELEASE_TAG).exe")
-          $files = @(Get-ChildItem release-assets -File)
-          if ($files.Count -ne 4) { throw 'Expected installer, portable ZIP and their checksums.' }
-          foreach ($name in $expected) {
-            $path = Join-Path release-assets $name
-            $checksum = (Get-Content -LiteralPath ($path + '.sha256') -Raw).Trim()
-            $expectedLine = (Get-FileHash -LiteralPath $path).Hash + '  ' + $name
-            if ($checksum -cne $expectedLine) { throw "Checksum mismatch: $name" }
-          }
-          $remoteCommit = gh api "repos/$($env:GH_REPO)/commits/$($env:RELEASE_TAG)" --jq .sha
-          if ($LASTEXITCODE -ne 0 -or $remoteCommit -ne $env:SOURCE_COMMIT) { throw 'Release tag changed during the build.' }
-          $releaseJson = gh release view $env:RELEASE_TAG --json isDraft,assets 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            $release = $releaseJson | ConvertFrom-Json
-            if (-not $release.isDraft) { throw 'Release is already published. Use a new tag; assets will not be replaced.' }
-            if ($release.assets.Count) { throw 'Draft already has assets. Inspect it before retrying; nothing will be overwritten.' }
-          } else {
-            $notes = "Source: $($env:SOURCE_COMMIT). Built on GitHub-hosted Windows from the tagged source. Includes native RTX and SDK-enabled engines with corresponding source. Game data, textures and optional runtimes are acquired during installation. Review these assets and release notes before publishing."
-            $notes | Set-Content release-notes.md -Encoding utf8
-            gh release create $env:RELEASE_TAG --draft --verify-tag --title "neuralDOOM $($env:RELEASE_TAG)" --notes-file release-notes.md
-            if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release.' }
-          }
-          gh release upload $env:RELEASE_TAG @($files.FullName)
-          if ($LASTEXITCODE -ne 0) { throw 'Could not upload release assets.' }
-          "Draft release ready: https://github.com/$($env:GH_REPO)/releases" >> $env:GITHUB_STEP_SUMMARY
+          & ./upload-source/tools/neural-rendering/Publish-ReleaseAssets.ps1 -Repository $env:GH_REPO -Tag $env:RELEASE_TAG -SourceCommit $env:SOURCE_COMMIT -ArtifactDirectory release-assets
+          "Release assets ready: https://github.com/$($env:GH_REPO)/releases/tag/$($env:RELEASE_TAG)" >> $env:GITHUB_STEP_SUMMARY
