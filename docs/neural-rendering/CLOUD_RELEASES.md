@@ -13,7 +13,7 @@ Once this workflow is merged into `main`:
 
 Alternatively, use **Actions > Build release installer > Run workflow** and enter an existing tag from `main`. The workflow must exist on the default branch for the manual action to appear. Saving a draft in GitHub without pushing an actual tag does not trigger a build. This deliberately prepares the assets before publication, including for [immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases).
 
-Existing published releases and populated drafts are never overwritten. If a run fails before upload, retry the run. If upload partially succeeds, inspect the draft and remove its incomplete asset set before retrying, or use a new version tag. Do not publish until all four assets are present. The workflow rechecks that the remote tag still identifies the built commit before uploading.
+Existing published releases and populated drafts are never overwritten. If a run fails before upload because of a transient service error, retry the run. A source/workflow bug requires a reviewed fix and a new tag on the merged commit: rerunning the old tag still builds its old source. If upload partially succeeds, inspect the draft and remove its incomplete asset set before retrying, or use a new version tag. Do not publish until all four assets are present. The workflow rechecks that the remote tag still identifies the built commit before uploading.
 
 ## What runs in the cloud
 
@@ -38,4 +38,21 @@ From a clean Windows checkout with VS2022, a Windows SDK, CMake, Git and Python 
 
 This downloads only the two build dependencies and writes artifacts under `releases/v0.2.0`. It does not upload anything. Use a new output version/directory for each attempt; the packager refuses to overwrite existing artifacts.
 
-The existing local build/package path and recovered texture installer are verified. The workflow is newly added and requires its first GitHub-hosted run after the branch is approved and pushed; cloud execution is not yet claimed as passing.
+The first hosted `v0.0.1` run failed in the public-source audit, before compilation.
+The audit searched for the checkout path literally; at a neutral drive root this
+matched both workflow paths and unrelated C strings ending in `r:` plus an escaped
+newline. The audit now omits volume roots from that exact-path search, retaining
+the checks for actual checkout directories, personal profiles and prohibited
+files. Empty profile paths are also excluded from literal searches.
+
+`Test-PublicSourceAudit.ps1` exercises a real temporary Git repository through a
+SUBST drive root, including personal-path rejection and staged-file isolation.
+The release runs this regression before building. Pull requests changing the
+workflow or audit run the regression and whole-repository mapped-root audit on
+Windows without building/uploading release assets.
+
+The failed run's nine false positives were reproduced locally; regression and
+mapped-root checks pass after the fix. Full hosted compilation/packaging still
+requires a successful release run. The already-published empty `v0.0.1` release
+must not be repurposed: merge the fix and create a new version tag, then wait for
+the four assets in its draft before publishing.
