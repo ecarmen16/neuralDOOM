@@ -79,4 +79,4 @@ Actual unsupported hardware and device loss have not been injected. The runtime
 guard exists; only the local RTX 5090 has been exercised. Missing-shader recovery
 is not proof of recovery from an invalid shader/driver/device failure. See
 `TEST_RESULTS.md` for exact artifacts and remaining visual checks, and
-`DOGFOOD_CHECKLIST.md` for the short manual pass.
+`TEST_PLAN.md` for manual validation.

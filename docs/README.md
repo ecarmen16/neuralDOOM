@@ -1,12 +1,11 @@
 # neuralDoom documentation
 
-Milestone 1 is released. Start with the guide that matches what you want to do.
+Guides for players, contributors and release maintainers.
 
 ## Playing
 
 - [Install, choose a profile, save settings snapshots and restore defaults](PLAYING.md)
 - [Known issues and troubleshooting](KNOWN_ISSUES.md)
-- [Short playtest checklist](neural-rendering/DOGFOOD_CHECKLIST.md)
 - [Reporting performance problems](neural-rendering/PERFORMANCE_FEEDBACK.md)
 
 ## Building and contributing

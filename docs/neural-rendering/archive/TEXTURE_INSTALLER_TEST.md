@@ -8,7 +8,7 @@ Allow approximately 4.3 GB of downloads and 32 GB free for a fresh installation.
 
 ## Attribution and asset loading
 
-D3HDP BFG Lite is by **H3llBaron and the Doom 3 modding community**. Setup displays that credit and preserves the downloaded top-level readme byte-for-byte at `notices/D3HDP-BFG-Lite/Readme.pdf` (or `Readme.txt` for the older layout), along with a [creator and contributor notice](D3HDP_CREDITS.md) and any other included credit documents. The installed manifest records the project URL, archive SHA-256 and installed file hashes. No pack assets or third-party readme contents are committed or bundled in our release payload.
+D3HDP BFG Lite is by **H3llBaron and the Doom 3 modding community**. Setup displays that credit and preserves the downloaded top-level readme byte-for-byte at `notices/D3HDP-BFG-Lite/Readme.pdf` (or `Readme.txt` for the older layout), along with a [creator and contributor notice](../D3HDP_CREDITS.md) and any other included credit documents. The installed manifest records the project URL, archive SHA-256 and installed file hashes. No pack assets or third-party readme contents are committed or bundled in our release payload.
 
 This local experiment loads the content as `base/zzz_neural_d3hdp_*.pk4` overlays. Original PK4 files retain their bytes; supported loose content is assembled into a local PK4. Loose mod launchers and CFGs are preserved under notices rather than executed or applied. Save/config paths remain `captures/dogfood/base`, so existing reset and snapshot tools continue to use the same location. This differs from the author's separate `fs_game` launch method and requires visual validation. No renderer code changes are part of this branch.
 
