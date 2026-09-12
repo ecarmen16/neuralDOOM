@@ -8,9 +8,9 @@ Build a reversible, optional, well-instrumented temporal input path around the e
 
 ## Contribution workflow
 
-- Milestone 1 is merged. Use focused `codex/` branches for follow-up changes. Review and playtest renderer branch builds before opening a PR; do not open a planning or tracking PR.
-- Keep `main` at its reviewed checkpoint. After branch testing, require manual approval of the latest PR changes by `ecarmen16` or `eraser851`; new changes after approval require renewed review.
-- Do not approve, merge, enable auto-merge, or push/cherry-pick milestone changes into `main` as an agent. Only ecarmen16 or eraser851 may perform the final merge. Actions using their credentials through automation are not human approval.
+- Name branches after the change, without tool or model names. Review and playtest renderer changes before opening a PR.
+- Keep `main` reviewed. After branch testing, require manual approval of the latest PR changes by `ecarmen16` or `eraser851`; new changes after approval require renewed review.
+- Only ecarmen16 or eraser851 may perform the final merge. Automated approval or merging does not satisfy this review requirement. Do not push or cherry-pick directly into `main`.
 - Keep `core.hooksPath=.githooks`; the pre-push hook rejects direct pushes to `main`. Do not bypass it. This local guard is not server-side branch protection.
 
 ## Non-negotiable legal and repository constraints
@@ -69,7 +69,7 @@ Do not delete or restructure upstream renderer backends as part of this work. DX
 ## Documentation
 
 - Write documentation for players and contributors. Describe current behavior, interfaces, limitations and reproducible commands.
-- Do not commit conversation summaries, references to the user or maintainer in the third person, personal testing history, session prompts, task diaries, "local only" instructions or future-agent handoffs.
+- Keep documentation about the project. Do not commit conversation summaries, personal testing history, task diaries, temporary-work instructions or handoff notes.
 - Put change-specific build/test results and review notes in the PR description. Keep raw logs, captures and temporary experiments in ignored local storage.
 - Update existing technical reference only when behavior, resource formats or coordinate conventions change. Do not recreate implementation notes, task boards or a development archive.
 - Delete obsolete documentation. Retain historical material only when it contains useful technical reference that is absent from current docs.
@@ -82,7 +82,7 @@ Before declaring a renderer task complete:
 2. Run the relevant debug view or capture scenario.
 3. Confirm the feature-off path still works.
 4. Inspect `git diff --check` and `git status --short`.
-5. Run Codex review or an equivalent focused review of the diff.
+5. Review the diff for correctness, regressions and scope.
 6. Keep commits small and describe the verified behavior, not merely the implementation.
 
 Useful test cases include a static camera, camera rotation, lateral translation, a moving door/lift, a rigid physics object, an animated MD5 character, weapon bob/recoil, transparent glass, smoke, muzzle flashes, emissive animation, and a camera cut/map transition.
