@@ -5066,47 +5066,50 @@ void idRenderBackend::DrawTemporalMask( bool transparencyMask )
 idRenderBackend::DrawTemporalMasks
 ==================
 */
-void idRenderBackend::DrawTemporalMasks()
+bool idRenderBackend::DrawTemporalMasks()
 {
 	const int debugMode = r_neuralDebug.GetInteger();
-	if( !r_neuralTemporalMasks.GetBool() && debugMode != 3 && debugMode != 4 && !r_neuralBackend.GetBool() )
+	if( !r_neuralTemporalMasks.GetBool() && debugMode != 3 && debugMode != 4 && !viewDef->neuralBackendMode )
 	{
-		return;
+		return false;
 	}
 
 	if( !viewDef->viewEntitys || viewDef->isSubview || ( viewDef->renderView.rdflags & ( RDF_NOAMBIENT | RDF_IRRADIANCE ) ) )
 	{
-		return;
+		return false;
 	}
 
 	OPTICK_GPU_EVENT( "Render_TemporalMasks" );
 	renderLog.OpenBlock( "Render_TemporalMasks", colorBlue );
+	Framebuffer* sceneFramebuffer = Framebuffer::GetActiveFramebuffer();
 	DrawTemporalMask( false );
 	DrawTemporalMask( true );
+	sceneFramebuffer->Bind();
 	renderLog.CloseBlock();
+	return true;
 }
 
-void idRenderBackend::DrawMotionVectors()
+bool idRenderBackend::DrawMotionVectors()
 {
 	if( !viewDef->viewEntitys || ( viewDef->renderView.rdflags & RDF_NO_TEMPORAL_HISTORY ) )
 	{
 		// Auxiliary captures must not replace the primary camera's previous MVP.
-		return;
+		return false;
 	}
 
 	if( !viewDef->useTemporalAA && r_motionBlur.GetInteger() <= 0 && r_neuralDebug.GetInteger() != 2 && !viewDef->neuralBackendMode )
 	{
-		return;
+		return false;
 	}
 
 	if( viewDef->isSubview )
 	{
-		return;
+		return false;
 	}
 
 	if( viewDef->renderView.rdflags & ( RDF_NOAMBIENT | RDF_IRRADIANCE ) )
 	{
-		return;
+		return false;
 	}
 
 	//OPTICK_EVENT( "Render_MotionVectors" );
@@ -5241,9 +5244,9 @@ void idRenderBackend::DrawMotionVectors()
 		DrawElementsWithCounters( &unitSquareSurface );
 	}
 
-	const bool drawRigidMotionVectors = r_neuralRigidMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2 || r_neuralBackend.GetBool();
-	const bool drawSkinnedMotionVectors = r_neuralSkinnedMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2 || r_neuralBackend.GetBool();
-	const bool drawViewmodelMotionVectors = r_neuralViewmodelMotionVectors.GetBool() || r_neuralBackend.GetBool();
+	const bool drawRigidMotionVectors = r_neuralRigidMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2 || viewDef->neuralBackendMode;
+	const bool drawSkinnedMotionVectors = r_neuralSkinnedMotionVectors.GetBool() || r_neuralDebug.GetInteger() == 2 || viewDef->neuralBackendMode;
+	const bool drawViewmodelMotionVectors = r_neuralViewmodelMotionVectors.GetBool() || viewDef->neuralBackendMode;
 	if( ( r_taaMotionVectors.GetBool() || viewDef->neuralBackendMode ) && motionViewsValid && ( drawRigidMotionVectors || drawSkinnedMotionVectors || drawViewmodelMotionVectors ) )
 	{
 		renderLog.OpenBlock( "Render_ObjectMotionVectors" );
@@ -5328,9 +5331,10 @@ void idRenderBackend::DrawMotionVectors()
 
 	renderLog.CloseBlock();
 	renderLog.CloseMainBlock();
+	return true;
 }
 
-bool idRenderBackend::EvaluateNeuralTemporalBackend( const viewDef_t* _viewDef, int stereoEye )
+bool idRenderBackend::EvaluateNeuralTemporalBackend( const viewDef_t* _viewDef, int stereoEye, bool motionVectorsValid, bool masksValid )
 {
 	if( _viewDef->viewEntitys && !_viewDef->isSubview )
 	{
@@ -5384,8 +5388,8 @@ bool idRenderBackend::EvaluateNeuralTemporalBackend( const viewDef_t* _viewDef, 
 	frame.motionVectorConvention = NMVC_PREVIOUS_MINUS_CURRENT_PIXELS;
 	frame.depthConvention = NDC_DEVICE_ZERO_TO_ONE_NON_REVERSED;
 	frame.resetHistory = _viewDef->temporalHistoryResetReasons != NTRR_NONE;
-	frame.motionVectorsValid = true;
-	frame.masksValid = true;
+	frame.motionVectorsValid = motionVectorsValid;
+	frame.masksValid = masksValid;
 	frame.viewmodelIncluded = true;
 	frame.exposureIsAutomatic = r_hdrAutoExposure.GetBool();
 	frame.exposureBufferValid = frame.exposure != NULL;
@@ -6473,7 +6477,7 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	//-------------------------------------------------
 	// classify unstable and translucent scene coverage before temporal resolve
 	//-------------------------------------------------
-	DrawTemporalMasks();
+	const bool masksValid = DrawTemporalMasks();
 
 	//-------------------------------------------------
 	// render debug tools
@@ -6483,7 +6487,7 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	//-------------------------------------------------
 	// motion vectors are useful for TAA and motion blur
 	//-------------------------------------------------
-	DrawMotionVectors();
+	const bool motionVectorsValid = DrawMotionVectors();
 
 	// Diagnostic lighting replaces the completed scene so later material stages
 	// do not obscure F10 views. Normal lighting ran before those stages above.
@@ -6500,7 +6504,7 @@ void idRenderBackend::DrawViewInternal( const viewDef_t* _viewDef, const int ste
 	//-------------------------------------------------
 	// offer complete engine-owned inputs to the optional temporal backend
 	//-------------------------------------------------
-	const bool neuralTemporalPresented = EvaluateNeuralTemporalBackend( _viewDef, stereoEye );
+	const bool neuralTemporalPresented = EvaluateNeuralTemporalBackend( _viewDef, stereoEye, motionVectorsValid, masksValid );
 
 	//-------------------------------------------------
 	// resolve of HDR target using temporal anti aliasing before any tonemapping and post processing

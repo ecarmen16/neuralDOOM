@@ -192,10 +192,10 @@ private:
 
 	void				ShadowAtlasPass( const viewDef_t* _viewDef );
 
-	void				DrawMotionVectors();
-	void				DrawTemporalMasks();
+	bool				DrawMotionVectors();
+	bool				DrawTemporalMasks();
 	void				DrawTemporalMask( bool transparencyMask );
-	bool				EvaluateNeuralTemporalBackend( const viewDef_t* _viewDef, int stereoEye );
+	bool				EvaluateNeuralTemporalBackend( const viewDef_t* _viewDef, int stereoEye, bool motionVectorsValid, bool masksValid );
 	void				TemporalAAPass( const viewDef_t* _viewDef );
 
 	// RB: outdated HDR stuff

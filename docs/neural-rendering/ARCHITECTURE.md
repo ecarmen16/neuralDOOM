@@ -22,6 +22,8 @@ D3D12 and vendor-specific calls stay in their adapters. The optional NR profile 
 
 Motion vectors use current-to-previous pixel displacement with positive Y down. The queued view owns the frame identity used for jitter, motion inputs and DLSS submission. History resets on mode changes, viewport changes and scene discontinuities.
 
+Motion and mask validity reflect whether their producer passes completed for the submitted view. Mask generation restores the scene framebuffer before debug rendering and motion-vector alpha coverage. Unsupported DLAA/DLSS modes and failed DLSS size queries fall back to the native resolution policy for that view.
+
 The Streamline adapter defaults DLAA, Quality, Balanced and Performance to preset K. `r_neuralDLSSPerformancePreset 1` selects M for comparison and resets history. Upscaled DLSS uses a stable reflection frame seed; `r_rayTracingReflectionStableNoise 0` restores animated sampling. Native and DLAA retain animated reflection sampling.
 
 ## Ray-traced lighting
