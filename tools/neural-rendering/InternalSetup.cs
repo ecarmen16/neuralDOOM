@@ -84,7 +84,7 @@ class ChoiceButton : Button {
 }
 
 class SetupWindow : Form {
-    readonly Color background = Color.FromArgb(19, 22, 27), panelColor = Color.FromArgb(28, 32, 39), ink = Color.FromArgb(240, 239, 236), muted = Color.FromArgb(158, 167, 181), accent = Color.FromArgb(232, 74, 58);
+    readonly Color background = Color.FromArgb(19, 22, 27), panelColor = Color.FromArgb(28, 32, 39), ink = Color.FromArgb(240, 239, 236), muted = Color.FromArgb(158, 167, 181), accent = Color.FromArgb(232, 74, 58), accentHot = Color.FromArgb(245, 106, 88), accentPressed = Color.FromArgb(198, 56, 42);
     Panel content, sidebar;
     Button next, back, cancel;
     TextBox destination, game, details;
@@ -163,7 +163,11 @@ class SetupWindow : Form {
     }
     Button MakeButton(string text, int x, int y, int width, bool primary) {
         Button b = new Button { Text = text, Location = new Point(x, y), Size = new Size(width, 40), FlatStyle = FlatStyle.Flat, BackColor = primary ? accent : panelColor, ForeColor = ink, Cursor = Cursors.Hand };
-        b.FlatAppearance.BorderSize = primary ? 0 : 1; b.FlatAppearance.BorderColor = Color.FromArgb(63, 69, 80); return b;
+        b.FlatAppearance.BorderSize = primary ? 0 : 1; b.FlatAppearance.BorderColor = Color.FromArgb(63, 69, 80);
+        // Give buttons visible hover/press feedback; the wizard reads as flat otherwise.
+        b.FlatAppearance.MouseOverBackColor = primary ? accentHot : Color.FromArgb(38, 44, 53);
+        b.FlatAppearance.MouseDownBackColor = primary ? accentPressed : Color.FromArgb(44, 51, 62);
+        return b;
     }
     Label TextAt(string text, int y, int height, float size, Color color) {
         Label label = new Label { Text = text, Location = new Point(32, y), Size = new Size(594, height), ForeColor = color, Font = new Font("Segoe UI", size), AutoEllipsis = true };
@@ -200,10 +204,14 @@ class SetupWindow : Form {
         using (Pen line = new Pen(Color.FromArgb(46, 32, 34), 2)) { for (int i = 0; i < 8; i++) g.DrawLine(line, -50, 330 + i * 32, 260, 160 + i * 32); }
         using (Font title = new Font("Segoe UI", 24, FontStyle.Bold)) g.DrawString("neural\nDOOM", title, Brushes.White, 23, 34);
         using (Brush red = new SolidBrush(accent)) g.FillRectangle(red, 26, 146, 40, 4);
+        using (Brush glow = new SolidBrush(Color.FromArgb(60, accent))) g.FillRectangle(glow, 26, 150, 40, 2);
         string[] steps = { "01   Welcome", "02   Install or manage", "03   Location", "04   Rendering", "05   Texture pack", "06   Review", "07   Installation" };
         int active = page == 7 ? 1 : page == 1 ? 2 : page == 6 ? 3 : page == 8 ? 4 : page == 2 ? 5 : page >= 3 ? 6 : 0;
         for (int i = 0; i < steps.Length; i++) using (Brush brush = new SolidBrush(i == active ? ink : muted)) {
-            using (Font font = new Font("Segoe UI", 10, i == active ? FontStyle.Bold : FontStyle.Regular)) g.DrawString(steps[i], font, brush, 26, 208 + 42 * i);
+            int y = 208 + 42 * i;
+            using (Font font = new Font("Segoe UI", 10, i == active ? FontStyle.Bold : FontStyle.Regular)) g.DrawString(steps[i], font, brush, 38, y);
+            if (i == active) using (Brush marker = new SolidBrush(accent)) g.FillRectangle(marker, 24, y + 3, 4, 16);
+            else if (i < active) using (Font tick = new Font("Segoe UI", 9, FontStyle.Bold)) g.DrawString("✓", tick, brush, 22, y + 1);
         }
         using (Brush brush = new SolidBrush(muted))
         using (Font font = new Font("Segoe UI", 8)) g.DrawString("RTX + NEURAL RENDERING\nINTERNAL TEST BUILD", font, brush, 26, sidebar.Height - 66);
