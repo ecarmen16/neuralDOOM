@@ -97,7 +97,8 @@ public:
 			resetPending = true;
 		}
 		const int requestedQuality = idMath::ClampInt( 0, 2, frame.dlssQuality );
-		if( configuredPerformancePreset != r_neuralDLSSPerformancePreset.GetInteger() || configuredMode != requestedMode || configuredQuality != requestedQuality || renderWidth != frame.renderWidth || renderHeight != frame.renderHeight || outputWidth != frame.outputWidth || outputHeight != frame.outputHeight )
+		const bool useAutoExposure = frame.exposureIsAutomatic || !frame.exposureBufferValid || !frame.exposure;
+		if( configuredPerformancePreset != r_neuralDLSSPerformancePreset.GetInteger() || configuredMode != requestedMode || configuredQuality != requestedQuality || configuredAutoExposure != useAutoExposure || renderWidth != frame.renderWidth || renderHeight != frame.renderHeight || outputWidth != frame.outputWidth || outputHeight != frame.outputHeight )
 		{
 			optionsDirty = true;
 			resetPending = true;
@@ -118,7 +119,7 @@ public:
 			options.qualityPreset = sl::DLSSPreset::ePresetK;
 			options.balancedPreset = sl::DLSSPreset::ePresetK;
 			options.performancePreset = r_neuralDLSSPerformancePreset.GetInteger() == 0 ? sl::DLSSPreset::ePresetK : sl::DLSSPreset::ePresetM;
-			options.useAutoExposure = sl::Boolean::eTrue;
+			options.useAutoExposure = useAutoExposure ? sl::Boolean::eTrue : sl::Boolean::eFalse;
 			options.alphaUpscalingEnabled = sl::Boolean::eFalse;
 			const sl::Result optionsResult = slDLSSSetOptions( sl::ViewportHandle( 0 ), options );
 			if( optionsResult != sl::Result::eOk )
@@ -129,6 +130,7 @@ public:
 			configuredMode = requestedMode;
 			configuredQuality = requestedQuality;
 			configuredPerformancePreset = r_neuralDLSSPerformancePreset.GetInteger();
+			configuredAutoExposure = useAutoExposure;
 			configuredExposureScale = frame.exposureScale;
 		}
 		renderWidth = frame.renderWidth;
@@ -194,6 +196,10 @@ public:
 		frame.commandList->setTextureState( frame.reactiveMask.Get(), nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource );
 		frame.commandList->setTextureState( frame.transparencyMask.Get(), nvrhi::AllSubresources, nvrhi::ResourceStates::ShaderResource );
 		frame.commandList->setTextureState( frame.output.Get(), nvrhi::AllSubresources, nvrhi::ResourceStates::UnorderedAccess );
+		if( !useAutoExposure )
+		{
+			frame.commandList->setBufferState( frame.exposure.Get(), nvrhi::ResourceStates::ShaderResource );
+		}
 		frame.commandList->commitBarriers();
 
 		const D3D12_RESOURCE_STATES shaderResourceState = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
@@ -214,6 +220,16 @@ public:
 			sl::ResourceTag( &reactiveMask, sl::kBufferTypeReactiveMaskHint, sl::ResourceLifecycle::eValidUntilEvaluate, &renderExtent ),
 			sl::ResourceTag( &transparencyMask, sl::kBufferTypeTransparencyAndCompositionMaskHint, sl::ResourceLifecycle::eValidUntilEvaluate, &renderExtent )
 		};
+		// Manual exposure mode supplies the engine's adapted-luminance buffer so
+		// DLSS uses the same exposure as the tonemapper rather than its own probe.
+		// A buffer tag has no texel extent (extent stays zero/null).
+		sl::Resource exposureBufferResource( sl::ResourceType::eBuffer, nullptr );
+		sl::ResourceTag exposureTag( NULL, 0, sl::ResourceLifecycle::eValidUntilEvaluate );
+		if( !useAutoExposure )
+		{
+			exposureBufferResource = MakeBufferResource( frame.exposure.Get(), shaderResourceState );
+			exposureTag = sl::ResourceTag( &exposureBufferResource, sl::kBufferTypeExposure, sl::ResourceLifecycle::eValidUntilEvaluate );
+		}
 
 		void* nativeCommandList = frame.commandList->getNativeObject( nvrhi::ObjectTypes::D3D12_GraphicsCommandList );
 		if( nativeCommandList == NULL )
@@ -229,7 +245,14 @@ public:
 		{
 			return Reject( "slSetConstants", result );
 		}
-		result = slSetTagForFrame( *frameToken, viewport, tags, sizeof( tags ) / sizeof( tags[0] ), nativeCommandList );
+		sl::ResourceTag allTags[7];
+		uint32 tagCount = sizeof( tags ) / sizeof( tags[0] );
+		memcpy( allTags, tags, sizeof( tags ) );
+		if( !useAutoExposure )
+		{
+			allTags[tagCount++] = exposureTag;
+		}
+		result = slSetTagForFrame( *frameToken, viewport, allTags, tagCount, nativeCommandList );
 		if( result != sl::Result::eOk )
 		{
 			return Reject( "slSetTagForFrame", result );
@@ -280,6 +303,11 @@ private:
 		return sl::Resource( sl::ResourceType::eTex2d, texture->getNativeObject( nvrhi::ObjectTypes::D3D12_Resource ), nullptr, nullptr, uint32( state ) );
 	}
 
+	static sl::Resource MakeBufferResource( nvrhi::IBuffer* buffer, D3D12_RESOURCE_STATES state )
+	{
+		return sl::Resource( sl::ResourceType::eBuffer, buffer->getNativeObject( nvrhi::ObjectTypes::D3D12_Resource ), nullptr, nullptr, uint32( state ) );
+	}
+
 	bool Reject( const char* operation, sl::Result result )
 	{
 		rejectedFrames++;
@@ -305,6 +333,7 @@ private:
 	int			configuredMode;
 	int			configuredQuality = -1;
 	int			configuredPerformancePreset = -1;
+	bool		configuredAutoExposure = true;
 	float		configuredExposureScale;
 	int			renderWidth;
 	int			renderHeight;

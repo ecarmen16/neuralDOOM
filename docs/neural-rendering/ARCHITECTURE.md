@@ -17,7 +17,7 @@ D3D12 and vendor-specific calls stay in their adapters. The optional NR profile 
 | Motion vectors | `_taaMotionVectors` | `RG16_FLOAT` | native render size | current-to-previous displacement in pixels; +Y down | frame/history | temporal backend | invalid history clears to zero |
 | Reactive mask | `_neuralReactiveMask` | `R8_UNORM` | native render size | 0..1 unstable coverage | frame | temporal backend | broad material classifier |
 | Transparency mask | `_neuralTransparencyMask` | `R8_UNORM` | native render size | 0..1 alpha/glass coverage | frame | temporal backend | excludes additive-only work |
-| Exposure | `TonemapPass::exposureBuffer` plus scalar | typed `R32_UINT` buffer containing float bits | one value/frame | manual scale is `exp2(r_exposure)`; buffer carries adapted luminance | persistent GPU buffer | temporal backend | current evaluation sees most recently completed adaptation |
+| Exposure | `TonemapPass::exposureBuffer` plus scalar | typed `R32_UINT` buffer containing float bits | one value/frame | manual scale is `exp2(r_exposure)`; buffer carries adapted luminance | persistent GPU buffer | temporal backend | current evaluation sees most recently completed adaptation; tagged to DLSS only when `r_hdrAutoExposure 0`, otherwise DLSS auto-exposure owns adaptation |
 | Output | `_taaResolved` | `RGBA16_FLOAT` | current native output size | linear HDR before tone map/UI | frame | later tone map/post/UI | backend `false` return preserves TAA fallback |
 
 Motion vectors use current-to-previous pixel displacement with positive Y down. The queued view owns the frame identity used for jitter, motion inputs and DLSS submission. History resets on mode changes, viewport changes and scene discontinuities.

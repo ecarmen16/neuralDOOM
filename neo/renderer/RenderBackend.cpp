@@ -4935,6 +4935,7 @@ void idRenderBackend::DrawTemporalMask( bool transparencyMask )
 	Framebuffer* maskFramebuffer = transparencyMask ? globalFramebuffers.neuralTransparencyMaskFBO : globalFramebuffers.neuralReactiveMaskFBO;
 	idImage* maskImage = transparencyMask ? globalImages->neuralTransparencyMaskImage : globalImages->neuralReactiveMaskImage;
 
+	Framebuffer* previousFramebuffer = Framebuffer::GetActiveFramebuffer();
 	maskFramebuffer->Bind();
 	commandList->clearTextureFloat( maskImage->GetTextureHandle(), nvrhi::AllSubresources, nvrhi::Color( 0.f ) );
 
@@ -5059,6 +5060,10 @@ void idRenderBackend::DrawTemporalMask( bool transparencyMask )
 	GL_Color( 1.0f, 1.0f, 1.0f );
 	GL_State( GLS_DEFAULT );
 	GL_SelectTexture( 0 );
+
+	// Restore the framebuffer that was active on entry so subsequent passes
+	// never render into the R8 mask by accident.
+	previousFramebuffer->Bind();
 }
 
 /*
@@ -5081,10 +5086,8 @@ bool idRenderBackend::DrawTemporalMasks()
 
 	OPTICK_GPU_EVENT( "Render_TemporalMasks" );
 	renderLog.OpenBlock( "Render_TemporalMasks", colorBlue );
-	Framebuffer* sceneFramebuffer = Framebuffer::GetActiveFramebuffer();
 	DrawTemporalMask( false );
 	DrawTemporalMask( true );
-	sceneFramebuffer->Bind();
 	renderLog.CloseBlock();
 	return true;
 }
