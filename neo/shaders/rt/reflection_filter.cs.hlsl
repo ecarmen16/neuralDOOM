@@ -18,6 +18,9 @@ void main(uint3 tid : SV_DispatchThreadID)
     if (any(tid.xy >= (uint2)Viewport.zw)) return;
     int2 p = int2(tid.xy), size = int2(Viewport.zw);
     float4 center = Raw[p], guide = Guide[p];
+    // Negative alpha marks incident radiance that includes moving geometry.
+    const bool dynamicReceiver = center.a < 0;
+    center.a = abs(center.a);
     Filtered[p] = center;
     // Rejected receivers and current misses never inherit another surface's reflection.
     if (guide.z <= 0 || center.a <= 0) return;
@@ -30,6 +33,7 @@ void main(uint3 tid : SV_DispatchThreadID)
     {
         int2 q = clamp(p + int2(x, y), 0, size - 1);
         float4 sampleGuide = Guide[q], value = Raw[q];
+        value.a = abs(value.a);
         if (sampleGuide.z <= 0 || value.a <= 0) continue;
         float similarity = dot(normal, DecodeReflectionNormal(sampleGuide.xy));
         if (similarity < 0.9 || abs(sampleGuide.w - guide.w) > 0.08) continue;
@@ -39,7 +43,8 @@ void main(uint3 tid : SV_DispatchThreadID)
         if (w > 0.1) { low = min(low, value); high = max(high, value); }
     }
     float4 filtered = sum / max(weights, 1e-6);
-    if (HistoryOptions.x > 0)
+    // Cross-frame reuse is only stable while neither frame sampled moving geometry.
+    if (HistoryOptions.x > 0 && !dynamicReceiver)
     {
         uint2 pixel = tid.xy + (uint2)Viewport.xy;
         float2 uv = (float2(tid.xy) + 0.5) / Viewport.zw;
