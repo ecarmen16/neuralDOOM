@@ -333,6 +333,7 @@ public:
 		return true;
 	}
 	uint32 StaticVertexCount() const { return staticVertexCount; }
+	uint32 StaticTriangleCount() const { return staticIndexCount / 3; }
 
 	bool Trace( const std::vector<rtRay_t>& rays, std::vector<rtHit_t>& hits )
 	{
@@ -1393,14 +1394,16 @@ private:
 			}
 		}
 		rtReflectionConstants_t reflectionCB = {};
+		// Secondary dynamic hits cannot be reprojected reliably yet. Reject both
+		// dynamic frames and history produced while moving geometry was present.
 		const bool historyValid = dynamicSurfaceCount == 0 && lastReflectionFrame >= 0 && view->taaFrameCount == lastReflectionFrame + 1 &&
 			reflectionEpoch == view->temporalHistoryEpoch && reflectionViewport == cb.viewport;
 		reflectionCB.previousWorldToClip = historyValid ? previousReflectionMatrix : cb.worldToClip;
 		reflectionCB.previousCamera = historyValid ? previousReflectionCamera : cb.cameraRadius;
 		reflectionCB.options = idVec4( r_rayTracedReflectionSamples.GetInteger(), r_rayTracedReflectionStrength.GetFloat(),
 			r_rayTracedReflectionRoughness.GetFloat(), r_rayTracedReflectionDistance.GetFloat() );
-		const bool stableSamples = r_rayTracingReflectionStableNoise.GetBool() && view->neuralBackendMode == 3;
-		reflectionCB.historyOptions = idVec4( historyValid ? 1 : 0, stableSamples ? 0 : view->taaFrameCount & 0xffff, r_rayTracingDebug.GetInteger(), 0 );
+		const bool stableSamples = r_rayTracingReflectionStableNoise.GetBool() && view->neuralBackendMode == 3 && dynamicSurfaceCount == 0;
+		reflectionCB.historyOptions = idVec4( historyValid ? 1 : 0, stableSamples ? 0 : view->taaFrameCount & 0xffff, r_rayTracingDebug.GetInteger(), float( scene.StaticTriangleCount() ) );
 		list->writeBuffer( reflectionConstants, &reflectionCB, sizeof( reflectionCB ) );
 		list->clearBufferUInt( reflectionStats, 0 );
 		const int index = reflectionFrames & 1;
@@ -1423,6 +1426,7 @@ private:
 		previousReflectionCamera = cb.cameraRadius;
 		reflectionViewport = cb.viewport;
 		lastReflectionFrame = view->taaFrameCount;
+		if( dynamicSurfaceCount != 0 ) { lastReflectionFrame = -1; }
 		reflectionEpoch = view->temporalHistoryEpoch;
 		reflectionFrames++;
 		return true;

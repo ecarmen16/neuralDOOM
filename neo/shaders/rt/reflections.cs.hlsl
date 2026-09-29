@@ -70,6 +70,7 @@ void main(uint3 tid : SV_DispatchThreadID)
     float alpha = roughness * roughness;
     float3 sum = 0;
     float totalWeight = 0, hitWeight = 0;
+    bool hitDynamic = false;
     // A GGX-prefiltered radiance estimate using the native split-sum BRDF
     // response. This is a hybrid reflection, not an unbiased path tracer.
     for (uint i = 0; i < (uint)ReflectionOptions.x; ++i)
@@ -99,11 +100,17 @@ void main(uint3 tid : SV_DispatchThreadID)
         }
         if (sampled) InterlockedAdd(Stats[2], 1);
         if (reflected.CommittedStatus() != COMMITTED_TRIANGLE_HIT) continue;
+        const uint hitPrimitive = reflected.CommittedInstanceID() + reflected.CommittedPrimitiveIndex();
+        const bool dynamicHit = hitPrimitive >= (uint)HistoryOptions.w;
+        if (dynamicHit) hitDynamic = true;
         float3 hitNormal, hitAlbedo, emission;
-        if (!Surface(reflected.CommittedInstanceID() + reflected.CommittedPrimitiveIndex(), reflected.CommittedTriangleBarycentrics(), direction, hitNormal, hitAlbedo, emission)) continue;
+        if (!Surface(hitPrimitive, reflected.CommittedTriangleBarycentrics(), direction, hitNormal, hitAlbedo, emission)) continue;
         float3 hit = ray.Origin + direction * reflected.CommittedRayT();
         float3 cached;
-        float cacheWeight = CachedRadiance(hit, cached);
+        // The completed-scene radiance cache only tracks static pixels; a moving
+        // receiver would reproject the background it just vacated. Treat dynamic
+        // hits as uncached and shade them explicitly instead.
+        float cacheWeight = dynamicHit ? 0 : CachedRadiance(hit, cached);
         // Normal lighting precedes generic emissives; late diagnostics already
         // have their visible emission in the completed-scene cache.
         float3 cachedEmission = AtlasOptions.y == 0 ? emission : 0;
@@ -128,6 +135,8 @@ void main(uint3 tid : SV_DispatchThreadID)
     // another surface's reflectivity or old Fresnel response.
     float3 contribution = sum / max(totalWeight, 1e-6) * fade;
     if (any(!isfinite(contribution))) { InterlockedAdd(Stats[5], 1); return; }
-    Reflection[tid.xy] = float4(contribution, coverage);
+    // Negative coverage marks receivers whose incident radiance includes moving
+    // geometry; the filter keeps spatial convergence but skips cross-frame reuse.
+    Reflection[tid.xy] = float4(contribution, hitDynamic ? -coverage : coverage);
     if (sampled && coverage > 0) InterlockedAdd(Stats[4], 1);
 }

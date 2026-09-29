@@ -6,10 +6,10 @@ neuralDoom is the downstream project; RBDOOM-3-BFG remains its upstream source. 
 
 - `origin`: the configured downstream repository; inspect it with `git remote -v`.
 - `upstream`: `https://github.com/RobertBeckebans/RBDOOM-3-BFG.git`.
-- `main`: reviewed downstream checkpoints.
-- `codex/...`: focused development branches. Do not rewrite upstream history to rename the project.
+- `main`: reviewed project source.
+- Development branches: choose a name describing the change, such as `fix/reflection-shimmer` or `docs/controls`. No tool-specific prefix is required.
 
-Use focused `codex/…` branches for follow-up work and open implementation PRs after relevant verification. The latest PR changes require manual approval from `ecarmen16` or `eraser851`; subsequent changes require renewed review. Only those reviewers perform the final merge. Agents must not approve, merge, enable auto-merge or push directly to `main`.
+Use your preferred editor and development workflow. Submit changes through pull requests after relevant verification. The latest PR changes require review and approval from `ecarmen16` or `eraser851`; subsequent changes require renewed review. Only those reviewers perform the final merge. Do not push directly to `main` or rewrite upstream history to rename the project.
 
 Install the repository's commit and push checks once per checkout:
 

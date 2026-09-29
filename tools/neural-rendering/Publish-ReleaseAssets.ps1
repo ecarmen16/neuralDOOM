@@ -20,8 +20,23 @@ foreach ($name in $expected) {
 }
 $remoteCommit = & gh api "repos/$Repository/commits/$Tag" --jq .sha
 if ($LASTEXITCODE -ne 0 -or $remoteCommit -ne $SourceCommit) { throw 'Release tag changed during the build.' }
-$releaseJson = & gh api "repos/$Repository/releases/tags/$Tag" 2>$null
-if ($LASTEXITCODE -ne 0) {
+function Find-Release {
+    # The tag endpoint returns only published releases. List releases to include
+    # drafts visible to this token, and fail closed on lookup errors/duplicates.
+    $json = & gh api "repos/$Repository/releases" --paginate --slurp
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect releases; no draft will be created.' }
+    $pages = $json | ConvertFrom-Json
+    $matchingReleases = @(foreach ($page in $pages) {
+        foreach ($item in $page) {
+            if ($item.tag_name -ceq $Tag) { $item }
+        }
+    })
+    if ($matchingReleases.Count -gt 1) { throw 'Multiple releases use this tag. Resolve duplicate drafts before uploading.' }
+    if ($matchingReleases.Count -eq 1) { return $matchingReleases[0] }
+    return $null
+}
+$release = Find-Release
+if ($null -eq $release) {
     $notes = "Source: $SourceCommit. Built on GitHub-hosted Windows from tagged source. Includes native RTX and SDK-enabled engines with corresponding source. Game data, textures and optional runtimes are acquired during installation."
     $notesFile = [IO.Path]::GetTempFileName()
     try {
@@ -29,10 +44,9 @@ if ($LASTEXITCODE -ne 0) {
         & gh release create $Tag --repo $Repository --draft --verify-tag --title "neuralDOOM $Tag" --notes-file $notesFile
         if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release.' }
     } finally { Remove-Item -LiteralPath $notesFile -Force }
-    $releaseJson = & gh api "repos/$Repository/releases/tags/$Tag"
-    if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect created release.' }
+    $release = Find-Release
+    if ($null -eq $release) { throw 'Cannot inspect created release.' }
 }
-$release = $releaseJson | ConvertFrom-Json
 $missing = @()
 foreach ($file in $files) {
     $existing = @($release.assets | Where-Object { $_.name -ceq $file.Name })
@@ -48,9 +62,8 @@ if ($missing.Count) {
     # No --clobber: concurrent uploads or conflicting names must fail safely.
     & gh release upload $Tag --repo $Repository @missing
     if ($LASTEXITCODE -ne 0) { throw 'Could not upload release assets. Retry to verify existing files and upload only missing files.' }
-    $verifiedJson = & gh api "repos/$Repository/releases/tags/$Tag"
-    if ($LASTEXITCODE -ne 0) { throw 'Could not verify uploaded release assets.' }
-    $verified = $verifiedJson | ConvertFrom-Json
+    $verified = Find-Release
+    if ($null -eq $verified) { throw 'Could not verify uploaded release assets.' }
     foreach ($file in $files) {
         $asset = @($verified.assets | Where-Object { $_.name -ceq $file.Name })
         if ($asset.Count -ne 1 -or $asset[0].state -ne 'uploaded' -or
