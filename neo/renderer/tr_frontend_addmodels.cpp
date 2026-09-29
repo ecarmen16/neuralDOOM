@@ -528,14 +528,9 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 	if( jointModel != NULL && jointModel->jointsInverted != NULL && jointModel->numInvertedJoints > 0 )
 	{
 		const int numJoints = jointModel->numInvertedJoints;
-		// Parallel R_AddSingleModel can visit the same entityDef twice in one frame
-		// (mirrors/subviews). A loop-free load first avoids a CAS on the read-mostly
-		// path; only the thread that flips the frame number performs the history swap.
-		int previousJointFrame = *reinterpret_cast<volatile int*>( &entityDef->motionVectorJointFrameNum );
-		if( previousJointFrame != tr.frameCount &&
-			Sys_InterlockedCompareExchange( reinterpret_cast<interlockedInt_t&>( entityDef->motionVectorJointFrameNum ), previousJointFrame, tr.frameCount ) == previousJointFrame )
+		if( entityDef->motionVectorJointFrameNum != tr.frameCount )
 		{
-			entityDef->motionVectorJointHistoryValid = temporalHistoryEpochValid && previousJointFrame == tr.frameCount - 1 &&
+			entityDef->motionVectorJointHistoryValid = temporalHistoryEpochValid && entityDef->motionVectorJointFrameNum == tr.frameCount - 1 &&
 				entityDef->motionVectorJoints.Num() == numJoints;
 
 			entityDef->previousMotionVectorJoints.SetNum( numJoints );
@@ -550,7 +545,7 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 
 			entityDef->motionVectorJoints.SetNum( numJoints );
 			memcpy( entityDef->motionVectorJoints.Ptr(), jointModel->jointsInverted, numJoints * sizeof( idJointMat ) );
-			SYS_MEMORYBARRIER;
+			entityDef->motionVectorJointFrameNum = tr.frameCount;
 		}
 
 		vEntity->jointMotionVectorHistoryValid = entityDef->motionVectorJointHistoryValid;
@@ -611,15 +606,12 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 	vEntity->weaponDepthHack = renderEntity->weaponDepthHack;
 	vEntity->skipMotionBlur = renderEntity->skipMotionBlur;
 
-	// Same parallel duplicate-view hazard as the joint history above: claim the
-	// frame number atomically so only one job performs the previous/current swap.
-	int previousModelFrame = *reinterpret_cast<volatile int*>( &entityDef->motionVectorFrameNum );
-	if( previousModelFrame != tr.frameCount &&
-		Sys_InterlockedCompareExchange( reinterpret_cast<interlockedInt_t&>( entityDef->motionVectorFrameNum ), previousModelFrame, tr.frameCount ) == previousModelFrame )
+	if( entityDef->motionVectorFrameNum != tr.frameCount )
 	{
-		entityDef->motionVectorHistoryValid = temporalHistoryEpochValid && previousModelFrame == tr.frameCount - 1;
+		entityDef->motionVectorHistoryValid = temporalHistoryEpochValid && entityDef->motionVectorFrameNum == tr.frameCount - 1;
 		entityDef->previousMotionVectorModelMatrix = entityDef->motionVectorHistoryValid ? entityDef->motionVectorModelMatrix : entityDef->modelRenderMatrix;
 		entityDef->motionVectorModelMatrix = entityDef->modelRenderMatrix;
+		entityDef->motionVectorFrameNum = tr.frameCount;
 		entityDef->motionVectorHistoryEpoch = tr.GetTemporalHistoryEpoch();
 
 		if( entityDef->motionVectorHistoryValid )
@@ -633,7 +625,6 @@ void R_AddSingleModel( viewEntity_t* vEntity )
 				entityDef->previousMotionVectorModelMatrix = entityDef->motionVectorModelMatrix;
 			}
 		}
-		SYS_MEMORYBARRIER;
 	}
 
 	vEntity->previousModelRenderMatrix = entityDef->previousMotionVectorModelMatrix;

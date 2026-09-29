@@ -1394,9 +1394,9 @@ private:
 			}
 		}
 		rtReflectionConstants_t reflectionCB = {};
-		// Static receivers keep their temporal history under moving ray geometry;
-		// only their secondary-hit radiance stops reusing history across moving hits.
-		const bool historyValid = lastReflectionFrame >= 0 && view->taaFrameCount == lastReflectionFrame + 1 &&
+		// Secondary dynamic hits cannot be reprojected reliably yet. Reject both
+		// dynamic frames and history produced while moving geometry was present.
+		const bool historyValid = dynamicSurfaceCount == 0 && lastReflectionFrame >= 0 && view->taaFrameCount == lastReflectionFrame + 1 &&
 			reflectionEpoch == view->temporalHistoryEpoch && reflectionViewport == cb.viewport;
 		reflectionCB.previousWorldToClip = historyValid ? previousReflectionMatrix : cb.worldToClip;
 		reflectionCB.previousCamera = historyValid ? previousReflectionCamera : cb.cameraRadius;
@@ -1426,6 +1426,7 @@ private:
 		previousReflectionCamera = cb.cameraRadius;
 		reflectionViewport = cb.viewport;
 		lastReflectionFrame = view->taaFrameCount;
+		if( dynamicSurfaceCount != 0 ) { lastReflectionFrame = -1; }
 		reflectionEpoch = view->temporalHistoryEpoch;
 		reflectionFrames++;
 		return true;

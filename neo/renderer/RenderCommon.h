@@ -280,12 +280,12 @@ public:
 	idRenderMatrix			modelRenderMatrix;
 	idRenderMatrix			motionVectorModelMatrix;
 	idRenderMatrix			previousMotionVectorModelMatrix;
-	int						motionVectorFrameNum;	// claimed once per frame via Sys_InterlockedCompareExchange; parallel R_AddSingleModel must not re-run the history swap
+	int						motionVectorFrameNum;
 	bool					motionVectorHistoryValid;
 	uint64					motionVectorHistoryEpoch;
 	idList<idJointMat, TAG_RENDER>	motionVectorJoints;
 	idList<idJointMat, TAG_RENDER>	previousMotionVectorJoints;
-	int						motionVectorJointFrameNum;	// claimed once per frame alongside motionVectorFrameNum
+	int						motionVectorJointFrameNum;
 	bool					motionVectorJointHistoryValid;
 	idRenderMatrix			inverseBaseModelProject;// transforms the unit cube to exactly cover the model in world space
 

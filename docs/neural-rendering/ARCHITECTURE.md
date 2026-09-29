@@ -17,14 +17,14 @@ D3D12 and vendor-specific calls stay in their adapters. The optional NR profile 
 | Motion vectors | `_taaMotionVectors` | `RG16_FLOAT` | native render size | current-to-previous displacement in pixels; +Y down | frame/history | temporal backend | invalid history clears to zero |
 | Reactive mask | `_neuralReactiveMask` | `R8_UNORM` | native render size | 0..1 unstable coverage | frame | temporal backend | broad material classifier |
 | Transparency mask | `_neuralTransparencyMask` | `R8_UNORM` | native render size | 0..1 alpha/glass coverage | frame | temporal backend | excludes additive-only work |
-| Exposure | `TonemapPass::exposureBuffer` plus scalar | typed `R32_UINT` buffer containing float bits | one value/frame | manual scale is `exp2(r_exposure)`; buffer carries adapted luminance | persistent GPU buffer | temporal backend | current evaluation sees most recently completed adaptation; tagged to DLSS only when `r_hdrAutoExposure 0`, otherwise DLSS auto-exposure owns adaptation |
+| Exposure | `TonemapPass::exposureBuffer` plus scalar | typed `R32_UINT` buffer containing float bits | one value/frame | manual scale is `exp2(r_exposure)`; buffer carries adapted luminance | persistent GPU buffer | temporal backend | engine tone mapping owns this adapted-luminance buffer; DLSS always uses its own auto-exposure and does not receive this buffer |
 | Output | `_taaResolved` | `RGBA16_FLOAT` | current native output size | linear HDR before tone map/UI | frame | later tone map/post/UI | backend `false` return preserves TAA fallback |
 
 Motion vectors use current-to-previous pixel displacement with positive Y down. The queued view owns the frame identity used for jitter, motion inputs and DLSS submission. History resets on mode changes, viewport changes and scene discontinuities.
 
 Motion and mask validity reflect whether their producer passes completed for the submitted view. Mask generation restores the scene framebuffer before debug rendering and motion-vector alpha coverage. Unsupported DLAA/DLSS modes and failed DLSS size queries fall back to the native resolution policy for that view.
 
-The Streamline adapter defaults DLAA, Quality, Balanced and Performance to preset K. `r_neuralDLSSPerformancePreset 1` selects M for comparison and resets history. Upscaled DLSS uses a stable reflection frame seed; `r_rayTracingReflectionStableNoise 0` restores animated sampling. Native and DLAA retain animated reflection sampling.
+The Streamline adapter defaults DLAA, Quality, Balanced and Performance to preset K. `r_neuralDLSSPerformancePreset 1` selects M for comparison and resets history. Upscaled DLSS uses a stable reflection frame seed when no dynamic ray geometry is present; `r_rayTracingReflectionStableNoise 0` restores animated sampling. Native and DLAA retain animated reflection sampling.
 
 ## Ray-traced lighting
 
