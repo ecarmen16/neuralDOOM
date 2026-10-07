@@ -26,7 +26,14 @@ The hook checks staged whitespace and staged source content. Game resources, cap
 
 The pre-push hook rejects updates and deletions targeting `main`; publish a
 development branch and use the manually reviewed PR instead. Do not bypass the
-hook. The repository is public. Local hooks are not server-side branch protection; verify GitHub rules before relying on remote enforcement.
+hook. The repository is public. Local hooks are not server-side branch protection.
+Protect `main` on GitHub with a required pull request, at least one approving
+review, dismissal of stale approvals, approval of the latest push, and enforcement
+for administrators. Require code-owner review; `.github/CODEOWNERS` names the
+two maintainers. Keep merge access limited to those maintainers and perform the
+final merge manually. Verify the live GitHub rules after setup or access changes.
+Enable required renderer CI checks once the workflow is present on `main`, so
+branches being consolidated are not blocked by checks that do not yet exist.
 
 ## Build and verify
 
