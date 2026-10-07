@@ -104,13 +104,17 @@ void main(uint3 tid : SV_DispatchThreadID)
         const bool dynamicHit = hitPrimitive >= (uint)HistoryOptions.w;
         if (dynamicHit) hitDynamic = true;
         float3 hitNormal, hitAlbedo, emission;
-        if (!Surface(hitPrimitive, reflected.CommittedTriangleBarycentrics(), direction, hitNormal, hitAlbedo, emission)) continue;
+        bool supportedMaterial;
+        if (!Surface(hitPrimitive, reflected.CommittedTriangleBarycentrics(), direction, hitNormal, hitAlbedo, emission, supportedMaterial)) continue;
         float3 hit = ray.Origin + direction * reflected.CommittedRayT();
-        float3 cached;
+        float3 cached = 0;
         // The completed-scene radiance cache only tracks static pixels; a moving
         // receiver would reproject the background it just vacated. Treat dynamic
         // hits as uncached and shade them explicitly instead.
         float cacheWeight = dynamicHit ? 0 : CachedRadiance(hit, cached);
+        // Missing authored shading is not a black material. Only a complete
+        // native cache can replace probes without a supported fallback.
+        if (!supportedMaterial && cacheWeight < 0.999) continue;
         // Normal lighting precedes generic emissives; late diagnostics already
         // have their visible emission in the completed-scene cache.
         float3 cachedEmission = AtlasOptions.y == 0 ? emission : 0;

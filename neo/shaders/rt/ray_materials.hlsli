@@ -31,8 +31,9 @@ float3 Linear(float3 c)
         c.g <= 0.04045 ? c.g / 12.92 : pow((c.g + 0.055) / 1.055, 2.4),
         c.b <= 0.04045 ? c.b / 12.92 : pow((c.b + 0.055) / 1.055, 2.4));
 }
-bool Surface(uint primitive, float2 bary, float3 direction, out float3 normal, out float3 albedo, out float3 emission)
+bool Surface(uint primitive, float2 bary, float3 direction, out float3 normal, out float3 albedo, out float3 emission, out bool supportedMaterial)
 {
+    supportedMaterial = false;
     uint3 idx = uint3(Indices[primitive * 3], Indices[primitive * 3 + 1], Indices[primitive * 3 + 2]);
     normal = cross(Positions[idx.y] - Positions[idx.x], Positions[idx.z] - Positions[idx.x]);
     albedo = emission = 0;
@@ -42,10 +43,19 @@ bool Surface(uint primitive, float2 bary, float3 direction, out float3 normal, o
     float4 a = UVMaterials[idx.x], b = UVMaterials[idx.y], c = UVMaterials[idx.z];
     float2 uv = a.xy * (1 - bary.x - bary.y) + b.xy * bary.x + c.xy * bary.y;
     Material m = Materials[(uint)a.z];
+    // UV vectors have z=0; these existing slots record successful stage caching,
+    // independently of tint/texture brightness (black and emissive-only are valid).
+    supportedMaterial = m.diffuseT.z > 0 || m.emissiveT.z > 0;
     float4 st = float4(uv, 0, 1);
     albedo = saturate(Atlas.SampleLevel(LinearWrap, float3(dot(st, m.diffuseS), dot(st, m.diffuseT), m.diffuse.w), 0).rgb * m.diffuse.rgb);
     emission = max(0, Atlas.SampleLevel(LinearWrap, float3(dot(st, m.emissiveS), dot(st, m.emissiveT), m.emissive.w), 0).rgb * m.emissive.rgb);
     return all(isfinite(albedo)) && all(isfinite(emission));
+}
+// GI and primary receiver matching retain their existing finite-surface contract.
+bool Surface(uint primitive, float2 bary, float3 direction, out float3 normal, out float3 albedo, out float3 emission)
+{
+    bool supportedMaterial;
+    return Surface(primitive, bary, direction, normal, albedo, emission, supportedMaterial);
 }
 // Native interaction shading is a radiance cache for visible hits, captured
 // before generic alpha/emissive stages and fog (late diagnostics retain the

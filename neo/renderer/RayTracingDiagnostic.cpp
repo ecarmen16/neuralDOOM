@@ -1522,6 +1522,9 @@ private:
 			s = idVec4( matrix[0], matrix[4], 0, matrix[12] );
 			t = idVec4( matrix[1], matrix[5], 0, matrix[13] );
 		}
+		// UV's third component is zero. Record cache success separately from
+		// tint so authored black materials remain valid reflection fallback hits.
+		t.z = 1.0f;
 	}
 	void PrepareLights( nvrhi::ICommandList* list, const viewDef_t* view )
 	{
