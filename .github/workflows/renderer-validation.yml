@@ -1,0 +1,73 @@
+name: Renderer validation
+
+# Always create both check names so they can become required after this workflow is merged.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: renderer-validation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  offline:
+    name: Renderer offline checks
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Run wrapper, audit, upload and provenance fixtures
+        shell: pwsh
+        run: ./tools/neural-rendering/Test-RendererContracts.ps1 -Suite Offline
+
+  compile:
+    name: Renderer compile checks
+    runs-on: windows-2022
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select relevant source changes
+        id: changes
+        env:
+          BASE_COMMIT: ${{ github.event.pull_request.base.sha }}
+          HEAD_COMMIT: ${{ github.event.pull_request.head.sha }}
+        run: |
+          $relevant = $true
+          if ($env:BASE_COMMIT -and $env:HEAD_COMMIT) {
+            $paths = @(git diff --no-renames --name-only $env:BASE_COMMIT $env:HEAD_COMMIT)
+            if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect PR changes.' }
+            $relevant = @($paths | Where-Object { $_ -match '^(neo/|tools/neural-rendering/|\.github/workflows/|\.gitmodules$|[^/]+\.cmd$)' }).Count -gt 0
+          }
+          "relevant=$($relevant.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          if (-not $relevant) { 'Compile checks skipped: no renderer, build, workflow or wrapper changes.' >> $env:GITHUB_STEP_SUMMARY }
+      - name: Initialize pinned submodules
+        if: steps.changes.outputs.relevant == 'true'
+        run: |
+          git submodule update --init --recursive
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot initialize pinned submodules.' }
+      - name: Set up Python
+        if: steps.changes.outputs.relevant == 'true'
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Compile baseline, ray tracing and official SDK variants; run CPU and shader contracts
+        if: steps.changes.outputs.relevant == 'true'
+        run: |
+          if (Test-Path R:\) { throw 'Neutral build drive R: is already in use.' }
+          subst R: $env:GITHUB_WORKSPACE
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot map neutral build path.' }
+          try {
+            & R:\tools\neural-rendering\Build-RendererValidation.ps1 -RepoRoot R:\ -Parallel 4
+            'These checks validate compilation and CPU/shader contracts only. GPU rendering and gameplay require local testing.' >> $env:GITHUB_STEP_SUMMARY
+          } finally { subst R: /D }

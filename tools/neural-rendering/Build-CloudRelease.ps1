@@ -42,7 +42,7 @@ Invoke-NativeChecked 'cmake' @('-S', (Join-Path $RepoRoot 'neo'), '-B', $neural,
 & (Join-Path $PSScriptRoot 'Build-RBDOOM.ps1') -RepoRoot $RepoRoot -BuildDirectory $neural -Configuration Release -Parallel $Parallel
 
 # Use the installer's actual Windows PowerShell 5.1 host for offline helper tests.
-foreach ($test in @('Test-TexturePack.ps1', 'Test-TexturePackWizard.ps1', 'Test-SetupUpgradeDefault.ps1', 'Test-InstallLifecycle.ps1', 'Test-NeuralSettingsSnapshot.ps1')) {
+foreach ($test in @('Test-CommandWrappers.ps1', 'Test-TexturePack.ps1', 'Test-TexturePackWizard.ps1', 'Test-SetupUpgradeDefault.ps1', 'Test-InstallLifecycle.ps1', 'Test-NeuralSettingsSnapshot.ps1')) {
     Invoke-NativeChecked 'powershell.exe' @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $PSScriptRoot $test))
 }
 $out = Join-Path $RepoRoot "releases/$Version"

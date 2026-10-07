@@ -22,7 +22,7 @@ A source/workflow bug requires a reviewed fix and a new tag on the merged commit
 - Recursive checkout of the tag and pinned submodules; tags outside `main` are rejected.
 - Official SHA-256-verified ISPC 1.31.0 and Streamline 2.12.0 build dependencies. Windows SDK/MSVC come from the hosted image. The default engine configuration remains SDK-off.
 - Sequential native RTX and SDK-enabled DX12 Release builds, using the existing configure/build helpers and a neutral drive path. Shared shader outputs prohibit a concurrent build matrix in one checkout.
-- Public-source audit, texture importer fixtures, hidden wizard/upgrade checks, lifecycle rollback and settings-snapshot checks.
+- Public-source audit, command-wrapper fixtures, texture importer fixtures, hidden wizard/upgrade checks, lifecycle rollback and settings-snapshot checks.
 - Existing source/EXE/shader manifest verification, prohibited-payload checks, ZIP integrity and setup `--verify`.
 - Read-only build token; only the separate asset-upload job receives `contents: write`. No personal access token is needed. Action versions are pinned to commits.
 
@@ -43,3 +43,7 @@ This downloads only the two build dependencies and writes artifacts under `relea
 ## Automated checks
 
 `Test-PublicSourceAudit.ps1` checks ordinary and mapped-root source audits. `Test-ReleaseAssetUpload.ps1` checks uploads to drafts and published releases, retries, matching hashes, immutable releases and invalid artifacts. Both run on workflow pull requests and before release builds.
+
+The separate `Renderer validation` workflow runs **Renderer offline checks** on every pull request, including wrapper, source-audit, uploader, build-identity and declared-submodule fixtures. **Renderer compile checks** builds relevant renderer/build/workflow/wrapper changes in three sequential DX12 `RelWithDebInfo` configurations: RT/SDK both OFF, RT ON/SDK OFF, and RT/SDK both ON. It uses the same pinned actions, official ISPC download and Streamline component manifest as release builds. CPU contracts run with the installed VS2022 compiler environment; compiled reflection/player-shadow contracts and reflection-material/cache/coverage fixtures run immediately after each RT build. See [the test plan](TEST_PLAN.md) for local commands and required-check names.
+
+PR checks use only `contents: read`, persist no checkout credentials, receive no release-upload token, and upload no engine or runtime artifacts. Superseded PR checks are cancelled. Changes outside the compile scope retain a successful check with an explicit skip summary. Release/tag triggers and the separate release uploader's permissions remain unchanged. A passing hosted build still needs local GPU/playtest evidence and current human review before integration.
