@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$RepoRoot,
+    [string]$BuildDirectory,
     [ValidateSet('Debug', 'Release', 'RelWithDebInfo', 'MinSizeRel')]
     [string]$Configuration = 'RelWithDebInfo',
     [string]$Notes = ''
@@ -8,10 +9,11 @@ param(
 
 . (Join-Path $PSScriptRoot 'Common.ps1')
 $RepoRoot = Resolve-NeuralRepoRoot $RepoRoot
-$exe = Find-RBDoomExecutable -RepoRoot $RepoRoot -Configuration $Configuration
-if (-not $exe) { throw 'Executable not found.' }
+$identity = Get-NeuralBuildIdentity -RepoRoot $RepoRoot -BuildDirectory $BuildDirectory -Configuration $Configuration
+$exe = $identity.executable
+$manifest = $identity.manifest
 
-$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$stamp = (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 8)
 $destination = Join-Path $RepoRoot "captures\neural\$stamp"
 New-Item -ItemType Directory -Path $destination -Force | Out-Null
 
@@ -27,21 +29,27 @@ $os = try {
 $gpu = if (Test-CommandAvailable 'nvidia-smi') {
     (& nvidia-smi --query-gpu=name,driver_version,vbios_version --format=csv,noheader) -join '; '
 } else { 'nvidia-smi unavailable' }
-$gitSha = (& git -C $RepoRoot rev-parse HEAD).Trim()
-$branch = (& git -C $RepoRoot branch --show-current).Trim()
 $cmake = ((& cmake --version) | Select-Object -First 1)
-$hash = (Get-FileHash $exe -Algorithm SHA256).Hash
 
 $metadata = @"
 # Baseline metadata
 
 - Captured: $(Get-Date -Format o)
 - Repository: $RepoRoot
-- Branch: $branch
-- Commit: $gitSha
+- Build directory: $($identity.buildDirectory)
+- Build manifest: $($identity.manifestPath)
+- Built: $($manifest.builtAt)
+- Build commit: $($manifest.commit)
+- Build dirty: $($manifest.dirty)
+- Checkout branch: $($identity.checkoutBranch)
+- Checkout commit: $($identity.checkoutCommit)
+- Checkout dirty: $($identity.checkoutDirty)
+- Revision relationship: $($identity.revisionRelationship)
 - Configuration: $Configuration
 - Executable: $exe
-- Executable SHA-256: $hash
+- Executable SHA-256: $($manifest.sha256)
+- Shader identity: $(@($manifest.shaders).Count) manifest hashes verified
+- Build features: DX12=$($manifest.features.dx12), Vulkan=$($manifest.features.vulkan), Streamline=$($manifest.features.streamline), ray tracing=$($manifest.features.rayTracing)
 - OS: $($os.Caption) build $($os.BuildNumber)
 - GPU/driver: $gpu
 - CMake: $cmake
@@ -49,7 +57,9 @@ $metadata = @"
 - Notes: $Notes
 
 Add screenshots, GPU captures, logs, and scene/save details to this directory. This directory is locally excluded from Git.
+$(if ($manifest.dirty) { 'The build was made with local changes; uncommitted build changes are not identified by its commit. The current checkout cannot reconstruct those changes from this manifest.' })
 "@
 $metadata | Set-Content (Join-Path $destination 'baseline-metadata.md') -Encoding utf8
+$manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $destination 'build-manifest.json') -Encoding utf8
 
 Write-Host "Created: $destination" -ForegroundColor Green

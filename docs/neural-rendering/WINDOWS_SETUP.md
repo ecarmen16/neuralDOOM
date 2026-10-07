@@ -33,6 +33,8 @@ git config --global core.longpaths true
 
 Long-path support is recommended for deeply nested C++ dependencies.
 
+`Check-Prerequisites.ps1` follows only the selected checkout's declared submodules and their recursive declarations. It verifies each repository root and pinned Git revision, reports missing or uninitialized dependencies, and ignores `.gitmodules` files in unrelated archives. A directory inside another checkout is not a valid repository root.
+
 ## ISPC
 
 Download the current Windows archive from the official ISPC releases page:
@@ -97,5 +99,15 @@ Useful later, not required for the baseline build:
 - PresentMon or another repeatable frame-time capture tool.
 
 Install capture tools only from their canonical vendor/project sources. Record versions in test results.
+
+Record the identity of the build being tested explicitly:
+
+```powershell
+.\tools\neural-rendering\Capture-BaselineMetadata.ps1 -RepoRoot . -BuildDirectory .\build-rt -Configuration RelWithDebInfo -Notes 'Static camera baseline'
+```
+
+Without `-BuildDirectory`, the script selects `build`. It requires a schema-2 manifest from `Build-RBDOOM.ps1`, verifies the configured executable and every recorded shader hash, and saves the manifest beside the local metadata. Missing, malformed or mismatched manifests are rejected before creating a capture directory. Rebuild the selected profile when shared loose shaders have changed.
+
+Metadata records the build commit and build dirty flag separately from the current checkout commit, branch and dirty flag. A verified historical build can be captured when its commit differs from the checkout; the difference is explicit. A dirty build's commit does not identify its uncommitted changes, and matching commits alone do not prove identical source. Hash validation checks the files against the local manifest; it does not authenticate the manifest's claimed source provenance.
 
 `Configure-RBDOOM-DX12.ps1 -Clean` only accepts an existing dedicated build directory inside the repository whose CMake cache matches this source tree. Source, asset and redirected directories are rejected.

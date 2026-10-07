@@ -67,3 +67,5 @@ foreach ($script in Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.ps1') {
 }
 Write-Host 'PASS: exact target, stale-output rejection, configuration isolation, safe clean targets, PowerShell syntax.'
 Write-Host "Fixtures retained at $fixture"
+
+& (Join-Path $PSScriptRoot 'Test-NeuralCaptureIdentity.ps1')
