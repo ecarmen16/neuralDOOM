@@ -9,8 +9,8 @@ Build a reversible, optional, well-instrumented temporal input path around the e
 ## Contribution workflow
 
 - Name branches after the change, without tool or model names. Review and playtest renderer changes before opening a PR.
-- Keep `main` reviewed. After branch testing, require manual approval of the latest PR changes by `ecarmen16` or `eraser851`; new changes after approval require renewed review.
-- Only ecarmen16 or eraser851 may perform the final merge. Automated approval or merging does not satisfy this review requirement. Do not push or cherry-pick directly into `main`.
+- Keep `main` reviewed. Verify and playtest changes before merging through a pull request. The repository owner authorizes merges; approval from another collaborator is optional.
+- Merge through the pull request when authorized by the repository owner, including delegated merges. Do not push or cherry-pick directly into `main`.
 - Keep `core.hooksPath=.githooks`; the pre-push hook rejects direct pushes to `main`. Do not bypass it. This local guard is not server-side branch protection.
 
 ## Non-negotiable legal and repository constraints

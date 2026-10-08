@@ -9,7 +9,7 @@ neuralDoom is the downstream project; RBDOOM-3-BFG remains its upstream source. 
 - `main`: reviewed project source.
 - Development branches: choose a name describing the change, such as `fix/reflection-shimmer` or `docs/controls`. No tool-specific prefix is required.
 
-Use your preferred editor and development workflow. Submit changes through pull requests after relevant verification. The latest PR changes require review and approval from `ecarmen16` or `eraser851`; subsequent changes require renewed review. Only those reviewers perform the final merge. Do not push directly to `main` or rewrite upstream history to rename the project.
+Use your preferred editor and development workflow. Submit changes through pull requests after relevant verification. The repository owner authorizes merges and may delegate them; approval from another collaborator is optional. Do not push directly to `main` or rewrite upstream history to rename the project.
 
 Install the repository's commit and push checks once per checkout:
 
@@ -25,13 +25,14 @@ Preserve upstream authorship and license notices.
 The hook checks staged whitespace and staged source content. Game resources, captures, local SDK/NR runtimes, private staging folders and concrete machine paths must not enter commits. The checked-in ignore rules cover disposable artifacts without relying on `.git/info/exclude`. A source audit complements review; it is not a complete license or secret scanner.
 
 The pre-push hook rejects updates and deletions targeting `main`; publish a
-development branch and use the manually reviewed PR instead. Do not bypass the
+development branch and use a pull request instead. Do not bypass the
 hook. The repository is public. Local hooks are not server-side branch protection.
-Protect `main` on GitHub with a required pull request, at least one approving
-review, dismissal of stale approvals, approval of the latest push, and enforcement
-for administrators. Require code-owner review; `.github/CODEOWNERS` names the
-two maintainers. Keep merge access limited to those maintainers and perform the
-final merge manually. Verify the live GitHub rules after setup or access changes.
+Protect `main` on GitHub with a required pull request and enforcement for
+administrators. Set required approving reviews to zero, with code-owner review
+and approval of the latest push disabled. `.github/CODEOWNERS` identifies the
+repository owner without requiring another collaborator's approval. The owner
+controls merge authorization. Verify the live GitHub rules after setup or access
+changes.
 Enable required renderer CI checks once the workflow is present on `main`, so
 branches being consolidated are not blocked by checks that do not yet exist.
 

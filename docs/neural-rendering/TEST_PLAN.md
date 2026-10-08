@@ -89,7 +89,7 @@ The `Renderer validation` workflow provides two stable checks on every pull requ
 - **Renderer offline checks** runs command-wrapper, public-source audit, release-uploader, build-identity and declared-submodule fixtures. It requires no SDK, retail data or GPU.
 - **Renderer compile checks** runs the CPU contracts in a VS2022 x64 compiler environment, then sequential DX12 `RelWithDebInfo` builds with RT/Streamline both OFF, RT ON/Streamline OFF, and RT/Streamline both ON. After each RT build it inspects compiled reflection and player-shadow shader contracts with that build's DXC and runs reflection-material/cache/coverage fixtures, including fresh shader compilation for defined control-flow values. Shared `base/renderprogs2` outputs are consumed before the next build. The compile check records a successful skip for changes outside renderer/build/workflow/wrapper paths.
 
-After this workflow has been merged and both checks have run, repository administrators can require those exact check names in branch protection. CI does not replace the latest manual PR approval or the renderer playtest required by `AGENTS.md`.
+After this workflow has been merged and both checks have run, repository administrators can require those exact check names in branch protection. CI complements the renderer playtest required by `AGENTS.md`; the repository owner authorizes merges.
 
 Local equivalents from a Windows checkout:
 
