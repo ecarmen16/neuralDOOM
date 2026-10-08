@@ -74,6 +74,8 @@ struct Common {
 } commonInstance;
 Common* common=&commonInstance;
 bool sdk=true;
+void Con_ToggleFeedback(const char*){}
+const char* va(const char* text, ...){return text;}
 bool R_StreamlineIsDLSSSupported(){return sdk;}
 struct idScreenRect {
     int x1=0, y1=0, x2=0, y2=0;
@@ -118,8 +120,9 @@ public:
 CVar r_screenFraction;
 struct View { int neuralBackendMode, neuralDLSSQuality; idScreenRect viewport; };
 int requestedWidth=853, requestedHeight=480;
+bool settingsAvailable=true;
 bool R_StreamlineDLSSRenderSize(int, int, int& width, int& height, int){
-    if(!sdk)return false;
+    if(!sdk || !settingsAvailable)return false;
     width=requestedWidth; height=requestedHeight; return true;
 }
 '''
@@ -149,29 +152,34 @@ void require(bool ok){if(!ok)throw std::runtime_error("reconstruction regression
 void checkViewport(){
     // The SDK tags [0, renderWidth) x [0, renderHeight). Every tagged pixel
     // must belong to the raster viewport, including reduced input and resize.
-    for(int scale : {1,2})for(int nr : {0,1})for(bool available : {false,true}){
+    for(int scale : {1,2})for(int nr : {0,1})for(bool available : {false,true})for(bool settings : {false,true}){
         tr.width=1280*scale;tr.height=720*scale;
         vars.values["r_neuralCompatibilityEnable"]=nr;sdk=available;
+        settingsAvailable=settings;
         const int widths[]={853,742,640}, heights[]={480,418,360};
         for(int quality=0;quality<3;++quality){
             requestedWidth=widths[quality]*scale;requestedHeight=heights[quality]*scale;
             tr.currentRenderCrop=0;tr.renderCrops[0]={0,0,tr.width-1,tr.height-1};
             r_screenFraction.value=50; // DLSS must own its input extent.
             View view={3,quality,{}};cropView(&view);
-            const int width=available?requestedWidth:tr.width, height=available?requestedHeight:tr.height;
-            require(view.viewport.x1==0 && view.viewport.y1==0);
-            require(view.viewport.x2==width-1 && view.viewport.y2==height-1);
+            const bool dlss=available && settings;
+            const bool scaled=!dlss && !nr;
+            require(view.neuralBackendMode==(dlss?3:0));
+            require(view.viewport.x1==0 && view.viewport.y1==(scaled?tr.height/2:0));
+            require(view.viewport.x2==(dlss?requestedWidth:scaled?tr.width/2:tr.width)-1);
+            require(view.viewport.y2==(dlss?requestedHeight:tr.height)-1);
         }
         // Native/DLAA behavior must preserve the previous crop policy.
         for(int backend : {0,1,2}){
             tr.currentRenderCrop=0;tr.renderCrops[0]={0,0,tr.width-1,tr.height-1};
             View view={backend,0,{}};cropView(&view);
-            const bool scaled=backend!=2 && !nr;
+            const bool scaled=(backend!=2 || !available) && !nr;
             require(view.viewport.x1==0 && view.viewport.y1==(scaled?tr.height/2:0));
             require(view.viewport.x2==(scaled?tr.width/2:tr.width)-1 && view.viewport.y2==tr.height-1);
         }
     }
     sdk=true;
+    settingsAvailable=true;
     std::cout<<"PASS: DLSS tagged input coverage for all presets, resize and SDK fallback; legacy crop preserved\n";
 }
 void checkScreenCoordinates(bool originalFullscreen=false,bool originalMotion=false){

@@ -4,7 +4,7 @@ cbuffer ReflectionParameters : register(b1)
     row_major float4x4 PreviousWorldToClip;
     float4 PreviousCamera;
     float4 ReflectionOptions; // samples, strength, roughness limit, ray distance
-    float4 HistoryOptions; // history valid, frame seed, debug view, unused
+    float4 HistoryOptions; // history valid, frame seed, debug view, static triangle/instance boundary
 };
 float2 EncodeReflectionNormal(float3 n)
 {

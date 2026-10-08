@@ -234,4 +234,147 @@ function Assert-NeuralShaderManifest {
     }
 }
 
+function Get-NeuralBuildIdentity {
+    param(
+        [Parameter(Mandatory)][string]$RepoRoot,
+        [string]$BuildDirectory,
+        [ValidateSet('Debug', 'Release', 'RelWithDebInfo', 'MinSizeRel')]
+        [string]$Configuration = 'RelWithDebInfo'
+    )
+    if ([string]::IsNullOrWhiteSpace($BuildDirectory)) { $BuildDirectory = Join-Path $RepoRoot 'build' }
+    $BuildDirectory = Resolve-NeuralFullPath $BuildDirectory
+    $manifestPath = Join-Path $BuildDirectory "neuraldoom-build-$Configuration.json"
+    if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
+        throw 'Missing build manifest. Rebuild with Build-RBDOOM.ps1 before capturing metadata.'
+    }
+    try { $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json } catch {
+        throw 'Invalid build manifest JSON. Rebuild before capturing metadata.'
+    }
+    foreach ($field in @('schemaVersion', 'builtAt', 'commit', 'dirty', 'configuration', 'executable', 'sha256', 'features', 'shaders')) {
+        if (-not $manifest -or -not $manifest.PSObject.Properties[$field]) { throw "Invalid build manifest: missing $field." }
+    }
+    $builtAt = [DateTimeOffset]::MinValue
+    if (($manifest.schemaVersion -isnot [int] -and $manifest.schemaVersion -isnot [long]) -or $manifest.schemaVersion -ne 2 -or
+        $manifest.commit -isnot [string] -or $manifest.commit -notmatch '^[0-9a-fA-F]{40}$' -or
+        $manifest.dirty -isnot [bool] -or $manifest.configuration -cne $Configuration -or
+        $manifest.executable -isnot [string] -or -not [IO.Path]::IsPathRooted($manifest.executable) -or
+        $manifest.sha256 -isnot [string] -or $manifest.sha256 -notmatch '^[0-9a-fA-F]{64}$' -or
+        ($manifest.builtAt -isnot [string] -and $manifest.builtAt -isnot [DateTime]) -or
+        -not [DateTimeOffset]::TryParse([string]$manifest.builtAt, [ref]$builtAt) -or
+        $manifest.features -isnot [pscustomobject] -or $manifest.shaders -isnot [array] -or $manifest.shaders.Count -eq 0) {
+        throw 'Invalid build manifest identity. Rebuild before capturing metadata.'
+    }
+    foreach ($feature in @('dx12', 'vulkan', 'streamline', 'rayTracing')) {
+        if (-not $manifest.features.PSObject.Properties[$feature] -or $manifest.features.$feature -cnotin @('ON', 'OFF')) {
+            throw "Invalid build manifest feature: $feature."
+        }
+    }
+    $exe = Find-NeuralDoomExecutable -RepoRoot $RepoRoot -Configuration $Configuration -BuildDirectory $BuildDirectory
+    if (-not $exe -or [IO.Path]::GetFullPath($manifest.executable) -ne $exe -or
+        (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -ne $manifest.sha256) {
+        throw 'Executable does not match the selected build manifest. Rebuild before capturing metadata.'
+    }
+    $paths = @{}
+    foreach ($shader in $manifest.shaders) {
+        if (-not $shader -or -not $shader.PSObject.Properties['path'] -or -not $shader.PSObject.Properties['sha256'] -or
+            $shader.path -isnot [string] -or $shader.path -notmatch '^(base|content)/renderprogs2/(dxil|dxbc|spirv)/[^\\:]+\.(bin|dxil)$' -or
+            @($shader.path.Split('/') | Where-Object { $_ -in @('', '.', '..') }).Count -gt 0 -or
+            $paths.ContainsKey($shader.path) -or $shader.sha256 -isnot [string] -or $shader.sha256 -notmatch '^[0-9a-fA-F]{64}$') {
+            throw 'Invalid shader identity in build manifest.'
+        }
+        $paths[$shader.path] = $true
+    }
+    Assert-NeuralShaderManifest -RepoRoot $RepoRoot -Manifest $manifest
+    $checkoutCommit = (& git -C $RepoRoot rev-parse HEAD 2>$null) -join ''
+    if ($LASTEXITCODE -ne 0 -or $checkoutCommit -notmatch '^[0-9a-fA-F]{40}$') { throw 'Cannot determine checkout revision.' }
+    $changes = @(& git -C $RepoRoot status --porcelain 2>$null)
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot determine checkout worktree state.' }
+    $branch = (& git -C $RepoRoot branch --show-current 2>$null) -join ''
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot determine checkout branch.' }
+    [pscustomobject]@{
+        manifest = $manifest; manifestPath = $manifestPath; buildDirectory = $BuildDirectory; executable = $exe
+        checkoutCommit = $checkoutCommit.Trim(); checkoutDirty = $changes.Count -gt 0; checkoutBranch = $branch.Trim()
+        revisionRelationship = if ($manifest.commit -eq $checkoutCommit.Trim()) { 'same commit' } else { 'different commit (build does not match checkout)' }
+    }
+}
+
+function Get-NeuralSubmoduleStatus {
+    param([Parameter(Mandatory)][string]$RepoRoot)
+    $problems = [Collections.Generic.List[string]]::new()
+    $state = @{ count = 0 }
+    $root = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\', '/')
+    if (-not (Test-CommandAvailable 'git')) {
+        return [pscustomobject]@{ count = 0; problems = @('Git is required to verify submodule repositories.') }
+    }
+    function Invoke-NeuralSubmoduleGit {
+        param([string[]]$ArgumentList)
+        # Windows PowerShell 5.1 promotes native stderr to an error even when
+        # redirected. Corrupt Git metadata is a failed check, not an early abort.
+        $ErrorActionPreference = 'Continue'
+        $PSNativeCommandUseErrorActionPreference = $false
+        $output = @(& git @ArgumentList 2>$null)
+        [pscustomobject]@{ output = $output; exitCode = $LASTEXITCODE }
+    }
+    $query = Invoke-NeuralSubmoduleGit @('-C', $root, 'rev-parse', '--show-toplevel')
+    $top = $query.output -join ''
+    if ($query.exitCode -ne 0 -or -not $top -or [IO.Path]::GetFullPath($top.Trim()).TrimEnd('\', '/') -ne $root) {
+        return [pscustomobject]@{ count = 0; problems = @('Invalid repository root: select the actual project checkout.') }
+    }
+    function Visit-NeuralSubmodules {
+        param([string]$Directory, [string]$Prefix)
+        $query = Invoke-NeuralSubmoduleGit @('-C', $Directory, 'ls-files', '--stage')
+        if ($query.exitCode -ne 0) { $problems.Add("${Prefix}: cannot read Git index"); return }
+        $gitlinks = @{}
+        foreach ($entry in $query.output) {
+            if ($entry -match '^160000 [0-9a-f]{40} [0-3]\t(.+)$') { $gitlinks[$matches[1]] = $true }
+        }
+        $modulesFile = Join-Path $Directory '.gitmodules'
+        $declarations = @()
+        if (Test-Path -LiteralPath $modulesFile -PathType Leaf) {
+            $query = Invoke-NeuralSubmoduleGit @('config', '--file', $modulesFile, '--get-regexp', '^submodule\..*\.path$')
+            $declarations = @($query.output)
+            if ($query.exitCode -notin @(0, 1)) { $problems.Add("${Prefix}: invalid .gitmodules"); return }
+        }
+        $seen = @{}
+        foreach ($declaration in $declarations) {
+            $parts = @($declaration -split '\s+', 2)
+            $relative = if ($parts.Count -eq 2) { $parts[1].Replace('\', '/') } else { '' }
+            $label = $Prefix + $relative
+            $state.count++
+            if (-not $relative -or [IO.Path]::IsPathRooted($relative) -or $relative.Contains(':') -or
+                @($relative.Split('/') | Where-Object { $_ -in @('', '.', '..') }).Count -gt 0 -or $seen.ContainsKey($relative)) {
+                $problems.Add("${label}: invalid declared path"); continue
+            }
+            $seen[$relative] = $true
+            $query = Invoke-NeuralSubmoduleGit @('-C', $Directory, 'ls-files', '--stage', '--', $relative)
+            $index = @($query.output)
+            if ($query.exitCode -ne 0 -or $index.Count -ne 1 -or $index[0] -notmatch '^160000 ([0-9a-f]{40}) 0\t(.+)$' -or $matches[2] -ne $relative) {
+                $problems.Add("${label}: missing pinned gitlink"); continue
+            }
+            $expected = $matches[1]
+            $moduleRoot = Join-Path $Directory $relative
+            if (-not (Test-Path -LiteralPath (Join-Path $moduleRoot '.git'))) {
+                $problems.Add("${label}: uninitialized or missing"); continue
+            }
+            $query = Invoke-NeuralSubmoduleGit @('-C', $moduleRoot, 'rev-parse', '--show-toplevel')
+            $moduleTop = $query.output -join ''
+            if ($query.exitCode -ne 0 -or -not $moduleTop -or
+                [IO.Path]::GetFullPath($moduleTop.Trim()).TrimEnd('\', '/') -ne [IO.Path]::GetFullPath($moduleRoot).TrimEnd('\', '/')) {
+                $problems.Add("${label}: foreign repository or uninitialized"); continue
+            }
+            $query = Invoke-NeuralSubmoduleGit @('-C', $moduleRoot, 'rev-parse', 'HEAD')
+            $revision = $query.output -join ''
+            if ($query.exitCode -ne 0 -or $revision.Trim() -ne $expected) {
+                $problems.Add("${label}: revision mismatch (expected $expected)"); continue
+            }
+            Visit-NeuralSubmodules -Directory $moduleRoot -Prefix ($label + '/')
+        }
+        foreach ($path in $gitlinks.Keys) {
+            if (-not $seen.ContainsKey($path)) { $problems.Add("${Prefix}${path}: missing .gitmodules path declaration") }
+        }
+    }
+    Visit-NeuralSubmodules -Directory $root -Prefix ''
+    [pscustomobject]@{ count = $state.count; problems = @($problems.ToArray()) }
+}
+
 Enable-NeuralBuildToolPaths

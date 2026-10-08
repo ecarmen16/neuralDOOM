@@ -60,7 +60,8 @@ $args = @(
     '-DUSE_DX12=ON',
     '-DUSE_VULKAN=OFF',
     '-DCMAKE_CXX_FLAGS=/wd4530',
-    "-DDXC_CUSTOM_PATH=$DxcDirectory"
+    "-DDXC_CUSTOM_PATH=$DxcDirectory",
+    "-DDXC_PATH=$(Join-Path $DxcDirectory 'dxc.exe')"
 )
 
 Write-Step 'Configuring neuralDoom on RBDOOM-3-BFG for VS2022 x64, DX12 only'

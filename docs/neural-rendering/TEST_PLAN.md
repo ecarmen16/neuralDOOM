@@ -82,6 +82,26 @@ git status --short
 
 Include the relevant runtime scenario, results and limitations in the pull request.
 
+### Pull-request checks
+
+The `Renderer validation` workflow provides two stable checks on every pull request:
+
+- **Renderer offline checks** runs command-wrapper, public-source audit, release-uploader, build-identity and declared-submodule fixtures. It requires no SDK, retail data or GPU.
+- **Renderer compile checks** runs the CPU contracts in a VS2022 x64 compiler environment, then sequential DX12 `RelWithDebInfo` builds with RT/Streamline both OFF, RT ON/Streamline OFF, and RT/Streamline both ON. After each RT build it inspects compiled reflection and player-shadow shader contracts with that build's DXC and runs reflection-material/cache/coverage fixtures, including fresh shader compilation for defined control-flow values. Shared `base/renderprogs2` outputs are consumed before the next build. The compile check records a successful skip for changes outside renderer/build/workflow/wrapper paths.
+
+After this workflow has been merged and both checks have run, repository administrators can require those exact check names in branch protection. CI complements the renderer playtest required by `AGENTS.md`; the repository owner authorizes merges.
+
+Local equivalents from a Windows checkout:
+
+```powershell
+.\tools\neural-rendering\Test-RendererContracts.ps1 -Suite Offline
+.\tools\neural-rendering\Test-RendererContracts.ps1 -Suite CPU
+.\tools\neural-rendering\Test-RendererContracts.ps1 -Suite Shaders -Dxc <build-DXC-path>
+.\tools\neural-rendering\Build-RendererValidation.ps1 -RepoRoot <neutral-source-path>
+```
+
+The offline suite's final repository audit requires a clean checkout; individual fixture scripts also run while editing. The CPU and shader suites initialize the installed VS2022 compiler environment themselves. The shader suite requires the compiled DXIL files in the specified checkout and its build compiler. The build helper obtains only the existing hash-verified official ISPC and Streamline pins and leaves all outputs ignored. It does not package, upload or launch the engine. Passing these checks establishes source/CPU/shader contracts and compilation, not GPU correctness, visual quality or gameplay acceptance.
+
 ## 6. Performance capture
 
 Record CPU and GPU frame times separately when tools permit. At minimum capture:

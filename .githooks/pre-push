@@ -3,7 +3,7 @@ set -eu
 
 while read -r local_ref local_oid remote_ref remote_oid; do
     if [ "$remote_ref" = "refs/heads/main" ]; then
-        echo "Direct pushes to main are disabled. Push a development branch and use a PR approved and merged manually by ecarmen16 or eraser851." >&2
+        echo "Direct pushes to main are disabled. Push a development branch and use a pull request authorized by the repository owner." >&2
         exit 1
     fi
 done

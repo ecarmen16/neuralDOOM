@@ -69,6 +69,7 @@ if(USE_RAYTRACING)
                 -Fo "${rt_shader}" "${CMAKE_CURRENT_SOURCE_DIR}/rt/${rt_name}.cs.hlsl"
             DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/rt/${rt_name}.cs.hlsl"
                 "${CMAKE_CURRENT_SOURCE_DIR}/rt/ray_materials.hlsli"
+                "${CMAKE_CURRENT_SOURCE_DIR}/rt/ray_visibility.hlsli"
                 "${CMAKE_CURRENT_SOURCE_DIR}/rt/reflection_parameters.hlsli"
             VERBATIM)
         list(APPEND rt_shaders "${rt_shader}")

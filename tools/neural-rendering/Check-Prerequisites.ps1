@@ -91,30 +91,11 @@ if ($retailCandidates.Count -gt 0) {
 $lighting = & (Join-Path $PSScriptRoot 'Get-NeuralLightingData.ps1') -RepoRoot $RepoRoot
 Add-Check 'Map lighting data' $(if ($lighting.hasCandidates) { 'INFO' } else { 'WARN' }) $lighting.detail $false
 
-$missingSubmodules = [System.Collections.Generic.List[string]]::new()
-$submoduleCount = 0
-$gitModuleFiles = @(Get-ChildItem -LiteralPath $RepoRoot -Filter '.gitmodules' -File -Recurse -Force -ErrorAction SilentlyContinue)
-foreach ($gitModuleFile in $gitModuleFiles) {
-    $declaredPaths = @(& git config --file $gitModuleFile.FullName --get-regexp path 2>$null)
-    foreach ($declaredPath in $declaredPaths) {
-        $parts = @($declaredPath -split '\s+', 2)
-        if ($parts.Count -lt 2) { continue }
-        $submoduleCount++
-        $submoduleRoot = Join-Path $gitModuleFile.Directory.FullName $parts[1]
-        $insideWorkTree = (& git -C $submoduleRoot rev-parse --is-inside-work-tree 2>$null) -join ''
-        if ($LASTEXITCODE -ne 0 -or $insideWorkTree.Trim() -ne 'true') {
-            $missingSubmodules.Add($parts[1])
-        }
-    }
-}
-if ($submoduleCount -gt 0 -and $missingSubmodules.Count -eq 0) {
-    Add-Check 'Git submodules' 'OK' "$submoduleCount declared submodule(s) initialized." $true
+$submodules = Get-NeuralSubmoduleStatus -RepoRoot $RepoRoot
+if ($submodules.problems.Count -eq 0) {
+    Add-Check 'Git submodules' 'OK' "$($submodules.count) declared submodule(s) initialized at the pinned revisions." $true
 } else {
-    $detail = if ($missingSubmodules.Count -gt 0) {
-        "Missing: $($missingSubmodules -join ', '). Run: git submodule update --init --recursive"
-    } else {
-        'No initialized submodules detected. Run: git submodule update --init --recursive'
-    }
+    $detail = "$($submodules.problems -join '; '). Run: git submodule update --init --recursive"
     Add-Check 'Git submodules' 'MISSING' $detail $true
 }
 

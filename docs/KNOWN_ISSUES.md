@@ -5,7 +5,7 @@ Milestone 1 includes experimental rendering features. Successful builds and auto
 ## Visual limitations
 
 - Reduced-resolution DLSS presets can introduce pulsing or apparent movement on floors and other materials. The v0.1.1 changes reduce this with DLSS Performance preset K and stable reflection sampling while upscaling. Residual grain or patterns in motion remain possible. Compare DLAA at native input resolution, then disable NR with F6 while preserving reconstruction to help isolate the effect.
-- F11 lighting comparisons can reveal dark patches on some surfaces. Unsupported reflected materials replacing valid probe lighting is a confirmed code defect and a possible explanation; the specific reported scenes have not been verified.
+- F11 lighting comparisons can reveal dark patches on some surfaces. Unsupported secondary reflection materials now retain native probe lighting when their radiance cache is incomplete; the specific reported scenes still require in-game verification.
 - Mirrors, glass, smoke and animated emissives still need broader motion testing. Temporal mask framebuffer restoration, unused DLSS mask inputs and conditional material-stage selection remain open findings.
 - NR can alter brightness and fine detail. Native HDR is unavailable with NR; use Native RTX or the DLAA/DLSS profile for native HDR.
 
@@ -26,7 +26,7 @@ See the [player guide](PLAYING.md) for installation, controls and reset details.
 Still open at M1:
 
 - Temporal mask passes leave the wrong framebuffer active for subsequent alpha/debug draws.
-- Unsupported reflected materials can suppress valid probe lighting.
+- Dark patches in reflection comparisons still need runtime validation of material fallback and native probe retention.
 - Conditional materials can lose a later active diffuse/emissive stage.
 - Generated temporal masks are not consumed through the intended DLSS inputs; changing tag names alone is not a validated fix.
 - Material declaration reload can leave dangling ray-stage cache pointers. Avoid live material reload with ray lighting until corrected.

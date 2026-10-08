@@ -6,19 +6,24 @@ $ErrorActionPreference = 'Stop'
 $fixture = Join-Path ([IO.Path]::GetTempPath()) ('release-upload-' + [guid]::NewGuid())
 New-Item -ItemType Directory -Path $fixture | Out-Null
 $commit = '0123456789012345678901234567890123456789'
-$global:releaseUploadTestState = @{ remoteCommit = $commit; release = $null; uploads = @(); creates = 0 }
+$global:releaseUploadTestState = @{ remoteCommit = $commit; release = $null; uploads = @(); creates = 0; duplicate = $false; lookupFailure = $false }
 function gh {
     $commandArgs = @($args)
     $global:LASTEXITCODE = 0
     if ($commandArgs[0] -eq 'api') {
         if ($commandArgs[1] -like '*/commits/*') { return $global:releaseUploadTestState.remoteCommit }
-        if ($null -eq $global:releaseUploadTestState.release) { $global:LASTEXITCODE = 1; return }
-        return ($global:releaseUploadTestState.release | ConvertTo-Json -Depth 10)
+        if ($commandArgs[1] -like '*/releases/tags/*') { $global:LASTEXITCODE = 1; return }
+        if ($commandArgs[1] -ne 'repos/fixture/repo/releases' -or '--paginate' -notin $commandArgs -or '--slurp' -notin $commandArgs) { throw 'Expected paginated draft-aware lookup.' }
+        if ($global:releaseUploadTestState.lookupFailure) { $global:LASTEXITCODE = 1; return }
+        if ($null -eq $global:releaseUploadTestState.release) { return '[[]]' }
+        $json = $global:releaseUploadTestState.release | ConvertTo-Json -Depth 10
+        if ($global:releaseUploadTestState.duplicate) { return ('[[' + $json + '],[' + $json + ']]') }
+        return ('[[{"tag_name":"v0.0.0"}],[' + $json + ']]')
     }
     if ($commandArgs[1] -eq 'create') {
         if ('--draft' -notin $commandArgs -or '--verify-tag' -notin $commandArgs) { throw 'Missing draft/tag safeguard.' }
         $global:releaseUploadTestState.creates++
-        $global:releaseUploadTestState.release = @{ draft = $true; immutable = $false; assets = @() }
+        $global:releaseUploadTestState.release = @{ tag_name = 'v1.0.0'; draft = $true; immutable = $false; assets = @() }
         return
     }
     if ($commandArgs[1] -eq 'upload') {
@@ -52,6 +57,14 @@ try {
     Invoke-Case 'Create missing draft' 4
     if ($global:releaseUploadTestState.creates -ne 1) { throw 'Expected one draft creation.' }
     Invoke-Case 'Retry complete draft without extra local files' 0
+    if ($global:releaseUploadTestState.creates -ne 1) { throw 'Existing draft must not be recreated.' }
+    $global:releaseUploadTestState.lookupFailure = $true
+    Invoke-Case 'Lookup failure does not create another draft' 0 '*Cannot inspect releases*'
+    $global:releaseUploadTestState.lookupFailure = $false
+    $global:releaseUploadTestState.duplicate = $true
+    Invoke-Case 'Duplicate drafts stop uploads' 0 '*Multiple releases*'
+    $global:releaseUploadTestState.duplicate = $false
+    if ($global:releaseUploadTestState.creates -ne 1) { throw 'Failed lookup created another draft.' }
     $global:releaseUploadTestState.release.draft = $false
     Invoke-Case 'Complete published release' 0
     $global:releaseUploadTestState.release.assets = @($global:releaseUploadTestState.release.assets[0])
